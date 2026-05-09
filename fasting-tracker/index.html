@@ -144,6 +144,8 @@
     .modal-sheet {
       width: 100%; background: var(--bg2);
       border-radius: 14px 14px 0 0;
+      height: 50dvh;
+      display: flex; flex-direction: column;
       padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
       transform: translateY(100%);
       transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
@@ -162,7 +164,7 @@
     /* Scroll picker */
     .time-picker-cols {
       display: flex; justify-content: center; align-items: center;
-      height: 220px; position: relative; overflow: hidden;
+      flex: 1; position: relative; overflow: hidden;
     }
     .picker-col {
       flex: 0 0 80px; height: 100%;
