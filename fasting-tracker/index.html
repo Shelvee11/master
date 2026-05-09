@@ -604,10 +604,19 @@ function exportCSV() {
     }
   });
 
-  const csv  = rows.map(r=>r.join(',')).join('\n');
-  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'), {href:url, download:`fasting-${todayKey()}.csv`});
+  const csv      = rows.map(r=>r.join(',')).join('\n');
+  const filename = `fasting-${todayKey()}.csv`;
+  const file     = new File(['﻿'+csv], filename, {type:'text/csv;charset=utf-8'});
+  if (navigator.canShare && navigator.canShare({files:[file]})) {
+    navigator.share({files:[file], title:filename}).catch(() => fallbackDownload(csv, filename));
+  } else {
+    fallbackDownload(csv, filename);
+  }
+}
+
+function fallbackDownload(csv, filename) {
+  const url = URL.createObjectURL(new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'}));
+  const a   = Object.assign(document.createElement('a'), {href:url, download:filename});
   a.click();
   URL.revokeObjectURL(url);
 }
