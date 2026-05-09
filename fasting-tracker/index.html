@@ -65,6 +65,24 @@
       text-transform: uppercase; letter-spacing: 0.06em;
     }
 
+    /* Mode selector */
+    .mode-row { display: flex; }
+    .mode-btn {
+      flex: 1; padding: 12px 4px; border: none; background: none;
+      font-size: 14px; font-weight: 500; font-family: inherit;
+      color: var(--label2); cursor: pointer;
+      border-right: 1px solid var(--sep); transition: background 0.1s;
+      line-height: 1.3;
+    }
+    .mode-btn:last-child { border-right: none; }
+    .mode-btn.active {
+      color: var(--accent); font-weight: 700;
+      background: rgba(61,82,213,0.07);
+    }
+    .mode-btn:active { background: var(--fill); }
+    .mode-btn small { display: block; font-size: 11px; font-weight: 400; color: var(--label3); margin-top: 2px; }
+    .mode-btn.active small { color: var(--accent); opacity: 0.7; }
+
     /* Today time rows */
     .time-row {
       display: flex; align-items: center; min-height: 48px;
@@ -245,6 +263,11 @@
 </header>
 
 <main>
+  <p class="card-label">断食模式</p>
+  <div class="card">
+    <div class="mode-row" id="mode-selector"></div>
+  </div>
+
   <p class="card-label">今日进食窗口</p>
   <div class="card">
     <div class="time-row" onclick="openPicker('start', todayKey())">
@@ -321,14 +344,50 @@
 </div>
 
 <script>
-const EATING_HOURS  = 8;
-const FASTING_HOURS = 16;
-const STORAGE_KEY   = 'fasting-records';
-const MINUTE_STEP   = 5;
+const MODES = [
+  { label: '16:8', fast: 16, eat: 8 },
+  { label: '15:9', fast: 15, eat: 9 },
+  { label: '14:10', fast: 14, eat: 10 },
+];
+const MODE_KEY    = 'fasting-mode';
+const STORAGE_KEY = 'fasting-records';
+const MINUTE_STEP = 5;
+
+function getMode() {
+  const i = parseInt(localStorage.getItem(MODE_KEY) || '0');
+  return MODES[i] || MODES[0];
+}
+function getModeIndex() {
+  return parseInt(localStorage.getItem(MODE_KEY) || '0');
+}
+function setModeIndex(i) {
+  localStorage.setItem(MODE_KEY, String(i));
+}
 
 let pickerField    = null;  // 'start' | 'end'
 let pickerDateKey  = null;  // which date the picker is editing
 let actionDateKey  = null;  // which date the action sheet is for
+
+// ── Mode selector ─────────────────────────────────────────
+
+function renderModeSelector() {
+  const current = getModeIndex();
+  document.getElementById('mode-selector').innerHTML = MODES.map((m, i) =>
+    `<button class="mode-btn${i===current?' active':''}" onclick="switchMode(${i})">
+      ${m.label}<small>断食 ${m.fast}h / 进食 ${m.eat}h</small>
+    </button>`
+  ).join('');
+  document.querySelector('header h1').textContent = `${MODES[current].label} 断食追踪`;
+}
+
+function switchMode(i) {
+  setModeIndex(i);
+  renderModeSelector();
+  const rec = getRecords()[todayKey()] || {};
+  refreshToday(rec);
+  renderChart();
+  renderHistory();
+}
 
 // ── Utils ─────────────────────────────────────────────────
 
@@ -523,12 +582,13 @@ function showHint(type, t) {
   const card = document.getElementById('hint-card');
   document.getElementById('hint-label').textContent =
     type === 'end' ? '建议今日结束进食' : '建议明日开始进食';
+  const mode = getMode();
   document.getElementById('hint-time').textContent =
-    addMinutes(t, (type === 'end' ? EATING_HOURS : FASTING_HOURS) * 60);
+    addMinutes(t, (type === 'end' ? mode.eat : mode.fast) * 60);
   document.getElementById('hint-sub').textContent =
     type === 'end'
-      ? `进食 ${EATING_HOURS}h 后结束，可设置闹钟`
-      : `断食 ${FASTING_HOURS}h 后开始，可设置明日闹钟`;
+      ? `进食 ${mode.eat}h 后结束，可设置闹钟`
+      : `断食 ${mode.fast}h 后开始，可设置明日闹钟`;
   card.classList.add('visible');
 }
 
@@ -548,7 +608,7 @@ function renderChart() {
     return;
   }
 
-  const BW=9, GAP=3, CH=120, LH=20, MAXV=12, TARGET=EATING_HOURS;
+  const BW=9, GAP=3, CH=120, LH=20, MAXV=12, TARGET=getMode().eat;
   const W = days.length*(BW+GAP)-GAP+2;
   const tY = CH-(TARGET/MAXV)*CH;
 
@@ -598,7 +658,7 @@ function renderHistory() {
     if (r.start&&r.end) {
       const h = calcEatHours(r.start,r.end);
       dur = `${h.toFixed(1)}h`;
-      cls = h<=EATING_HOURS ? 'h-ok' : 'h-over';
+      cls = h<=getMode().eat ? 'h-ok' : 'h-over';
     }
     const sep = i<keys.length-1 ? `border-bottom:0.5px solid var(--sep)` : '';
     return `<div class="history-item" style="${sep}" onclick="openActionSheet('${k}')">
@@ -646,6 +706,7 @@ function init() {
   document.getElementById('today-label').textContent =
     `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
 
+  renderModeSelector();
   refreshToday(getRecords()[todayKey()] || {});
   renderHistory();
   renderChart();
