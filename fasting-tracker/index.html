@@ -538,11 +538,16 @@ function hideHint() { document.getElementById('hint-card').classList.remove('vis
 
 function renderChart() {
   const records = getRecords();
-  const days = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate()-i);
-    days.push(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`);
+  // Only render days that exist in records, up to 30, sorted oldest→newest
+  const allKeys = Object.keys(records).sort();
+  const days = allKeys.slice(-30);
+
+  const container = document.getElementById('chart-container');
+  if (!days.length) {
+    container.innerHTML = `<p style="text-align:center;color:var(--label3);font-size:13px;padding:20px 0">暂无数据</p>`;
+    return;
   }
+
   const BW=9, GAP=3, CH=120, LH=20, MAXV=12, TARGET=EATING_HOURS;
   const W = days.length*(BW+GAP)-GAP+2;
   const tY = CH-(TARGET/MAXV)*CH;
@@ -558,14 +563,14 @@ function renderChart() {
 
   const labels = days.map((k,i) => {
     const [,m,d] = k.split('-').map(Number);
-    if (d===1||i===0) {
+    if (d===1||i===0||i===days.length-1) {
       const x = i*(BW+GAP)+1+BW/2;
       return `<text x="${x}" y="${CH+LH-2}" font-size="9" fill="#adadb8" text-anchor="middle">${m}/${d}</text>`;
     }
     return '';
   });
 
-  document.getElementById('chart-container').innerHTML =
+  container.innerHTML =
     `<svg width="${W}" height="${CH+LH+4}" viewBox="0 0 ${W} ${CH+LH+4}" xmlns="http://www.w3.org/2000/svg">
       <line x1="0" y1="${tY}" x2="${W}" y2="${tY}" stroke="#3d52d5" stroke-width="1" stroke-dasharray="3,3" opacity="0.3"/>
       <text x="${W-1}" y="${tY-4}" font-size="9" fill="#3d52d5" text-anchor="end" opacity="0.6">${TARGET}h</text>
