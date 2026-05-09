@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="断食追踪">
+  <meta name="theme-color" content="#007aff">
+  <link rel="manifest" href="manifest.json">
+  <title>16+8 断食追踪</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --blue:   #007aff;
+      --teal:   #32ade6;
+      --green:  #34c759;
+      --red:    #ff3b30;
+      --label:  #000000;
+      --label2: #3c3c43cc;
+      --label3: #3c3c4399;
+      --fill:   #78788014;
+      --fill2:  #78788029;
+      --bg:     #f2f2f7;
+      --bg2:    #ffffff;
+      --sep:    #3c3c4349;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--label);
+      min-height: 100dvh;
+      padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
+    }
+
+    header {
+      background: rgba(242,242,247,0.85);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 0.5px solid var(--sep);
+      padding: 14px 20px 12px;
+      padding-top: calc(env(safe-area-inset-top) + 14px);
+      position: sticky; top: 0; z-index: 10;
+    }
+    header h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+    header p  { font-size: 13px; color: var(--label2); margin-top: 1px; }
+
+    main {
+      max-width: 430px; margin: 0 auto;
+      padding: 20px 16px 0;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .card { background: var(--bg2); border-radius: var(--radius); overflow: hidden; }
+
+    .card-label {
+      font-size: 13px; color: var(--label2);
+      padding: 0 16px 6px;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+
+    /* Today time rows */
+    .time-row {
+      display: flex; align-items: center; min-height: 44px;
+      padding: 0 16px; border-bottom: 0.5px solid var(--sep); gap: 12px;
+      cursor: pointer;
+    }
+    .time-row:last-of-type { border-bottom: none; }
+    .row-label { font-size: 17px; color: var(--label); flex: 1; }
+    .time-val  { font-size: 17px; color: var(--blue); font-weight: 500; }
+    .time-placeholder-text { font-size: 17px; color: var(--label3); }
+
+    /* Duration */
+    .dur-row {
+      display: flex; padding: 12px 16px; gap: 10px;
+      border-top: 0.5px solid var(--sep);
+    }
+    .dur-chip { flex: 1; border-radius: 10px; padding: 10px; text-align: center; }
+    .dur-chip-eat  { background: rgba(0,122,255,0.1); }
+    .dur-chip-fast { background: rgba(50,173,230,0.1); }
+    .dur-chip strong { display: block; font-size: 20px; font-weight: 700; margin-bottom: 1px; }
+    .dur-chip-eat  strong { color: var(--blue); }
+    .dur-chip-fast strong { color: var(--teal); }
+    .dur-chip span { font-size: 12px; color: var(--label2); }
+
+    /* Hint */
+    .hint-banner {
+      background: var(--bg2); border-radius: var(--radius);
+      padding: 14px 16px; display: none;
+      border-left: 3px solid var(--blue);
+    }
+    .hint-banner.visible { display: block; }
+    .hint-eyebrow {
+      font-size: 12px; color: var(--blue); font-weight: 500;
+      margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .hint-time { font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+    .hint-sub  { font-size: 13px; color: var(--label2); margin-top: 4px; }
+
+    /* Buttons */
+    .btn-group { display: flex; flex-direction: column; gap: 10px; }
+    .btn {
+      width: 100%; padding: 14px; border: none; border-radius: var(--radius);
+      font-size: 17px; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: opacity 0.12s; letter-spacing: -0.2px;
+    }
+    .btn:active { opacity: 0.7; }
+    .btn-start  { background: var(--blue); color: #fff; }
+    .btn-end    { background: var(--teal); color: #fff; }
+    .btn-export { background: var(--fill2); color: var(--label2); font-size: 15px; font-weight: 500; }
+    .btn:disabled { background: var(--fill); color: var(--label3); cursor: default; }
+    .btn:disabled:active { opacity: 1; }
+
+    /* Chart */
+    .chart-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 4px 0 0; }
+
+    /* History */
+    .history-item {
+      display: flex; align-items: center; min-height: 44px;
+      padding: 0 16px; border-bottom: 0.5px solid var(--sep); gap: 10px;
+      cursor: pointer; transition: background 0.1s;
+    }
+    .history-item:active { background: var(--fill); }
+    .history-item:last-child { border-bottom: none; }
+    .h-date { font-size: 15px; color: var(--label2); width: 44px; flex-shrink: 0; }
+    .h-win  { font-size: 15px; color: var(--label); flex: 1; }
+    .h-dur  { font-size: 15px; font-weight: 600; }
+    .h-ok   { color: var(--green); }
+    .h-over { color: var(--red); }
+    .h-part { color: var(--label3); }
+
+    /* ── Generic Modal Sheet ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 100; display: flex; align-items: flex-end;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal-sheet {
+      width: 100%; background: var(--bg2);
+      border-radius: 14px 14px 0 0;
+      padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
+      transform: translateY(100%);
+      transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+    }
+    .modal-overlay.open .modal-sheet { transform: translateY(0); }
+
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px 10px; border-bottom: 0.5px solid var(--sep);
+    }
+    .modal-title { font-size: 17px; font-weight: 600; }
+    .modal-btn { font-size: 17px; font-family: inherit; border: none; background: none; cursor: pointer; padding: 0; }
+    .modal-btn-cancel { color: var(--label2); }
+    .modal-btn-done   { color: var(--blue); font-weight: 600; }
+
+    /* Scroll picker */
+    .time-picker-cols {
+      display: flex; justify-content: center; align-items: center;
+      height: 220px; position: relative; overflow: hidden;
+    }
+    .picker-col {
+      flex: 0 0 80px; height: 100%;
+      overflow-y: scroll; scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .picker-col::-webkit-scrollbar { display: none; }
+    .picker-item {
+      height: 44px; display: flex; align-items: center; justify-content: center;
+      font-size: 22px; scroll-snap-align: center;
+    }
+    .picker-spacer { height: calc(50% - 22px); }
+    .picker-separator { font-size: 22px; font-weight: 300; flex: 0 0 16px; text-align: center; }
+    .time-picker-cols::before {
+      content: ''; position: absolute; left: 0; right: 0; height: 44px;
+      top: calc(50% - 22px);
+      border-top: 0.5px solid var(--sep); border-bottom: 0.5px solid var(--sep);
+      background: var(--fill); pointer-events: none;
+    }
+
+    /* ── Action Sheet ── */
+    .action-sheet-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 200; display: flex; align-items: flex-end;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .action-sheet-overlay.open { opacity: 1; pointer-events: all; }
+
+    .action-sheet {
+      width: 100%; padding: 0 8px calc(env(safe-area-inset-bottom) + 8px);
+      transform: translateY(100%);
+      transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+    }
+    .action-sheet-overlay.open .action-sheet { transform: translateY(0); }
+
+    .action-group {
+      background: var(--bg2); border-radius: var(--radius);
+      overflow: hidden; margin-bottom: 8px;
+    }
+
+    .action-title {
+      padding: 12px 16px 8px;
+      font-size: 13px; color: var(--label2); text-align: center;
+      border-bottom: 0.5px solid var(--sep);
+    }
+
+    .action-btn {
+      width: 100%; padding: 16px; border: none; background: var(--bg2);
+      font-size: 17px; font-family: inherit; cursor: pointer;
+      border-bottom: 0.5px solid var(--sep); text-align: center;
+      transition: background 0.1s;
+    }
+    .action-btn:last-child { border-bottom: none; }
+    .action-btn:active { background: var(--fill); }
+    .action-btn-blue   { color: var(--blue); }
+    .action-btn-red    { color: var(--red); }
+    .action-btn-cancel { color: var(--blue); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>16+8 断食追踪</h1>
+  <p id="today-label"></p>
+</header>
+
+<main>
+  <p class="card-label">今日进食窗口</p>
+  <div class="card">
+    <div class="time-row" onclick="openPicker('start', todayKey())">
+      <span class="row-label">开始进食</span>
+      <span id="start-display" class="time-placeholder-text">点击记录</span>
+    </div>
+    <div class="time-row" onclick="openPicker('end', todayKey())">
+      <span class="row-label">结束进食</span>
+      <span id="end-display" class="time-placeholder-text">点击记录</span>
+    </div>
+    <div class="dur-row" id="duration-row" style="display:none">
+      <div class="dur-chip dur-chip-eat">
+        <strong id="eat-hours">-</strong><span>进食时长</span>
+      </div>
+      <div class="dur-chip dur-chip-fast">
+        <strong id="fast-hours">-</strong><span>断食时长</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint-banner" id="hint-card">
+    <div class="hint-eyebrow" id="hint-label"></div>
+    <div class="hint-time"    id="hint-time"></div>
+    <div class="hint-sub"     id="hint-sub"></div>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn btn-start" id="btn-start" onclick="recordNow('start')">开始进食</button>
+    <button class="btn btn-end"   id="btn-end"   onclick="recordNow('end')" disabled>结束进食</button>
+  </div>
+
+  <p class="card-label" style="margin-top:4px">过去 30 天进食时长</p>
+  <div class="card" style="padding:16px">
+    <div class="chart-scroll" id="chart-container"></div>
+  </div>
+
+  <p class="card-label" style="margin-top:4px">历史记录 <span style="font-size:11px;color:var(--label3)">(点击可编辑)</span></p>
+  <div class="card">
+    <div id="history-list"></div>
+  </div>
+
+  <button class="btn btn-export" onclick="exportCSV()">导出 CSV</button>
+</main>
+
+<!-- Time Picker Modal -->
+<div class="modal-overlay" id="modal" onclick="handlePickerOverlayClick(event)">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <button class="modal-btn modal-btn-cancel" onclick="closePicker()">取消</button>
+      <span class="modal-title" id="modal-title">选择时间</span>
+      <button class="modal-btn modal-btn-done" onclick="confirmPicker()">确定</button>
+    </div>
+    <div class="time-picker-cols">
+      <div class="picker-col" id="col-hour"></div>
+      <div class="picker-separator">:</div>
+      <div class="picker-col" id="col-minute"></div>
+    </div>
+  </div>
+</div>
+
+<!-- History Action Sheet -->
+<div class="action-sheet-overlay" id="action-sheet" onclick="handleActionOverlayClick(event)">
+  <div class="action-sheet">
+    <div class="action-group">
+      <div class="action-title" id="action-title"></div>
+      <button class="action-btn action-btn-blue" onclick="editHistoryField('start')">修改开始时间</button>
+      <button class="action-btn action-btn-blue" onclick="editHistoryField('end')">修改结束时间</button>
+      <button class="action-btn action-btn-red"  onclick="deleteHistoryRecord()">删除这天的记录</button>
+    </div>
+    <div class="action-group">
+      <button class="action-btn action-btn-cancel" onclick="closeActionSheet()">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const EATING_HOURS  = 8;
+const FASTING_HOURS = 16;
+const STORAGE_KEY   = 'fasting-records';
+const MINUTE_STEP   = 5;
+
+let pickerField    = null;  // 'start' | 'end'
+let pickerDateKey  = null;  // which date the picker is editing
+let actionDateKey  = null;  // which date the action sheet is for
+
+// ── Utils ─────────────────────────────────────────────────
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+function pad(n) { return String(n).padStart(2,'0'); }
+
+function fmtKey(key) {
+  const [, m, d] = key.split('-');
+  return `${parseInt(m)}/${parseInt(d)}`;
+}
+
+function getRecords() { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+function saveRecords(r) { localStorage.setItem(STORAGE_KEY, JSON.stringify(r)); }
+
+function addMinutes(t, mins) {
+  const [h, m] = t.split(':').map(Number);
+  const total = ((h*60+m+mins) % 1440 + 1440) % 1440;
+  return `${pad(Math.floor(total/60))}:${pad(total%60)}`;
+}
+
+function calcEatHours(start, end) {
+  const [sh,sm] = start.split(':').map(Number);
+  const [eh,em] = end.split(':').map(Number);
+  let mins = (eh*60+em)-(sh*60+sm);
+  if (mins < 0) mins += 1440;
+  return mins / 60;
+}
+
+function nowHHMM() {
+  const n = new Date();
+  const rounded = Math.round((n.getHours()*60+n.getMinutes()) / MINUTE_STEP) * MINUTE_STEP;
+  return `${pad(Math.floor(rounded/60)%24)}:${pad(rounded%60)}`;
+}
+
+// ── Picker ────────────────────────────────────────────────
+
+function buildCol(col, items, idx) {
+  col.innerHTML = `<div class="picker-spacer"></div>` +
+    items.map(v => `<div class="picker-item">${v}</div>`).join('') +
+    `<div class="picker-spacer"></div>`;
+  requestAnimationFrame(() => { col.scrollTop = idx * 44; });
+}
+
+function openPicker(field, dateKey) {
+  pickerField   = field;
+  pickerDateKey = dateKey || todayKey();
+
+  const rec = (getRecords()[pickerDateKey] || {});
+  const existing = rec[field] || nowHHMM();
+  const [h, m] = existing.split(':').map(Number);
+
+  const hours   = Array.from({length:24}, (_,i) => pad(i));
+  const minutes = Array.from({length:60/MINUTE_STEP}, (_,i) => pad(i*MINUTE_STEP));
+
+  buildCol(document.getElementById('col-hour'),   hours,   h);
+  buildCol(document.getElementById('col-minute'), minutes, Math.round(m/MINUTE_STEP));
+
+  document.getElementById('modal-title').textContent =
+    field === 'start' ? '开始进食时间' : '结束进食时间';
+  document.getElementById('modal').classList.add('open');
+}
+
+function closePicker() {
+  document.getElementById('modal').classList.remove('open');
+  pickerField = pickerDateKey = null;
+}
+
+function handlePickerOverlayClick(e) {
+  if (e.target === document.getElementById('modal')) closePicker();
+}
+
+function getPickerValue() {
+  const hCol = document.getElementById('col-hour');
+  const mCol = document.getElementById('col-minute');
+  const hours   = Array.from({length:24}, (_,i) => pad(i));
+  const minutes = Array.from({length:60/MINUTE_STEP}, (_,i) => pad(i*MINUTE_STEP));
+  const hIdx = Math.min(Math.round(hCol.scrollTop/44), hours.length-1);
+  const mIdx = Math.min(Math.round(mCol.scrollTop/44), minutes.length-1);
+  return `${hours[hIdx]}:${minutes[mIdx]}`;
+}
+
+function confirmPicker() {
+  const val     = getPickerValue();
+  const field   = pickerField;
+  const dateKey = pickerDateKey;
+  closePicker();
+  saveTime(field, val, dateKey);
+}
+
+// ── Action Sheet (history edit) ────────────────────────────
+
+function openActionSheet(dateKey) {
+  actionDateKey = dateKey;
+  const rec = getRecords()[dateKey] || {};
+  const win = rec.start && rec.end ? `${rec.start} – ${rec.end}`
+            : rec.start ? `${rec.start} – 未结束` : '无记录';
+  document.getElementById('action-title').textContent = `${fmtKey(dateKey)}  ${win}`;
+  document.getElementById('action-sheet').classList.add('open');
+}
+
+function closeActionSheet() {
+  document.getElementById('action-sheet').classList.remove('open');
+  actionDateKey = null;
+}
+
+function handleActionOverlayClick(e) {
+  if (e.target === document.getElementById('action-sheet')) closeActionSheet();
+}
+
+function editHistoryField(field) {
+  const key = actionDateKey;
+  closeActionSheet();
+  openPicker(field, key);
+}
+
+function deleteHistoryRecord() {
+  const key = actionDateKey;
+  closeActionSheet();
+  const records = getRecords();
+  delete records[key];
+  saveRecords(records);
+  if (key === todayKey()) refreshToday({});
+  renderChart();
+  renderHistory();
+}
+
+// ── Record / Save ─────────────────────────────────────────
+
+function recordNow(field) { saveTime(field, nowHHMM(), todayKey()); }
+
+function saveTime(field, val, dateKey) {
+  dateKey = dateKey || todayKey();
+  const records = getRecords();
+  if (!records[dateKey]) records[dateKey] = {};
+  records[dateKey][field] = val;
+  saveRecords(records);
+  if (dateKey === todayKey()) refreshToday(records[dateKey]);
+  renderChart();
+  renderHistory();
+}
+
+// ── Today display ─────────────────────────────────────────
+
+function refreshToday(rec) {
+  const sEl = document.getElementById('start-display');
+  const eEl = document.getElementById('end-display');
+
+  if (rec.start) {
+    sEl.textContent  = rec.start;
+    sEl.className    = 'time-val';
+  } else {
+    sEl.textContent  = '点击记录';
+    sEl.className    = 'time-placeholder-text';
+  }
+
+  if (rec.end) {
+    eEl.textContent  = rec.end;
+    eEl.className    = 'time-val';
+  } else {
+    eEl.textContent  = '点击记录';
+    eEl.className    = 'time-placeholder-text';
+  }
+
+  document.getElementById('btn-end').disabled = !rec.start;
+
+  if (rec.start && rec.end) {
+    const eatH = calcEatHours(rec.start, rec.end);
+    document.getElementById('eat-hours').textContent  = `${eatH.toFixed(1)}h`;
+    document.getElementById('fast-hours').textContent = `${(24-eatH).toFixed(1)}h`;
+    document.getElementById('duration-row').style.display = 'flex';
+    showHint('next', rec.end);
+  } else if (rec.start) {
+    document.getElementById('duration-row').style.display = 'none';
+    showHint('end', rec.start);
+  } else {
+    document.getElementById('duration-row').style.display = 'none';
+    hideHint();
+  }
+}
+
+// ── Hint ──────────────────────────────────────────────────
+
+function showHint(type, t) {
+  const card = document.getElementById('hint-card');
+  document.getElementById('hint-label').textContent =
+    type === 'end' ? '建议今日结束进食' : '建议明日开始进食';
+  document.getElementById('hint-time').textContent =
+    addMinutes(t, (type === 'end' ? EATING_HOURS : FASTING_HOURS) * 60);
+  document.getElementById('hint-sub').textContent =
+    type === 'end'
+      ? `进食 ${EATING_HOURS}h 后结束，可设置闹钟`
+      : `断食 ${FASTING_HOURS}h 后开始，可设置明日闹钟`;
+  card.classList.add('visible');
+}
+
+function hideHint() { document.getElementById('hint-card').classList.remove('visible'); }
+
+// ── Chart ─────────────────────────────────────────────────
+
+function renderChart() {
+  const records = getRecords();
+  const days = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    days.push(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`);
+  }
+  const BW=9, GAP=3, CH=120, LH=20, MAXV=12, TARGET=EATING_HOURS;
+  const W = days.length*(BW+GAP)-GAP+2;
+  const tY = CH-(TARGET/MAXV)*CH;
+
+  const bars = days.map((k,i) => {
+    const r = records[k], x = i*(BW+GAP)+1;
+    if (!r||!r.start||!r.end)
+      return `<rect x="${x}" y="${CH-3}" width="${BW}" height="3" rx="1.5" fill="#d1d1d6"/>`;
+    const h = Math.min(calcEatHours(r.start,r.end),MAXV);
+    const barH = Math.max((h/MAXV)*CH,4);
+    return `<rect x="${x}" y="${CH-barH}" width="${BW}" height="${barH}" rx="2" fill="${h<=TARGET?'#007aff':'#ff3b30'}"/>`;
+  });
+
+  const labels = days.map((k,i) => {
+    const [,m,d] = k.split('-').map(Number);
+    if (d===1||i===0) {
+      const x = i*(BW+GAP)+1+BW/2;
+      return `<text x="${x}" y="${CH+LH-2}" font-size="9" fill="#8e8e93" text-anchor="middle">${m}/${d}</text>`;
+    }
+    return '';
+  });
+
+  document.getElementById('chart-container').innerHTML =
+    `<svg width="${W}" height="${CH+LH+4}" viewBox="0 0 ${W} ${CH+LH+4}" xmlns="http://www.w3.org/2000/svg">
+      <line x1="0" y1="${tY}" x2="${W}" y2="${tY}" stroke="#007aff" stroke-width="1" stroke-dasharray="3,3" opacity="0.35"/>
+      <text x="${W-1}" y="${tY-4}" font-size="9" fill="#007aff" text-anchor="end" opacity="0.7">${TARGET}h</text>
+      ${bars.join('')}${labels.join('')}
+    </svg>`;
+}
+
+// ── History ───────────────────────────────────────────────
+
+function renderHistory() {
+  const records = getRecords();
+  const keys = Object.keys(records).sort().reverse().slice(0,30);
+  const list  = document.getElementById('history-list');
+
+  if (!keys.length) {
+    list.innerHTML = `<div style="padding:16px;text-align:center;font-size:15px;color:var(--label3)">暂无记录</div>`;
+    return;
+  }
+
+  list.innerHTML = keys.map((k,i) => {
+    const r   = records[k];
+    const win = r.start&&r.end ? `${r.start} – ${r.end}`
+              : r.start ? `${r.start} – …` : '未记录';
+    let dur='', cls='h-part';
+    if (r.start&&r.end) {
+      const h = calcEatHours(r.start,r.end);
+      dur = `${h.toFixed(1)}h`;
+      cls = h<=EATING_HOURS ? 'h-ok' : 'h-over';
+    }
+    const sep = i<keys.length-1 ? `border-bottom:0.5px solid var(--sep)` : '';
+    return `<div class="history-item" style="${sep}" onclick="openActionSheet('${k}')">
+      <span class="h-date">${fmtKey(k)}</span>
+      <span class="h-win">${win}</span>
+      <span class="h-dur ${cls}">${dur}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Export CSV ────────────────────────────────────────────
+
+function exportCSV() {
+  const records = getRecords();
+  const keys = Object.keys(records).sort();
+  if (!keys.length) { alert('暂无记录可导出'); return; }
+
+  const rows = [['日期','开始时间','结束时间','进食时长(h)','断食时长(h)']];
+  keys.forEach(k => {
+    const r = records[k];
+    if (r.start&&r.end) {
+      const eatH = calcEatHours(r.start,r.end);
+      rows.push([k, r.start, r.end, eatH.toFixed(2), (24-eatH).toFixed(2)]);
+    } else {
+      rows.push([k, r.start||'', r.end||'', '', '']);
+    }
+  });
+
+  const csv  = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {href:url, download:`fasting-${todayKey()}.csv`});
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Init ──────────────────────────────────────────────────
+
+function init() {
+  const d = new Date();
+  document.getElementById('today-label').textContent =
+    `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+
+  refreshToday(getRecords()[todayKey()] || {});
+  renderHistory();
+  renderChart();
+
+  if ('serviceWorker' in navigator)
+    navigator.serviceWorker.register('service-worker.js');
+}
+
+init();
+</script>
+</body>
+</html>
