@@ -170,6 +170,7 @@
       flex: 0 0 80px; height: 100%;
       overflow-y: scroll; scroll-snap-type: y mandatory;
       -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      touch-action: pan-y;
     }
     .picker-col::-webkit-scrollbar { display: none; }
     .picker-item {
@@ -381,10 +382,12 @@ function openPicker(field, dateKey) {
   document.getElementById('modal-title').textContent =
     field === 'start' ? '开始进食时间' : '结束进食时间';
   document.getElementById('modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 
 function closePicker() {
   document.getElementById('modal').classList.remove('open');
+  document.body.style.overflow = '';
   pickerField = pickerDateKey = null;
 }
 
@@ -419,10 +422,12 @@ function openActionSheet(dateKey) {
             : rec.start ? `${rec.start} – 未结束` : '无记录';
   document.getElementById('action-title').textContent = `${fmtKey(dateKey)}  ${win}`;
   document.getElementById('action-sheet').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 
 function closeActionSheet() {
   document.getElementById('action-sheet').classList.remove('open');
+  document.body.style.overflow = '';
   actionDateKey = null;
 }
 
