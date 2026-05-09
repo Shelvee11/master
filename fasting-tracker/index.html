@@ -629,12 +629,7 @@ function exportCSV() {
 
   const csv      = rows.map(r=>r.join(',')).join('\n');
   const filename = `fasting-${todayKey()}.csv`;
-  const file     = new File(['﻿'+csv], filename, {type:'text/csv;charset=utf-8'});
-  if (navigator.canShare && navigator.canShare({files:[file]})) {
-    navigator.share({files:[file], title:filename}).catch(() => fallbackDownload(csv, filename));
-  } else {
-    fallbackDownload(csv, filename);
-  }
+  fallbackDownload(csv, filename);
 }
 
 function fallbackDownload(csv, filename) {
