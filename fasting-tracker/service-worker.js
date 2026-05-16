@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fasting-tracker-v2';
+const CACHE_NAME = 'fastbit-v3';
 const BASE = '/master/fasting-tracker/';
 const ASSETS = [BASE, BASE + 'index.html', BASE + 'manifest.json'];
 

@@ -1,11 +1,11 @@
 {
-  "name": "16+8 断食追踪",
-  "short_name": "断食追踪",
-  "description": "记录每日 16+8 轻断食进食窗口",
+  "name": "FastBit — 断食追踪",
+  "short_name": "FastBit",
+  "description": "FastBit — 轻断食进食窗口追踪",
   "start_url": "/master/fasting-tracker/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#007aff",
+  "theme_color": "#3d52d5",
   "icons": [
     {
       "src": "icon-192.png",

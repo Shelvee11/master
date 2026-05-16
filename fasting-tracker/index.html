@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="断食追踪">
+  <meta name="apple-mobile-web-app-title" content="FastBit">
   <meta name="theme-color" content="#3d52d5">
   <link rel="manifest" href="manifest.json">
-  <title>16+8 断食追踪</title>
+  <link rel="apple-touch-icon" href="168-app-icon-1024.png">
+  <title>FastBit — 断食追踪</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -258,7 +259,7 @@
 <body>
 
 <header>
-  <h1>16+8 断食追踪</h1>
+  <h1>FastBit</h1>
   <p id="today-label"></p>
 </header>
 
@@ -309,7 +310,11 @@
     <div id="history-list"></div>
   </div>
 
-  <button class="btn btn-export" onclick="exportCSV()">导出 CSV</button>
+  <div class="btn-group">
+    <button class="btn btn-export" onclick="exportCSV()">导出 CSV</button>
+    <button class="btn btn-export" onclick="document.getElementById('csv-input').click()">导入 CSV</button>
+    <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
+  </div>
 </main>
 
 <!-- Time Picker Modal -->
@@ -377,7 +382,7 @@ function renderModeSelector() {
       ${m.label}<small>断食 ${m.fast}h / 进食 ${m.eat}h</small>
     </button>`
   ).join('');
-  document.querySelector('header h1').textContent = `${MODES[current].label} 断食追踪`;
+  document.querySelector('header h1').textContent = `FastBit · ${MODES[current].label}`;
 }
 
 function switchMode(i) {
@@ -697,6 +702,47 @@ function fallbackDownload(csv, filename) {
   const a   = Object.assign(document.createElement('a'), {href:url, download:filename});
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── Import CSV ───────────────────────────────────────────
+
+function importCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result.replace(/^﻿/, '');
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) { alert('CSV 文件为空'); return; }
+
+    const records = getRecords();
+    let imported = 0;
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      if (cols.length < 3) continue;
+
+      const date  = cols[0].trim();
+      const start = cols[1].trim();
+      const end   = cols[2].trim();
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+
+      if (!records[date]) records[date] = {};
+      if (start && /^\d{2}:\d{2}$/.test(start)) records[date].start = start;
+      if (end   && /^\d{2}:\d{2}$/.test(end))   records[date].end   = end;
+      imported++;
+    }
+
+    saveRecords(records);
+    refreshToday(records[todayKey()] || {});
+    renderChart();
+    renderHistory();
+    alert(`已导入 ${imported} 条记录`);
+  };
+  reader.readAsText(file);
 }
 
 // ── Init ──────────────────────────────────────────────────
