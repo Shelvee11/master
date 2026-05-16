@@ -157,31 +157,38 @@ main {
 .btn:disabled:active { opacity: 1; transform: none; }
 .btn-group { display: flex; flex-direction: column; gap: 10px; }
 
-/* Backup banner */
-.backup-banner {
-  border-radius: var(--radius); padding: 12px 16px;
-  font-size: 13px; display: none;
-  align-items: center; justify-content: space-between;
-  border: 1px solid var(--sep); background: var(--bg2);
-}
-.backup-banner.warn { display: flex; border-color: #fbbf24; background: #fffbeb; color: #92400e; }
-.backup-banner.safe { display: flex; border-color: #6ee7b7; background: #f0fdf4; color: #065f46; }
-.backup-banner button {
-  border: 1px solid currentColor; background: none; color: inherit;
-  padding: 4px 10px; border-radius: 8px; font-size: 12px; font-family: inherit; cursor: pointer;
-  white-space: nowrap; margin-left: 8px;
-}
 
 /* Month picker */
 .month-nav {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px;
+  padding: 12px 16px; position: relative;
 }
 .month-nav button {
   background: none; border: none; color: var(--accent);
   font-size: 22px; padding: 2px 8px; cursor: pointer; font-family: inherit;
 }
 .month-nav span { font-size: 16px; font-weight: 600; color: var(--label); }
+.month-nav-right { display: flex; align-items: center; gap: 0; }
+.more-btn {
+  background: none; border: none; color: var(--label2);
+  font-size: 20px; padding: 4px 8px; cursor: pointer; font-family: inherit;
+  letter-spacing: 2px; line-height: 1;
+}
+.more-menu {
+  display: none; position: absolute; right: 16px; top: 48px;
+  background: var(--bg2); border: 1px solid var(--sep);
+  border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  z-index: 20; overflow: hidden; min-width: 160px;
+}
+.more-menu.show { display: block; }
+.more-menu button {
+  display: block; width: 100%; padding: 12px 16px; border: none;
+  background: none; font-size: 15px; font-family: inherit;
+  color: var(--label); text-align: left; cursor: pointer;
+  border-bottom: 1px solid var(--sep);
+}
+.more-menu button:last-child { border-bottom: none; }
+.more-menu button:active { background: var(--fill); }
 
 /* Summary */
 .summary-row {
@@ -262,8 +269,6 @@ main {
 <main>
   <!-- Record Panel -->
   <div id="record-panel" class="panel active">
-    <div class="backup-banner" id="backup-banner"></div>
-
     <p class="card-label">类别</p>
     <div class="card">
       <div class="cat-grid" id="cat-grid"></div>
@@ -299,7 +304,15 @@ main {
       <div class="month-nav">
         <button onclick="changeMonth(-1)">‹</button>
         <span id="month-label"></span>
-        <button onclick="changeMonth(1)">›</button>
+        <div class="month-nav-right">
+          <button onclick="changeMonth(1)">›</button>
+          <button class="more-btn" onclick="toggleMoreMenu(event)">⋯</button>
+        </div>
+        <div class="more-menu" id="more-menu">
+          <button onclick="exportCSV(); closeMoreMenu()">导出本月 CSV</button>
+          <button onclick="exportAllCSV(); closeMoreMenu()">导出全部 CSV</button>
+          <button onclick="importCSV(); closeMoreMenu()">导入 CSV</button>
+        </div>
       </div>
     </div>
 
@@ -308,12 +321,6 @@ main {
     <p class="card-label">记录</p>
     <div class="card" id="records-card"></div>
 
-    <div class="btn-group" style="margin-top:4px">
-      <button class="btn btn-secondary" onclick="exportCSV()">导出本月 CSV</button>
-      <button class="btn btn-secondary" onclick="exportAllCSV()">导出全部 CSV</button>
-      <button class="btn btn-secondary" onclick="backupData()">💾 备份数据</button>
-      <button class="btn btn-secondary" onclick="restoreData()">📥 恢复数据</button>
-    </div>
   </div>
 </main>
 
@@ -348,83 +355,66 @@ function getRecords() {
 }
 function saveRecords(records) {
   localStorage.setItem('expense_records', JSON.stringify(records));
-  localStorage.setItem('expense_last_save', Date.now().toString());
-  updateBackupBanner();
 }
 
-// ── Backup ───────────────────────────────────────────────────
+// ── More Menu ────────────────────────────────────────────────
 
-function getLastBackupTime() { return parseInt(localStorage.getItem('expense_last_backup') || '0'); }
-function getRecordsSinceBackup() {
-  const lb = getLastBackupTime();
-  return getRecords().filter(r => r.id > lb).length;
+function toggleMoreMenu(e) {
+  e.stopPropagation();
+  document.getElementById('more-menu').classList.toggle('show');
+}
+function closeMoreMenu() {
+  document.getElementById('more-menu').classList.remove('show');
 }
 
-function updateBackupBanner() {
-  const banner = document.getElementById('backup-banner');
-  const records = getRecords();
-  if (!records.length) { banner.className = 'backup-banner'; return; }
-  const unsaved = getRecordsSinceBackup();
-  const lb = getLastBackupTime();
-  if (unsaved === 0) {
-    banner.className = 'backup-banner safe';
-    const ago = lb ? timeSince(lb) : '';
-    banner.innerHTML = `<span>✅ 数据已备份${ago ? '（' + ago + '）' : ''}</span>`;
-  } else {
-    banner.className = 'backup-banner warn';
-    banner.innerHTML = `<span>⚠️ ${unsaved} 条记录未备份</span><button onclick="backupData()">立即备份</button>`;
+// ── CSV Import ───────────────────────────────────────────────
+
+function importCSV() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,text/csv';
+  input.onchange = () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => parseAndImportCSV(reader.result);
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function parseAndImportCSV(text) {
+  const lines = text.replace(/^﻿/, '').trim().split('\n');
+  if (lines.length < 2) { alert('CSV 文件为空'); return; }
+  const incoming = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    if (cols.length < 5) continue;
+    const [dateStr, type, largeCat, smallCat, amount, ...rest] = cols;
+    const note = rest.join(',').trim();
+    const amt = parseFloat(amount);
+    if (!dateStr || isNaN(amt)) continue;
+    incoming.push({
+      id: new Date(dateStr).getTime() + i,
+      date: dateStr.trim(),
+      dateStr: dateStr.trim(),
+      largeCat: largeCat.trim(),
+      smallCat: smallCat.trim(),
+      type: type.trim() || '支出',
+      amount: amt,
+      note: note
+    });
   }
-}
-
-function timeSince(ts) {
-  const mins = Math.floor((Date.now() - ts) / 60000);
-  if (mins < 1) return '刚刚';
-  if (mins < 60) return mins + '分钟前';
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return hrs + '小时前';
-  return Math.floor(hrs / 24) + '天前';
-}
-
-async function backupData() {
-  const records = getRecords();
-  if (!records.length) { alert('没有数据需要备份'); return; }
-  const payload = JSON.stringify({ version: 1, exportDate: new Date().toISOString(), records });
-  try {
-    await navigator.clipboard.writeText(payload);
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = payload;
-    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-  }
-  localStorage.setItem('expense_last_backup', Date.now().toString());
-  updateBackupBanner();
-  alert('✅ 已复制到剪贴板！\n请粘贴到备忘录或笔记中保存。\n共 ' + records.length + ' 条记录。');
-}
-
-async function restoreData() {
-  let text = '';
-  try { text = await navigator.clipboard.readText(); }
-  catch { text = prompt('请粘贴备份数据（JSON）:') || ''; }
-  if (!text) return;
-  try {
-    const data = JSON.parse(text.trim());
-    let incoming = data.version && data.records ? data.records : Array.isArray(data) ? data : null;
-    if (!incoming) throw new Error('格式不对');
-    if (!incoming.length) { alert('备份数据为空'); return; }
-    const existing = getRecords();
-    const ids = new Set(existing.map(r => r.id));
-    const newRecs = incoming.filter(r => !ids.has(r.id));
-    if (!newRecs.length) { alert('所有记录已存在，无需恢复。'); return; }
-    if (!confirm(`发现 ${newRecs.length} 条新记录，合并到现有 ${existing.length} 条中？`)) return;
-    const merged = [...existing, ...newRecs].sort((a,b) => a.id - b.id);
-    saveRecords(merged);
-    localStorage.setItem('expense_last_backup', Date.now().toString());
-    updateBackupBanner();
-    renderHistory();
-    alert(`✅ 已恢复 ${newRecs.length} 条记录！当前共 ${merged.length} 条。`);
-  } catch(e) {
-    alert('❌ 数据格式错误\n' + e.message);
-  }
+  if (!incoming.length) { alert('未找到有效记录'); return; }
+  const existing = getRecords();
+  const existSet = new Set(existing.map(r => `${r.date}_${r.largeCat}_${r.smallCat}_${r.amount}`));
+  const newRecs = incoming.filter(r => !existSet.has(`${r.date}_${r.largeCat}_${r.smallCat}_${r.amount}`));
+  if (!newRecs.length) { alert('所有记录已存在，无需导入。'); return; }
+  if (!confirm(`发现 ${newRecs.length} 条新记录，合并到现有 ${existing.length} 条中？`)) return;
+  const merged = [...existing, ...newRecs].sort((a, b) => a.id - b.id);
+  saveRecords(merged);
+  renderHistory();
+  alert(`已导入 ${newRecs.length} 条记录！当前共 ${merged.length} 条。`);
 }
 
 // ── Record Panel ──────────────────────────────────────────────
@@ -682,8 +672,8 @@ function init() {
     `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
   initCatGrid();
   initDate();
-  updateBackupBanner();
   document.getElementById('amount').addEventListener('input', updateSubmit);
+  document.addEventListener('click', closeMoreMenu);
   if ('serviceWorker' in navigator)
     navigator.serviceWorker.register('service-worker.js');
 }
