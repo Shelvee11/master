@@ -980,9 +980,8 @@ function renderHeatmap() {
   monthsEl.innerHTML = '';
 
   const today = new Date();
-  const totalWeeks = 26;
-  const startMonday = isoMonday(today);
-  startMonday.setDate(startMonday.getDate() - (totalWeeks - 1) * 7);
+  const startMonday = isoMonday(new Date(today.getFullYear(), 0, 1));
+  const totalWeeks = Math.ceil((isoMonday(today).getTime() - startMonday.getTime()) / (7 * 86400000)) + 1;
 
   const monthPositions = [];
   let lastMonth = -1;
