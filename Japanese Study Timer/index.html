@@ -46,8 +46,8 @@ body {
   color: var(--label);
   max-width: 430px;
   margin: 0 auto;
-  min-height: 100dvh;
-  padding-bottom: 80px;
+  height: 100dvh;
+  overflow: hidden;
   -webkit-tap-highlight-color: transparent;
   font-weight: 400;
 }
@@ -78,8 +78,35 @@ body {
 }
 
 /* Views */
-.view { display: none; padding: 20px 16px; }
+.view {
+  display: none;
+  padding: 20px 16px calc(env(safe-area-inset-bottom) + 20px);
+  height: calc(100dvh - var(--header-h, 60px) - var(--tabbar-h, 70px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .view.active { display: block; }
+
+/* Home layout: heatmap fixed, timeline scrolls */
+#view-home {
+  display: none;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+#view-home.active { display: flex; }
+
+.home-top {
+  flex-shrink: 0;
+  padding: 16px 16px 12px;
+}
+
+.home-timeline {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 16px calc(env(safe-area-inset-bottom) + 4px);
+}
 
 /* Tab bar */
 .tab-bar {
@@ -692,27 +719,31 @@ body {
 
 <!-- Home View -->
 <section class="view active" id="view-home">
-  <button class="quick-start" id="quickStartBtn" onclick="quickStart()">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="9"/><polyline points="12 9 12 13 15.5 15"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="9" y1="1" x2="15" y2="1"/></svg>
-    <span class="quick-start-text" id="quickStartText">开始学习</span>
-  </button>
+  <div class="home-top">
+    <button class="quick-start" id="quickStartBtn" onclick="quickStart()">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="9"/><polyline points="12 9 12 13 15.5 15"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="9" y1="1" x2="15" y2="1"/></svg>
+      <span class="quick-start-text" id="quickStartText">开始学习</span>
+    </button>
 
-  <div class="card">
-    <div class="card-inner">
-      <div class="heatmap-wrap">
-        <div class="heatmap-months" id="heatmapMonths"></div>
-        <div class="heatmap-body">
-          <div class="heatmap-labels">
-            <span></span><span>一</span><span></span><span>三</span><span></span><span>五</span><span></span>
+    <div class="card">
+      <div class="card-inner">
+        <div class="heatmap-wrap">
+          <div class="heatmap-months" id="heatmapMonths"></div>
+          <div class="heatmap-body">
+            <div class="heatmap-labels">
+              <span></span><span>一</span><span></span><span>三</span><span></span><span>五</span><span></span>
+            </div>
+            <div class="heatmap-grid" id="heatmapGrid"></div>
           </div>
-          <div class="heatmap-grid" id="heatmapGrid"></div>
         </div>
+        <div class="heatmap-tooltip" id="heatmapTooltip"></div>
       </div>
-      <div class="heatmap-tooltip" id="heatmapTooltip"></div>
     </div>
   </div>
 
-  <div class="timeline-section" id="timeline"></div>
+  <div class="home-timeline">
+    <div class="timeline-section" id="timeline"></div>
+  </div>
 </section>
 
 <!-- Timer View (Tab 2) -->
@@ -1483,11 +1514,20 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── Init ─────────────────────────────────────────────────────
+function updateLayoutVars() {
+  const header = document.querySelector('.header');
+  const tabbar = document.querySelector('.tab-bar');
+  if (header) document.documentElement.style.setProperty('--header-h', header.offsetHeight + 'px');
+  if (tabbar) document.documentElement.style.setProperty('--tabbar-h', tabbar.offsetHeight + 'px');
+}
+
 function renderAll() {
   renderHome();
   loadSettings();
 }
 
+updateLayoutVars();
+window.addEventListener('resize', updateLayoutVars);
 renderAll();
 
 const savedTab = sessionStorage.getItem('jp-active-tab');
