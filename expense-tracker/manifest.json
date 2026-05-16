@@ -1,6 +1,6 @@
 {
-  "name": "记账",
-  "short_name": "记账",
+  "name": "Spendex",
+  "short_name": "Spendex",
   "description": "简单好用的个人记账工具",
   "start_url": "/master/expense-tracker/",
   "display": "standalone",
@@ -13,7 +13,7 @@
       "type": "image/png"
     },
     {
-      "src": "icon-512.png",
+      "src": "owl.png",
       "sizes": "512x512",
       "type": "image/png"
     }
