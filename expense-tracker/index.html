@@ -45,7 +45,7 @@ header {
   border-bottom: 1px solid var(--sep);
   padding: 14px 20px 12px;
   padding-top: calc(env(safe-area-inset-top) + 14px);
-  position: sticky; top: 0; z-index: 10;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
 }
 header h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.4px; color: var(--accent); }
@@ -55,7 +55,7 @@ header p  { font-size: 13px; color: var(--label2); margin-top: 2px; }
 .tab-bar {
   display: flex; background: var(--bg2);
   border-bottom: 1px solid var(--sep);
-  position: sticky; top: calc(env(safe-area-inset-top) + 53px); z-index: 9;
+  position: fixed; top: calc(env(safe-area-inset-top) + 53px); left: 0; right: 0; z-index: 9;
 }
 .tab-btn {
   flex: 1; padding: 12px 4px; border: none; background: none;
@@ -68,6 +68,7 @@ header p  { font-size: 13px; color: var(--label2); margin-top: 2px; }
 main {
   max-width: 430px; margin: 0 auto;
   padding: 16px 16px 0;
+  padding-top: calc(env(safe-area-inset-top) + 53px + 46px + 16px);
   display: flex; flex-direction: column; gap: 12px;
 }
 
@@ -659,6 +660,19 @@ function init() {
   document.getElementById('amount').addEventListener('input', updateSubmit);
   if ('serviceWorker' in navigator)
     navigator.serviceWorker.register('service-worker.js');
+
+  let touchStartX = 0, touchStartY = 0;
+  document.body.addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+  }, {passive: true});
+  document.body.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].screenX - touchStartX;
+    const dy = e.changedTouches[0].screenY - touchStartY;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      switchTab(dx < 0 ? 'history' : 'record');
+    }
+  }, {passive: true});
 }
 
 init();
