@@ -35,7 +35,7 @@ body {
   background: var(--bg);
   color: var(--label);
   min-height: 100dvh;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
 }
 
 header {
@@ -55,7 +55,7 @@ header p  { font-size: 13px; color: var(--label2); margin-top: 2px; }
 .tab-bar {
   display: flex; background: var(--bg2);
   border-bottom: 1px solid var(--sep);
-  position: fixed; top: calc(env(safe-area-inset-top) + 53px); left: 0; right: 0; z-index: 9;
+  position: fixed; left: 0; right: 0; z-index: 9;
 }
 .tab-btn {
   flex: 1; padding: 12px 4px; border: none; background: none;
@@ -68,7 +68,7 @@ header p  { font-size: 13px; color: var(--label2); margin-top: 2px; }
 main {
   max-width: 430px; margin: 0 auto;
   padding: 16px 16px 0;
-  padding-top: calc(env(safe-area-inset-top) + 53px + 46px + 16px);
+  padding-top: 16px;
   display: flex; flex-direction: column; gap: 12px;
 }
 
@@ -655,6 +655,12 @@ function init() {
   const d = new Date();
   document.getElementById('today-label').textContent =
     `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+  const hdr = document.querySelector('header');
+  const tab = document.querySelector('.tab-bar');
+  const hdrH = hdr.offsetHeight;
+  tab.style.top = hdrH + 'px';
+  document.querySelector('main').style.paddingTop = (hdrH + tab.offsetHeight + 16) + 'px';
+
   initCatGrid();
   initDate();
   document.getElementById('amount').addEventListener('input', updateSubmit);
