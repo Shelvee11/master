@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="学日语">
+<meta name="theme-color" content="#4853a7">
+<title>学日语</title>
+<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22%E5%AD%A6%E6%97%A5%E8%AF%AD%22%2C%22short_name%22%3A%22%E5%AD%A6%E6%97%A5%E8%AF%AD%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23fafbff%22%2C%22theme_color%22%3A%22%234853a7%22%2C%22start_url%22%3A%22.%2F%22%7D">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --accent: #4853a7;
+  --accent2: #5c68c4;
+  --accent-light: #7b83d1;
+  --accent-bg: rgba(72,83,167,0.06);
+  --green: #3ea87a;
+  --red: #d4564e;
+  --label: #2e3142;
+  --label2: #7b8095;
+  --label3: #aeb3cc;
+  --fill: #eef0f8;
+  --fill2: #e4e7f2;
+  --bg: #fafbff;
+  --bg2: #ffffff;
+  --sep: #e8eaf4;
+  --radius: 14px;
+  --heatmap-0: #eef0f8;
+  --heatmap-1: #c8cde8;
+  --heatmap-2: #8b93cc;
+  --heatmap-3: #5c68c4;
+  --heatmap-4: #3a44a0;
+}
+
+html { background: var(--bg); }
+
+body {
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  background: var(--bg);
+  color: var(--label);
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  padding-bottom: 80px;
+  -webkit-tap-highlight-color: transparent;
+  font-weight: 400;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(250,251,255,0.88);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  padding: calc(env(safe-area-inset-top) + 14px) 20px 14px;
+  border-bottom: 1px solid var(--sep);
+}
+
+.header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.3px;
+}
+
+.header-sub {
+  font-size: 12px;
+  color: var(--label3);
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+/* Views */
+.view { display: none; padding: 20px 16px; }
+.view.active { display: block; }
+
+/* Tab bar */
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  background: rgba(255,255,255,0.94);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--sep);
+  display: flex;
+  padding: 6px 0 calc(env(safe-area-inset-bottom) + 6px);
+  z-index: 20;
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--label3);
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s;
+  -webkit-user-select: none;
+  user-select: none;
+  font-family: inherit;
+}
+
+.tab-btn .tab-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-btn .tab-icon svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tab-btn.active { color: var(--accent); }
+.tab-btn.active .tab-icon svg { stroke-width: 1.8; }
+
+/* Cards */
+.card {
+  background: var(--bg2);
+  border-radius: var(--radius);
+  border: 1px solid var(--sep);
+  box-shadow: 0 2px 8px rgba(72,83,167,0.04);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.card-inner { padding: 16px; }
+
+/* Quick start FAB on home */
+.quick-start {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  width: 100%;
+  margin-bottom: 16px;
+  transition: opacity 0.12s, transform 0.08s;
+  box-shadow: 0 4px 14px rgba(72,83,167,0.2);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.quick-start:active { opacity: 0.8; transform: scale(0.98); }
+
+.quick-start svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.quick-start-text { flex: 1; text-align: left; }
+
+.quick-start-hint {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+/* Heatmap */
+.heatmap-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+.heatmap-months {
+  display: flex;
+  font-size: 11px;
+  color: var(--label3);
+  margin-bottom: 4px;
+  padding-left: 28px;
+  font-weight: 500;
+}
+
+.heatmap-months span { flex-shrink: 0; }
+
+.heatmap-body { display: flex; }
+
+.heatmap-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--label3);
+  padding-right: 6px;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.heatmap-labels span {
+  height: 12px;
+  line-height: 12px;
+}
+
+.heatmap-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 12px);
+  grid-auto-flow: column;
+  grid-auto-columns: 12px;
+  gap: 3px;
+}
+
+.heatmap-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--heatmap-0);
+  cursor: pointer;
+  transition: opacity 0.12s, transform 0.12s;
+}
+
+.heatmap-cell:hover { opacity: 0.8; transform: scale(1.2); }
+.heatmap-cell.level-1 { background: var(--heatmap-1); }
+.heatmap-cell.level-2 { background: var(--heatmap-2); }
+.heatmap-cell.level-3 { background: var(--heatmap-3); }
+.heatmap-cell.level-4 { background: var(--heatmap-4); }
+.heatmap-cell.future { background: transparent; }
+
+/* Heatmap tooltip */
+.heatmap-tooltip {
+  display: none;
+  background: var(--fill);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--label2);
+}
+
+.heatmap-tooltip.show { display: block; }
+
+.heatmap-tooltip .tt-date {
+  font-weight: 600;
+  color: var(--label);
+  margin-bottom: 4px;
+}
+
+.heatmap-tooltip .tt-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+/* Timeline */
+.timeline-section { margin-top: 4px; }
+
+.timeline-entry {
+  display: flex;
+  gap: 14px;
+  padding: 14px 0;
+}
+
+.timeline-entry:not(:last-child) {
+  border-bottom: 1px solid var(--sep);
+}
+
+.timeline-date {
+  flex-shrink: 0;
+  width: 44px;
+  text-align: center;
+}
+
+.timeline-date .day {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.timeline-date .month {
+  font-size: 12px;
+  color: var(--label3);
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+.timeline-items {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timeline-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--fill);
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.timeline-item:active { background: var(--fill2); }
+
+.timeline-item .topic {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--label);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-item .dur {
+  font-size: 13px;
+  color: var(--label2);
+  flex-shrink: 0;
+  margin-left: 10px;
+  font-weight: 500;
+}
+
+.timeline-total {
+  font-size: 12px;
+  color: var(--label3);
+  text-align: right;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.timeline-gap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  color: var(--label3);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.timeline-gap::before,
+.timeline-gap::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--sep);
+}
+
+.timeline-empty {
+  text-align: center;
+  color: var(--label3);
+  font-size: 14px;
+  padding: 40px 0;
+  line-height: 1.8;
+}
+
+/* Stats */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat-card {
+  background: var(--bg2);
+  border-radius: var(--radius);
+  border: 1px solid var(--sep);
+  box-shadow: 0 2px 8px rgba(72,83,167,0.04);
+  padding: 16px 14px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+
+.stat-unit {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-light);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--label3);
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+/* Timer */
+.timer-display {
+  text-align: center;
+  padding: 40px 0 30px;
+}
+
+.timer-time {
+  font-size: 60px;
+  font-weight: 300;
+  letter-spacing: -2px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-topic-display {
+  font-size: 14px;
+  color: var(--label2);
+  margin-top: 8px;
+}
+
+.timer-input-group {
+  margin-bottom: 24px;
+}
+
+.timer-input-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--label3);
+  display: block;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.timer-input-group input[type="text"] {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--sep);
+  font-size: 15px;
+  font-family: inherit;
+  background: var(--bg2);
+  color: var(--label);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.timer-input-group input[type="text"]:focus {
+  border-color: var(--accent-light);
+  box-shadow: 0 0 0 3px rgba(72,83,167,0.08);
+}
+
+.timer-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.btn {
+  flex: 1;
+  padding: 13px;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.12s, transform 0.08s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.btn:active { opacity: 0.75; transform: scale(0.98); }
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-secondary {
+  background: var(--fill);
+  color: var(--label);
+}
+
+.btn-danger {
+  background: rgba(212,86,78,0.08);
+  color: var(--red);
+}
+
+.btn-outline {
+  background: var(--bg2);
+  color: var(--accent);
+  border: 1px solid var(--sep);
+  font-weight: 500;
+}
+
+.timer-summary {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.timer-summary .summary-dur {
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.timer-summary .summary-label {
+  font-size: 13px;
+  color: var(--label3);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* Edit sheet */
+.edit-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(46,49,66,0.3);
+  z-index: 100;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.edit-overlay.show { display: flex; }
+
+.edit-sheet {
+  background: var(--bg2);
+  border-radius: 18px 18px 0 0;
+  padding: 24px 20px calc(env(safe-area-inset-bottom) + 20px);
+  width: 100%;
+  max-width: 430px;
+}
+
+.edit-sheet h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--label);
+  margin-bottom: 16px;
+}
+
+.edit-field {
+  margin-bottom: 14px;
+}
+
+.edit-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--label3);
+  display: block;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.edit-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sep);
+  font-size: 15px;
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--label);
+  outline: none;
+}
+
+.edit-field input:focus {
+  border-color: var(--accent-light);
+}
+
+.edit-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.edit-delete {
+  margin-top: 12px;
+  width: 100%;
+}
+
+/* Settings */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--sep);
+}
+
+.setting-row:last-child { border-bottom: none; }
+
+.setting-label {
+  font-size: 14px;
+  color: var(--label);
+  font-weight: 500;
+}
+
+.setting-input {
+  width: 64px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--sep);
+  font-size: 14px;
+  font-family: inherit;
+  text-align: center;
+  background: var(--bg);
+  color: var(--label);
+  outline: none;
+}
+
+.setting-input:focus { border-color: var(--accent-light); }
+
+.settings-section {
+  margin-top: 20px;
+}
+
+.settings-section h3 {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--label3);
+  margin-bottom: 8px;
+}
+
+.btn-block {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* Confirm overlay */
+.confirm-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(46,49,66,0.3);
+  z-index: 100;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.confirm-overlay.show { display: flex; }
+
+.confirm-sheet {
+  background: var(--bg2);
+  border-radius: 18px 18px 0 0;
+  padding: 24px 20px calc(env(safe-area-inset-bottom) + 20px);
+  width: 100%;
+  max-width: 430px;
+  text-align: center;
+}
+
+.confirm-sheet p {
+  font-size: 14px;
+  color: var(--label2);
+  margin-bottom: 20px;
+}
+
+.confirm-sheet .btn { margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <h1>学日语</h1>
+  <p class="header-sub" id="headerSub">日语学习追踪</p>
+</header>
+
+<!-- Home View -->
+<section class="view active" id="view-home">
+  <button class="quick-start" id="quickStartBtn" onclick="quickStart()">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="9"/><polyline points="12 9 12 13 15.5 15"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="9" y1="1" x2="15" y2="1"/></svg>
+    <span class="quick-start-text" id="quickStartText">开始学习</span>
+  </button>
+
+  <div class="card">
+    <div class="card-inner">
+      <div class="heatmap-wrap">
+        <div class="heatmap-months" id="heatmapMonths"></div>
+        <div class="heatmap-body">
+          <div class="heatmap-labels">
+            <span></span><span>一</span><span></span><span>三</span><span></span><span>五</span><span></span>
+          </div>
+          <div class="heatmap-grid" id="heatmapGrid"></div>
+        </div>
+      </div>
+      <div class="heatmap-tooltip" id="heatmapTooltip"></div>
+    </div>
+  </div>
+
+  <div class="timeline-section" id="timeline"></div>
+</section>
+
+<!-- Timer View (Tab 2) -->
+<section class="view" id="view-timer">
+  <div id="timerIdle">
+    <div class="timer-input-group">
+      <label for="topicInput">学习内容</label>
+      <input type="text" id="topicInput" placeholder="播客、教材、单词…" list="topicSuggestions" autocomplete="off">
+      <datalist id="topicSuggestions"></datalist>
+    </div>
+    <button class="btn btn-primary btn-block" onclick="startTimer()">开始学习</button>
+  </div>
+
+  <div id="timerRunning" style="display:none">
+    <div class="timer-display">
+      <div class="timer-time" id="timerTime">00:00:00</div>
+      <div class="timer-topic-display" id="timerTopicLabel"></div>
+    </div>
+    <div class="timer-buttons">
+      <button class="btn btn-secondary" id="pauseBtn" onclick="togglePause()">暂停</button>
+      <button class="btn btn-danger" onclick="stopTimer()">结束</button>
+    </div>
+  </div>
+
+  <div id="timerStopped" style="display:none">
+    <div class="timer-summary">
+      <div class="summary-dur" id="summaryDur"></div>
+      <div class="summary-label">学习时长</div>
+    </div>
+    <div class="timer-input-group">
+      <label for="topicEdit">学习内容</label>
+      <input type="text" id="topicEdit" autocomplete="off">
+    </div>
+    <div class="timer-buttons">
+      <button class="btn btn-primary" onclick="saveSession()">保存</button>
+      <button class="btn btn-secondary" onclick="discardSession()">丢弃</button>
+    </div>
+  </div>
+</section>
+
+<!-- Stats View -->
+<section class="view" id="view-stats">
+  <div class="stats-grid" id="statsGrid"></div>
+  <div class="settings-section" style="margin-top:20px">
+    <h3>本周学习</h3>
+    <div class="card">
+      <div class="card-inner" id="weekDetail"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Settings View -->
+<section class="view" id="view-settings">
+  <div class="card">
+    <div class="card-inner">
+      <div class="setting-row">
+        <span class="setting-label">每日目标（分钟）</span>
+        <input type="number" class="setting-input" id="goalMinutes" min="1" max="480" onchange="saveSetting()">
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">每周目标（天数）</span>
+        <input type="number" class="setting-input" id="goalDays" min="1" max="7" onchange="saveSetting()">
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h3>数据管理</h3>
+    <button class="btn btn-outline btn-block" onclick="exportCSV()">导出 CSV</button>
+    <button class="btn btn-outline btn-block" onclick="document.getElementById('importFile').click()">导入 CSV</button>
+    <input type="file" id="importFile" accept=".csv" style="display:none" onchange="importCSV(event)">
+    <button class="btn btn-danger btn-block" onclick="showConfirm()">清除所有数据</button>
+  </div>
+</section>
+
+<!-- Tab Bar: Home / Timer / Stats / Settings -->
+<nav class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('home')" data-tab="home">
+    <span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+    <span>首页</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('timer')" data-tab="timer">
+    <span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="9"/><polyline points="12 9 12 13 15.5 15"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="9" y1="1" x2="15" y2="1"/></svg></span>
+    <span>计时</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('stats')" data-tab="stats">
+    <span class="tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg></span>
+    <span>统计</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('settings')" data-tab="settings">
+    <span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+    <span>设置</span>
+  </button>
+</nav>
+
+<!-- Edit session sheet -->
+<div class="edit-overlay" id="editOverlay" onclick="closeEdit()">
+  <div class="edit-sheet" onclick="event.stopPropagation()">
+    <h3>编辑记录</h3>
+    <div class="edit-field">
+      <label>学习内容</label>
+      <input type="text" id="editTopic">
+    </div>
+    <div class="edit-field">
+      <label>时长（分钟）</label>
+      <input type="number" id="editDuration" min="1">
+    </div>
+    <div class="edit-actions">
+      <button class="btn btn-primary" onclick="saveEdit()">保存</button>
+      <button class="btn btn-secondary" onclick="closeEdit()">取消</button>
+    </div>
+    <button class="btn btn-danger edit-delete" onclick="deleteSession()">删除此记录</button>
+  </div>
+</div>
+
+<!-- Confirm overlay -->
+<div class="confirm-overlay" id="confirmOverlay" onclick="hideConfirm()">
+  <div class="confirm-sheet" onclick="event.stopPropagation()">
+    <p>确定要清除所有学习记录吗？此操作不可恢复。</p>
+    <button class="btn btn-danger btn-block" onclick="clearAllData()">确认清除</button>
+    <button class="btn btn-secondary btn-block" onclick="hideConfirm()">取消</button>
+  </div>
+</div>
+
+<script>
+// ── Date Helpers ─────────────────────────────────────────────
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function parseDate(s) {
+  return new Date(s + 'T00:00:00');
+}
+
+function dateDiffDays(a, b) {
+  return Math.round((parseDate(a) - parseDate(b)) / 86400000);
+}
+
+function isoMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function formatDuration(seconds) {
+  if (seconds < 60) return `${seconds}秒`;
+  const m = Math.floor(seconds / 60);
+  if (m < 60) return `${m}分钟`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}小时${rm}分钟` : `${h}小时`;
+}
+
+function formatDurShort(seconds) {
+  const m = Math.floor(seconds / 60);
+  if (m < 60) return `${m}分钟`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}.${Math.round(rm/6)}小时` : `${h}小时`;
+}
+
+function formatTimer(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function getMonthName(m) {
+  return ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'][m];
+}
+
+// ── Storage ──────────────────────────────────────────────────
+const KEY = 'jp-study-sessions';
+
+function defaultData() {
+  return { sessions: [], activeTimer: null, settings: { dailyGoalMinutes: 30, weeklyGoalDays: 6 } };
+}
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (!d.settings) d.settings = defaultData().settings;
+      if (!d.sessions) d.sessions = [];
+      return d;
+    }
+  } catch(e) {}
+  return defaultData();
+}
+
+function saveData(data) {
+  localStorage.setItem(KEY, JSON.stringify(data));
+}
+
+// ── Tab Navigation ───────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  document.querySelector(`[data-tab="${id}"]`).classList.add('active');
+  sessionStorage.setItem('jp-active-tab', id);
+  if (id === 'home') renderHome();
+  if (id === 'stats') renderStats();
+  if (id === 'timer') renderTimerView();
+}
+
+// ── Quick Start ──────────────────────────────────────────────
+function quickStart() {
+  const data = loadData();
+  if (data.activeTimer) {
+    switchTab('timer');
+  } else {
+    switchTab('timer');
+  }
+}
+
+function updateQuickStartBtn() {
+  const data = loadData();
+  const btn = document.getElementById('quickStartBtn');
+  const text = document.getElementById('quickStartText');
+  if (data.activeTimer) {
+    const at = data.activeTimer;
+    let elapsed;
+    if (at.pausedAt) {
+      elapsed = Math.floor((at.pausedAt - at.startedAt - (at.pausedDuration || 0)) / 1000);
+    } else {
+      elapsed = Math.floor((Date.now() - at.startedAt - (at.pausedDuration || 0)) / 1000);
+    }
+    if (elapsed < 0) elapsed = 0;
+    text.innerHTML = `学习中 · ${formatTimer(elapsed)}<br><span class="quick-start-hint">${escHtml(at.topic || '未命名')}</span>`;
+  } else {
+    text.innerHTML = '开始学习';
+  }
+}
+
+// ── Heatmap ──────────────────────────────────────────────────
+function buildDayMap(sessions) {
+  const map = {};
+  for (const s of sessions) {
+    map[s.date] = (map[s.date] || 0) + s.duration;
+  }
+  return map;
+}
+
+function getLevel(totalSeconds) {
+  const m = totalSeconds / 60;
+  if (m <= 0) return 0;
+  if (m < 15) return 1;
+  if (m < 30) return 2;
+  if (m < 60) return 3;
+  return 4;
+}
+
+function renderHeatmap() {
+  const data = loadData();
+  const dayMap = buildDayMap(data.sessions);
+  const grid = document.getElementById('heatmapGrid');
+  const monthsEl = document.getElementById('heatmapMonths');
+  grid.innerHTML = '';
+  monthsEl.innerHTML = '';
+
+  const today = new Date();
+  const totalWeeks = 26;
+  const startMonday = isoMonday(today);
+  startMonday.setDate(startMonday.getDate() - (totalWeeks - 1) * 7);
+
+  const monthPositions = [];
+  let lastMonth = -1;
+
+  for (let w = 0; w < totalWeeks; w++) {
+    for (let d = 0; d < 7; d++) {
+      const cellDate = new Date(startMonday);
+      cellDate.setDate(startMonday.getDate() + w * 7 + d);
+
+      const dateStr = `${cellDate.getFullYear()}-${String(cellDate.getMonth()+1).padStart(2,'0')}-${String(cellDate.getDate()).padStart(2,'0')}`;
+
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-cell';
+
+      if (cellDate > today) {
+        cell.classList.add('future');
+      } else {
+        const total = dayMap[dateStr] || 0;
+        const level = getLevel(total);
+        if (level > 0) cell.classList.add('level-' + level);
+        cell.dataset.date = dateStr;
+        cell.onclick = () => showHeatmapTooltip(dateStr, data.sessions);
+      }
+
+      grid.appendChild(cell);
+
+      if (d === 0 && cellDate.getMonth() !== lastMonth) {
+        monthPositions.push({ month: cellDate.getMonth(), week: w });
+        lastMonth = cellDate.getMonth();
+      }
+    }
+  }
+
+  const cellSize = 15;
+  for (let i = 0; i < monthPositions.length; i++) {
+    const span = document.createElement('span');
+    span.textContent = getMonthName(monthPositions[i].month);
+    const nextWeek = i + 1 < monthPositions.length ? monthPositions[i+1].week : totalWeeks;
+    span.style.width = (nextWeek - monthPositions[i].week) * cellSize + 'px';
+    monthsEl.appendChild(span);
+  }
+}
+
+function showHeatmapTooltip(dateStr, sessions) {
+  const tooltip = document.getElementById('heatmapTooltip');
+  const daySessions = sessions.filter(s => s.date === dateStr);
+  const d = parseDate(dateStr);
+  const label = `${d.getMonth()+1}月${d.getDate()}日`;
+
+  if (daySessions.length === 0) {
+    tooltip.innerHTML = `<div class="tt-date">${label}</div><div>无学习记录</div>`;
+  } else {
+    const total = daySessions.reduce((a, s) => a + s.duration, 0);
+    let html = `<div class="tt-date">${label} — ${formatDuration(total)}</div>`;
+    for (const s of daySessions) {
+      html += `<div class="tt-item"><span>${escHtml(s.topic || '未命名')}</span><span>${formatDurShort(s.duration)}</span></div>`;
+    }
+    tooltip.innerHTML = html;
+  }
+  tooltip.classList.add('show');
+}
+
+// ── Timeline ─────────────────────────────────────────────────
+function renderTimeline() {
+  const data = loadData();
+  const container = document.getElementById('timeline');
+  const sessions = [...data.sessions].sort((a, b) => {
+    const dd = b.date.localeCompare(a.date);
+    if (dd !== 0) return dd;
+    return (b.startTime || '').localeCompare(a.startTime || '');
+  });
+
+  if (sessions.length === 0) {
+    container.innerHTML = '<div class="timeline-empty">还没有学习记录<br>点击上方按钮开始第一次学习</div>';
+    return;
+  }
+
+  const groups = [];
+  let cur = null;
+  for (const s of sessions) {
+    if (!cur || cur.date !== s.date) {
+      cur = { date: s.date, items: [] };
+      groups.push(cur);
+    }
+    cur.items.push(s);
+  }
+
+  let html = '';
+  for (let i = 0; i < groups.length; i++) {
+    const g = groups[i];
+    const d = parseDate(g.date);
+    const total = g.items.reduce((a, s) => a + s.duration, 0);
+
+    if (i > 0) {
+      const gap = dateDiffDays(groups[i-1].date, g.date);
+      if (gap >= 2) {
+        html += `<div class="timeline-gap">${gap}天</div>`;
+      }
+    }
+
+    html += '<div class="timeline-entry">';
+    html += `<div class="timeline-date"><div class="day">${String(d.getDate()).padStart(2,'0')}</div><div class="month">${d.getMonth()+1}月</div></div>`;
+    html += '<div class="timeline-items">';
+    for (const s of g.items) {
+      html += `<div class="timeline-item" onclick="openEdit('${s.id}')"><span class="topic">${escHtml(s.topic || '未命名')}</span><span class="dur">${formatDurShort(s.duration)}</span></div>`;
+    }
+    if (g.items.length > 1) {
+      html += `<div class="timeline-total">${formatDuration(total)}</div>`;
+    }
+    html += '</div></div>';
+  }
+  container.innerHTML = html;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderHome() {
+  updateQuickStartBtn();
+  renderHeatmap();
+  renderTimeline();
+  document.getElementById('heatmapTooltip').classList.remove('show');
+}
+
+// ── Edit / Delete Sessions ───────────────────────────────────
+let editingId = null;
+
+function openEdit(id) {
+  const data = loadData();
+  const session = data.sessions.find(s => s.id === id);
+  if (!session) return;
+
+  editingId = id;
+  document.getElementById('editTopic').value = session.topic || '';
+  document.getElementById('editDuration').value = Math.round(session.duration / 60);
+  document.getElementById('editOverlay').classList.add('show');
+}
+
+function closeEdit() {
+  document.getElementById('editOverlay').classList.remove('show');
+  editingId = null;
+}
+
+function saveEdit() {
+  if (!editingId) return;
+  const data = loadData();
+  const session = data.sessions.find(s => s.id === editingId);
+  if (!session) return;
+
+  session.topic = document.getElementById('editTopic').value.trim();
+  const mins = parseInt(document.getElementById('editDuration').value);
+  if (mins > 0) session.duration = mins * 60;
+
+  saveData(data);
+  closeEdit();
+  renderHome();
+}
+
+function deleteSession() {
+  if (!editingId) return;
+  const data = loadData();
+  data.sessions = data.sessions.filter(s => s.id !== editingId);
+  saveData(data);
+  closeEdit();
+  renderHome();
+}
+
+// ── Stats ────────────────────────────────────────────────────
+function renderStats() {
+  const data = loadData();
+  const sessions = data.sessions;
+  const settings = data.settings;
+  const grid = document.getElementById('statsGrid');
+
+  const totalSec = sessions.reduce((a, s) => a + s.duration, 0);
+  const uniqueDays = new Set(sessions.map(s => s.date));
+  const avgSec = uniqueDays.size > 0 ? Math.round(totalSec / uniqueDays.size) : 0;
+
+  const dayMap = buildDayMap(sessions);
+  let streak = 0;
+  const t = new Date();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(t);
+    d.setDate(d.getDate() - i);
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const mins = (dayMap[ds] || 0) / 60;
+    if (mins >= settings.dailyGoalMinutes) {
+      streak++;
+    } else if (i === 0) {
+      continue;
+    } else {
+      break;
+    }
+  }
+
+  const monday = isoMonday(new Date());
+  const mondayStr = `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`;
+  const weekDays = new Set();
+  for (const s of sessions) {
+    if (s.date >= mondayStr) weekDays.add(s.date);
+  }
+
+  const totalH = Math.floor(totalSec / 3600);
+  const totalM = Math.floor((totalSec % 3600) / 60);
+
+  grid.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-value">${totalH > 0 ? totalH : totalM}<span class="stat-unit">${totalH > 0 ? '小时' : '分钟'}</span></div>
+      <div class="stat-label">总学习时长${totalH > 0 && totalM > 0 ? ` ${totalM}分钟` : ''}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${streak}<span class="stat-unit">天</span></div>
+      <div class="stat-label">连续达标</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${Math.round(avgSec/60)}<span class="stat-unit">分钟</span></div>
+      <div class="stat-label">日均学习</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${weekDays.size}<span class="stat-unit">/${settings.weeklyGoalDays}天</span></div>
+      <div class="stat-label">本周进度</div>
+    </div>
+  `;
+
+  const weekDetail = document.getElementById('weekDetail');
+  const weekSessions = sessions.filter(s => s.date >= mondayStr).sort((a,b) => b.date.localeCompare(a.date));
+  if (weekSessions.length === 0) {
+    weekDetail.innerHTML = '<div style="color:var(--label3);font-size:13px;text-align:center;padding:12px 0">本周还没有学习记录</div>';
+  } else {
+    const weekTotal = weekSessions.reduce((a,s) => a + s.duration, 0);
+    let html = '';
+    for (const s of weekSessions) {
+      const d = parseDate(s.date);
+      html += `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px"><span style="color:var(--label2)">${d.getMonth()+1}/${d.getDate()} ${escHtml(s.topic || '未命名')}</span><span style="color:var(--label);font-weight:500">${formatDurShort(s.duration)}</span></div>`;
+    }
+    html += `<div style="text-align:right;font-size:12px;color:var(--label3);margin-top:6px;padding-top:6px;border-top:1px solid var(--sep);font-weight:500">合计 ${formatDuration(weekTotal)}</div>`;
+    weekDetail.innerHTML = html;
+  }
+}
+
+// ── Timer ────────────────────────────────────────────────────
+let timerInterval = null;
+let stoppedDuration = 0;
+
+function renderTimerView() {
+  const data = loadData();
+  populateTopicSuggestions(data);
+
+  if (data.activeTimer) {
+    showTimerState('running');
+    document.getElementById('timerTopicLabel').textContent = data.activeTimer.topic || '';
+    const btn = document.getElementById('pauseBtn');
+    btn.textContent = data.activeTimer.pausedAt ? '继续' : '暂停';
+    startTimerDisplay();
+  } else {
+    showTimerState('idle');
+  }
+}
+
+function populateTopicSuggestions(data) {
+  const topics = [...new Set(data.sessions.map(s => s.topic).filter(Boolean))].slice(-20).reverse();
+  const dl = document.getElementById('topicSuggestions');
+  dl.innerHTML = topics.map(t => `<option value="${escHtml(t)}">`).join('');
+}
+
+function showTimerState(state) {
+  document.getElementById('timerIdle').style.display = state === 'idle' ? 'block' : 'none';
+  document.getElementById('timerRunning').style.display = state === 'running' ? 'block' : 'none';
+  document.getElementById('timerStopped').style.display = state === 'stopped' ? 'block' : 'none';
+  if (state !== 'running' && timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function startTimer() {
+  const topic = document.getElementById('topicInput').value.trim();
+  const data = loadData();
+  data.activeTimer = {
+    startedAt: Date.now(),
+    topic: topic,
+    pausedAt: null,
+    pausedDuration: 0
+  };
+  saveData(data);
+  document.getElementById('topicInput').value = '';
+  showTimerState('running');
+  document.getElementById('timerTopicLabel').textContent = topic;
+  document.getElementById('pauseBtn').textContent = '暂停';
+  startTimerDisplay();
+}
+
+function startTimerDisplay() {
+  updateTimerDisplay();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(updateTimerDisplay, 1000);
+}
+
+function updateTimerDisplay() {
+  const data = loadData();
+  if (!data.activeTimer) return;
+  const at = data.activeTimer;
+  let elapsed;
+  if (at.pausedAt) {
+    elapsed = Math.floor((at.pausedAt - at.startedAt - (at.pausedDuration || 0)) / 1000);
+  } else {
+    elapsed = Math.floor((Date.now() - at.startedAt - (at.pausedDuration || 0)) / 1000);
+  }
+  if (elapsed < 0) elapsed = 0;
+  document.getElementById('timerTime').textContent = formatTimer(elapsed);
+}
+
+function togglePause() {
+  const data = loadData();
+  if (!data.activeTimer) return;
+  const at = data.activeTimer;
+  const btn = document.getElementById('pauseBtn');
+
+  if (at.pausedAt) {
+    at.pausedDuration = (at.pausedDuration || 0) + (Date.now() - at.pausedAt);
+    at.pausedAt = null;
+    btn.textContent = '暂停';
+    startTimerDisplay();
+  } else {
+    at.pausedAt = Date.now();
+    btn.textContent = '继续';
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    updateTimerDisplay();
+  }
+  saveData(data);
+}
+
+function stopTimer() {
+  const data = loadData();
+  if (!data.activeTimer) return;
+  const at = data.activeTimer;
+
+  let endTime = at.pausedAt || Date.now();
+  stoppedDuration = Math.floor((endTime - at.startedAt - (at.pausedDuration || 0)) / 1000);
+  if (stoppedDuration < 0) stoppedDuration = 0;
+
+  showTimerState('stopped');
+  document.getElementById('summaryDur').textContent = formatDuration(stoppedDuration);
+  document.getElementById('topicEdit').value = at.topic || '';
+}
+
+function saveSession() {
+  const data = loadData();
+  const at = data.activeTimer;
+  if (!at) return;
+
+  const topic = document.getElementById('topicEdit').value.trim();
+  const startDate = new Date(at.startedAt);
+  const session = {
+    id: String(at.startedAt),
+    date: `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`,
+    startTime: `${String(startDate.getHours()).padStart(2,'0')}:${String(startDate.getMinutes()).padStart(2,'0')}`,
+    duration: stoppedDuration,
+    topic: topic
+  };
+
+  data.sessions.push(session);
+  data.activeTimer = null;
+  saveData(data);
+
+  showTimerState('idle');
+  switchTab('home');
+}
+
+function discardSession() {
+  const data = loadData();
+  data.activeTimer = null;
+  saveData(data);
+  showTimerState('idle');
+}
+
+// ── Settings ─────────────────────────────────────────────────
+function loadSettings() {
+  const data = loadData();
+  document.getElementById('goalMinutes').value = data.settings.dailyGoalMinutes;
+  document.getElementById('goalDays').value = data.settings.weeklyGoalDays;
+}
+
+function saveSetting() {
+  const data = loadData();
+  data.settings.dailyGoalMinutes = parseInt(document.getElementById('goalMinutes').value) || 30;
+  data.settings.weeklyGoalDays = parseInt(document.getElementById('goalDays').value) || 6;
+  saveData(data);
+}
+
+function showConfirm() { document.getElementById('confirmOverlay').classList.add('show'); }
+function hideConfirm() { document.getElementById('confirmOverlay').classList.remove('show'); }
+
+function clearAllData() {
+  localStorage.removeItem(KEY);
+  hideConfirm();
+  renderAll();
+}
+
+// ── CSV Export/Import ────────────────────────────────────────
+function exportCSV() {
+  const data = loadData();
+  const rows = ['date,start_time,duration_minutes,topic'];
+  for (const s of [...data.sessions].sort((a,b) => a.date.localeCompare(b.date))) {
+    rows.push(`${s.date},${s.startTime || ''},${Math.round(s.duration / 60)},"${(s.topic||'').replace(/"/g,'""')}"`);
+  }
+  const csv = rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `japanese_study_${todayStr()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const lines = e.target.result.split('\n').slice(1);
+    const data = loadData();
+    const header = e.target.result.split('\n')[0];
+    const isMinutes = header.includes('duration_minutes');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const match = line.match(/^(\d{4}-\d{2}-\d{2}),([^,]*),(\d+),(.*)$/);
+      if (!match) continue;
+      const [, date, startTime, durVal, topicRaw] = match;
+      const topic = topicRaw.replace(/^"|"$/g, '').replace(/""/g, '"');
+      const duration = isMinutes ? parseInt(durVal) * 60 : parseInt(durVal);
+      if (!data.sessions.some(s => s.date === date && s.duration === duration && s.topic === topic)) {
+        data.sessions.push({
+          id: String(Date.now() + Math.random()),
+          date,
+          startTime,
+          duration,
+          topic
+        });
+      }
+    }
+    saveData(data);
+    renderAll();
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ── Service Worker ───────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'jp-study-v2';
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html'])));
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+    });
+  `;
+  const swBlob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl).catch(() => {});
+}
+
+// ── Init ─────────────────────────────────────────────────────
+function renderAll() {
+  renderHome();
+  loadSettings();
+}
+
+renderAll();
+
+const savedTab = sessionStorage.getItem('jp-active-tab');
+if (savedTab) switchTab(savedTab);
+
+const initData = loadData();
+if (initData.activeTimer) switchTab('timer');
+</script>
+</body>
+</html>
