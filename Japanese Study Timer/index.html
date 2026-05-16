@@ -1348,8 +1348,40 @@ function saveSession() {
   data.activeTimer = null;
   saveData(data);
 
+  downloadICS(session);
   showTimerState('idle');
   switchTab('home');
+}
+
+function generateICS(session) {
+  const start = new Date(parseInt(session.id));
+  const end = new Date(start.getTime() + session.duration * 1000);
+  const fmt = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//JP Study Timer//EN',
+    'BEGIN:VEVENT',
+    'UID:' + session.id + '@jp-study',
+    'DTSTART:' + fmt(start),
+    'DTEND:' + fmt(end),
+    'SUMMARY:日语学习',
+    'DESCRIPTION:' + (session.topic || '').replace(/\n/g, '\\n'),
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ];
+  return lines.join('\r\n');
+}
+
+function downloadICS(session) {
+  const ics = generateICS(session);
+  const blob = new Blob([ics], { type: 'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '日语学习.ics';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function discardSession() {
