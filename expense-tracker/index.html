@@ -175,12 +175,13 @@ main {
 .data-action-btn {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 14px 4px; border: none; background: none; font-family: inherit;
-  cursor: pointer; color: var(--label2); font-size: 12px; gap: 6px;
+  cursor: pointer; color: var(--label2); font-size: 12px; gap: 8px;
   border-right: 1px solid var(--sep); transition: background 0.1s;
 }
 .data-action-btn:last-child { border-right: none; }
 .data-action-btn:active { background: var(--fill); }
-.data-action-btn .icon { font-size: 20px; }
+.icon-emoji  { font-size: 28px; line-height: 1; }
+.icon-img    { width: 32px; height: 32px; object-fit: contain; }
 
 /* Summary */
 .summary-row {
@@ -305,9 +306,9 @@ main {
     <p class="card-label">数据管理</p>
     <div class="card">
       <div class="data-actions">
-        <button class="data-action-btn" onclick="exportAllCSV()"><span class="icon">🗂️</span>导出全部</button>
-        <button class="data-action-btn" onclick="exportCSV()"><span class="icon">📄</span>导出本月</button>
-        <button class="data-action-btn" onclick="importCSV()"><span class="icon">⬆️</span>导入数据</button>
+        <button class="data-action-btn" onclick="exportAllCSV()"><span class="icon-emoji">🗂️</span>导出全部</button>
+        <button class="data-action-btn" onclick="exportCSV()"><span class="icon-emoji">📄</span>导出本月</button>
+        <button class="data-action-btn" onclick="importCSV()"><img class="icon-img" src="data-backup.png" alt="恢复">恢复数据</button>
       </div>
     </div>
 
