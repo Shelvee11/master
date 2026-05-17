@@ -44,8 +44,13 @@ body {
   font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
   background: var(--bg);
   color: var(--label);
+  /* fixed 脱离文档流，键盘弹起无法影响布局 */
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
   max-width: 430px;
-  margin: 0 auto;
   height: var(--app-h, 100dvh);
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
@@ -53,8 +58,7 @@ body {
 }
 
 .header {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 10;
   background: rgba(250,251,255,0.88);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -81,7 +85,7 @@ body {
 .view {
   display: none;
   padding: 20px 16px calc(env(safe-area-inset-bottom) + 20px);
-  height: calc(var(--app-h, 100dvh) - var(--header-h, 60px) - var(--tabbar-h, 70px));
+  height: calc(100% - var(--header-h, 60px) - var(--tabbar-h, 70px));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -1526,19 +1530,10 @@ function renderAll() {
   loadSettings();
 }
 
-// Lock the initial viewport height so keyboard events don't reflow the layout.
-function lockViewportHeight() {
-  const h = window.innerHeight;
-  document.documentElement.style.setProperty('--app-h', h + 'px');
-  document.body.style.height = h + 'px';
-}
-lockViewportHeight();
 updateLayoutVars();
 
-// Only re-lock on genuine orientation changes, not keyboard events.
-// visualViewport shrinks when keyboard opens; window.innerHeight stays stable on iOS.
 window.addEventListener('orientationchange', () => {
-  setTimeout(() => { lockViewportHeight(); updateLayoutVars(); }, 300);
+  setTimeout(updateLayoutVars, 300);
 });
 renderAll();
 
