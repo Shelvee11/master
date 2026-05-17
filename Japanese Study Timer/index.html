@@ -1230,8 +1230,8 @@ function renderStats() {
 
   grid.innerHTML = `
     <div class="stat-card">
-      <div class="stat-value">${totalH > 0 ? totalH : totalM}<span class="stat-unit">${totalH > 0 ? '小时' : '分钟'}</span></div>
-      <div class="stat-label">总学习时长${totalH > 0 && totalM > 0 ? ` ${totalM}分钟` : ''}</div>
+      <div class="stat-value">${totalH > 0 ? totalH : totalM}<span class="stat-unit">${totalH > 0 ? '小时' : '分钟'}${totalH > 0 && totalM > 0 ? ` ${totalM}分钟` : ''}</span></div>
+      <div class="stat-label">总学习时长</div>
     </div>
     <div class="stat-card">
       <div class="stat-value">${streak}<span class="stat-unit">天</span></div>
@@ -1283,7 +1283,14 @@ function renderTimerView() {
 }
 
 function populateTopicSuggestions(data) {
-  const topics = [...new Set(data.sessions.map(s => s.topic).filter(Boolean))].slice(-20).reverse();
+  const latest = {};
+  for (const s of data.sessions) {
+    if (s.topic) {
+      const key = s.date + (s.startTime || '');
+      if (!latest[s.topic] || key > latest[s.topic]) latest[s.topic] = key;
+    }
+  }
+  const topics = Object.keys(latest).sort((a, b) => latest[b].localeCompare(latest[a])).slice(0, 20);
   const dl = document.getElementById('topicSuggestions');
   dl.innerHTML = topics.map(t => `<option value="${escHtml(t)}">`).join('');
 }
