@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="跡">
@@ -495,7 +495,7 @@ body {
   padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid var(--sep);
-  font-size: 15px;
+  font-size: 16px;
   font-family: inherit;
   background: var(--bg2);
   color: var(--label);
@@ -616,7 +616,7 @@ body {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--sep);
-  font-size: 15px;
+  font-size: 16px;
   font-family: inherit;
   background: var(--bg);
   color: var(--label);
@@ -660,7 +660,7 @@ body {
   padding: 7px 8px;
   border-radius: 8px;
   border: 1px solid var(--sep);
-  font-size: 14px;
+  font-size: 16px;
   font-family: inherit;
   text-align: center;
   background: var(--bg);
@@ -1530,10 +1530,17 @@ function updateLayoutVars() {
   if (tabbar) document.documentElement.style.setProperty('--tabbar-h', tabbar.offsetHeight + 'px');
 }
 
-// Lock app height on load so virtual keyboard doesn't cause layout shift
+// Lock app height on first load; ignore keyboard resize
 (function() {
-  const h = window.innerHeight;
+  const h = document.documentElement.clientHeight;
   document.body.style.setProperty('--app-h', h + 'px');
+  // Prevent iOS from scrolling the fixed body when input is focused
+  document.addEventListener('focusin', function(e) {
+    if (e.target.tagName === 'INPUT') {
+      setTimeout(function() { window.scrollTo(0, 0); }, 50);
+    }
+  });
+  window.addEventListener('scroll', function() { window.scrollTo(0, 0); });
 })();
 
 function renderAll() {
