@@ -86,8 +86,7 @@ body {
   display: none;
   padding: 20px 16px calc(env(safe-area-inset-bottom) + 20px);
   height: calc(100% - var(--header-h, 60px) - var(--tabbar-h, 70px));
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 .view.active { display: block; }
 
@@ -99,6 +98,11 @@ body {
   overflow: hidden;
 }
 #view-home.active { display: flex; }
+
+#view-home .home-timeline {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
 .home-top {
   flex-shrink: 0;
@@ -1525,6 +1529,12 @@ function updateLayoutVars() {
   if (header) document.documentElement.style.setProperty('--header-h', header.offsetHeight + 'px');
   if (tabbar) document.documentElement.style.setProperty('--tabbar-h', tabbar.offsetHeight + 'px');
 }
+
+// Lock app height on load so virtual keyboard doesn't cause layout shift
+(function() {
+  const h = window.innerHeight;
+  document.body.style.setProperty('--app-h', h + 'px');
+})();
 
 function renderAll() {
   renderHome();
