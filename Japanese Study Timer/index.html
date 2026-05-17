@@ -46,7 +46,7 @@ body {
   color: var(--label);
   max-width: 430px;
   margin: 0 auto;
-  height: 100dvh;
+  height: var(--app-h, 100dvh);
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
   font-weight: 400;
@@ -81,7 +81,7 @@ body {
 .view {
   display: none;
   padding: 20px 16px calc(env(safe-area-inset-bottom) + 20px);
-  height: calc(100dvh - var(--header-h, 60px) - var(--tabbar-h, 70px));
+  height: calc(var(--app-h, 100dvh) - var(--header-h, 60px) - var(--tabbar-h, 70px));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -1526,8 +1526,20 @@ function renderAll() {
   loadSettings();
 }
 
+// Lock the initial viewport height so keyboard events don't reflow the layout.
+function lockViewportHeight() {
+  const h = window.innerHeight;
+  document.documentElement.style.setProperty('--app-h', h + 'px');
+  document.body.style.height = h + 'px';
+}
+lockViewportHeight();
 updateLayoutVars();
-window.addEventListener('resize', updateLayoutVars);
+
+// Only re-lock on genuine orientation changes, not keyboard events.
+// visualViewport shrinks when keyboard opens; window.innerHeight stays stable on iOS.
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => { lockViewportHeight(); updateLayoutVars(); }, 300);
+});
 renderAll();
 
 const savedTab = sessionStorage.getItem('jp-active-tab');
