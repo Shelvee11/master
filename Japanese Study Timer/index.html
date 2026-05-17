@@ -508,6 +508,66 @@ body {
   box-shadow: 0 0 0 3px rgba(72,83,167,0.08);
 }
 
+.combo-box {
+  position: relative;
+}
+
+.combo-box input[type="text"] {
+  padding-right: 38px;
+}
+
+.combo-toggle {
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  bottom: 1px;
+  width: 36px;
+  background: none;
+  border: none;
+  color: var(--label3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 10px 10px 0;
+  transition: color 0.12s;
+}
+
+.combo-toggle:active { color: var(--accent); }
+
+.combo-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg2);
+  border: 1px solid var(--sep);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(72,83,167,0.12);
+  max-height: 200px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  z-index: 50;
+}
+
+.combo-dropdown.open { display: block; }
+
+.combo-option {
+  padding: 11px 14px;
+  font-size: 15px;
+  color: var(--label);
+  cursor: pointer;
+  transition: background 0.1s;
+  font-family: inherit;
+}
+
+.combo-option:not(:last-child) {
+  border-bottom: 1px solid var(--sep);
+}
+
+.combo-option:active { background: var(--fill); }
+
 .timer-buttons {
   display: flex;
   gap: 10px;
@@ -760,8 +820,13 @@ body {
   <div id="timerIdle">
     <div class="timer-input-group">
       <label for="topicInput">学习内容</label>
-      <input type="text" id="topicInput" placeholder="播客、教材、单词…" list="topicSuggestions" autocomplete="off">
-      <datalist id="topicSuggestions"></datalist>
+      <div class="combo-box" id="comboBox">
+        <input type="text" id="topicInput" placeholder="播客、教材、单词…" autocomplete="off">
+        <button type="button" class="combo-toggle" id="comboToggle" tabindex="-1">
+          <svg width="12" height="12" viewBox="0 0 12 12"><polyline points="2 4 6 8 10 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="combo-dropdown" id="comboDropdown"></div>
+      </div>
     </div>
     <button class="btn btn-primary btn-block" onclick="startTimer()">开始学习</button>
   </div>
@@ -1282,7 +1347,7 @@ function renderTimerView() {
   }
 }
 
-function populateTopicSuggestions(data) {
+function getTopicsByRecency(data) {
   const latest = {};
   for (const s of data.sessions) {
     if (s.topic) {
@@ -1290,10 +1355,66 @@ function populateTopicSuggestions(data) {
       if (!latest[s.topic] || key > latest[s.topic]) latest[s.topic] = key;
     }
   }
-  const topics = Object.keys(latest).sort((a, b) => latest[b].localeCompare(latest[a])).slice(0, 20);
-  const dl = document.getElementById('topicSuggestions');
-  dl.innerHTML = topics.map(t => `<option value="${escHtml(t)}">`).join('');
+  return Object.keys(latest).sort((a, b) => latest[b].localeCompare(latest[a])).slice(0, 20);
 }
+
+function populateTopicSuggestions(data) {
+  const topics = getTopicsByRecency(data);
+  const dd = document.getElementById('comboDropdown');
+  if (topics.length === 0) {
+    dd.innerHTML = '';
+    return;
+  }
+  dd.innerHTML = topics.map(t => `<div class="combo-option" data-value="${escHtml(t)}">${escHtml(t)}</div>`).join('');
+}
+
+(function initComboBox() {
+  document.addEventListener('click', function(e) {
+    const box = document.getElementById('comboBox');
+    const dd = document.getElementById('comboDropdown');
+    if (!box || !dd) return;
+    if (!box.contains(e.target)) dd.classList.remove('open');
+  });
+
+  document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('combo-option')) {
+      const input = document.getElementById('topicInput');
+      input.value = e.target.dataset.value;
+      document.getElementById('comboDropdown').classList.remove('open');
+      input.focus();
+    }
+  });
+
+  const toggle = document.getElementById('comboToggle');
+  if (toggle) {
+    toggle.addEventListener('click', function() {
+      const dd = document.getElementById('comboDropdown');
+      if (dd.children.length === 0) return;
+      dd.classList.toggle('open');
+    });
+  }
+
+  const input = document.getElementById('topicInput');
+  if (input) {
+    input.addEventListener('focus', function() {
+      const dd = document.getElementById('comboDropdown');
+      if (dd.children.length > 0) dd.classList.add('open');
+    });
+    input.addEventListener('input', function() {
+      const dd = document.getElementById('comboDropdown');
+      const val = this.value.trim().toLowerCase();
+      const items = dd.querySelectorAll('.combo-option');
+      let hasVisible = false;
+      items.forEach(item => {
+        const match = !val || item.dataset.value.toLowerCase().includes(val);
+        item.style.display = match ? '' : 'none';
+        if (match) hasVisible = true;
+      });
+      if (hasVisible) dd.classList.add('open');
+      else dd.classList.remove('open');
+    });
+  }
+})();
 
 function showTimerState(state) {
   document.getElementById('timerIdle').style.display = state === 'idle' ? 'block' : 'none';
