@@ -136,7 +136,11 @@ main {
 }
 .form-input::placeholder { color: var(--label3); }
 .form-input[type="number"] { font-size: 20px; font-weight: 600; color: var(--accent); }
-.form-input[type="date"] { color: var(--label2); }
+.form-input[type="date"] {
+  color: var(--label2); -webkit-appearance: none; appearance: none;
+  text-align: right; direction: rtl;
+}
+.form-input[type="date"]::-webkit-date-and-time-value { text-align: right; }
 
 /* Buttons */
 .btn {
@@ -273,7 +277,7 @@ main {
     <div class="card">
       <div class="form-row">
         <span class="form-label">日期</span>
-        <input class="form-input" type="date" id="record-date" style="color:var(--label2)">
+        <input class="form-input" type="date" id="record-date">
       </div>
       <div class="form-row">
         <span class="form-label">金额</span>
