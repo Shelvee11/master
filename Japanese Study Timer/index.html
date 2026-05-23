@@ -867,6 +867,12 @@ body {
       <div class="card-inner" id="weekDetail"></div>
     </div>
   </div>
+  <div class="settings-section" style="margin-top:20px">
+    <h3>学习内容统计</h3>
+    <div class="card">
+      <div class="card-inner" id="topicBreakdown"></div>
+    </div>
+  </div>
 </section>
 
 <!-- Settings View -->
@@ -987,6 +993,12 @@ function formatTimer(seconds) {
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function weekSunday(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
 }
 
 function getMonthName(m) {
@@ -1114,7 +1126,9 @@ function renderHeatmap() {
       grid.appendChild(cell);
 
       if (d === 0 && cellDate.getMonth() !== lastMonth) {
-        monthPositions.push({ month: cellDate.getMonth(), week: w });
+        if (cellDate.getFullYear() === today.getFullYear()) {
+          monthPositions.push({ month: cellDate.getMonth(), week: w });
+        }
         lastMonth = cellDate.getMonth();
       }
     }
@@ -1283,8 +1297,8 @@ function renderStats() {
     }
   }
 
-  const monday = isoMonday(new Date());
-  const mondayStr = `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`;
+  const sunday = weekSunday(new Date());
+  const mondayStr = `${sunday.getFullYear()}-${String(sunday.getMonth()+1).padStart(2,'0')}-${String(sunday.getDate()).padStart(2,'0')}`;
   const weekDays = new Set();
   for (const s of sessions) {
     if (s.date >= mondayStr) weekDays.add(s.date);
@@ -1325,6 +1339,27 @@ function renderStats() {
     }
     html += `<div style="text-align:right;font-size:12px;color:var(--label3);margin-top:6px;padding-top:6px;border-top:1px solid var(--sep);font-weight:500">合计 ${formatDuration(weekTotal)}</div>`;
     weekDetail.innerHTML = html;
+  }
+
+  const topicMap = {};
+  const topicLatest = {};
+  for (const s of sessions) {
+    const t = s.topic || '未命名';
+    topicMap[t] = (topicMap[t] || 0) + s.duration;
+    const key = s.date + (s.startTime || '');
+    if (!topicLatest[t] || key > topicLatest[t]) topicLatest[t] = key;
+  }
+  const topicBreakdown = document.getElementById('topicBreakdown');
+  const sorted = Object.entries(topicMap).sort((a, b) => (topicLatest[b[0]] || '').localeCompare(topicLatest[a[0]] || ''));
+  if (sorted.length === 0) {
+    topicBreakdown.innerHTML = '<div style="color:var(--label3);font-size:13px;text-align:center;padding:12px 0">暂无数据</div>';
+  } else {
+    let thtml = '';
+    for (const [topic, dur] of sorted) {
+      const pct = totalSec > 0 ? Math.round(dur / totalSec * 100) : 0;
+      thtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px"><span style="color:var(--label);font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(topic)}</span><span style="color:var(--label2);flex-shrink:0;margin-left:10px">${formatDuration(dur)}</span><span style="color:var(--label3);flex-shrink:0;width:40px;text-align:right">${pct}%</span></div>`;
+    }
+    topicBreakdown.innerHTML = thtml;
   }
 }
 
@@ -1524,7 +1559,7 @@ function saveSession() {
 function generateICS(session) {
   const start = new Date(parseInt(session.id));
   const end = new Date(start.getTime() + session.duration * 1000);
-  const fmt = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const fmt = d => `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`;
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
