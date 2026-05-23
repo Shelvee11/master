@@ -1650,9 +1650,12 @@ function importCSV(event) {
     const isMinutes = header.includes('duration_minutes');
     for (const line of lines) {
       if (!line.trim()) continue;
-      const match = line.match(/^(\d{4}-\d{2}-\d{2}),([^,]*),(\d+),(.*)$/);
+      const match = line.match(/^(\d{4}[-/]\d{1,2}[-/]\d{1,2}),([^,]*),(\d+),(.*)$/);
       if (!match) continue;
-      const [, date, startTime, durVal, topicRaw] = match;
+      const rawDate = match[1];
+      const dp = rawDate.split(/[-/]/);
+      const date = `${dp[0]}-${dp[1].padStart(2,'0')}-${dp[2].padStart(2,'0')}`;
+      const [, , startTime, durVal, topicRaw] = match;
       const topic = topicRaw.replace(/^"|"$/g, '').replace(/""/g, '"');
       const duration = isMinutes ? parseInt(durVal) * 60 : parseInt(durVal);
       if (!data.sessions.some(s => s.date === date && s.duration === duration && s.topic === topic)) {
