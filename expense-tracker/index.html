@@ -334,7 +334,7 @@ const CATS = [
   {code:"I-父母", icon:"❤️", subs:["父母"]},
   {code:"J-医疗", icon:"💊", subs:["医疗"]},
   {code:"Z-其他", icon:"📦", subs:["订阅","快递","保险","其他"]},
-  {code:"收入",  icon:"💰", subs:["工资","公积金","报销"], isIncome:true},
+  {code:"收入",  icon:"💰", subs:["工资","公积金","报销","其他"], isIncome:true},
 ];
 
 let selectedCat = null;
@@ -663,6 +663,7 @@ function init() {
 
   initCatGrid();
   initDate();
+  selectCat('B-食');
   document.getElementById('amount').addEventListener('input', updateSubmit);
   if ('serviceWorker' in navigator)
     navigator.serviceWorker.register('service-worker.js');
