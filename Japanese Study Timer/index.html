@@ -1643,9 +1643,10 @@ function importCSV(event) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = function(e) {
-    const lines = e.target.result.split('\n').slice(1);
+    const text = e.target.result.replace(/^﻿/, '');
+    const lines = text.split('\n').slice(1);
     const data = loadData();
-    const header = e.target.result.split('\n')[0];
+    const header = text.split('\n')[0];
     const isMinutes = header.includes('duration_minutes');
     for (const line of lines) {
       if (!line.trim()) continue;
