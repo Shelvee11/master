@@ -1643,7 +1643,7 @@ function importCSV(event) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = function(e) {
-    const text = e.target.result.replace(/^﻿/, '');
+    const text = e.target.result.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const lines = text.split('\n').slice(1);
     const data = loadData();
     const header = text.split('\n')[0];
