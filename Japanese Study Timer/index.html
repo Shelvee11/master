@@ -86,7 +86,9 @@ body {
   display: none;
   padding: 20px 16px calc(env(safe-area-inset-bottom) + 20px);
   height: calc(100% - var(--header-h, 60px) - var(--tabbar-h, 70px));
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .view.active { display: block; }
 
