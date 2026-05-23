@@ -1217,6 +1217,13 @@ function renderTimeline() {
   container.innerHTML = html;
 }
 
+function truncMid(s, max) {
+  if (s.length <= max) return s;
+  const tail = Math.ceil(max * 0.4);
+  const head = max - tail - 1;
+  return s.slice(0, head) + '…' + s.slice(-tail);
+}
+
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -1334,10 +1341,19 @@ function renderStats() {
     weekDetail.innerHTML = '<div style="color:var(--label3);font-size:13px;text-align:center;padding:12px 0">本周还没有学习记录</div>';
   } else {
     const weekTotal = weekSessions.reduce((a,s) => a + s.duration, 0);
-    let html = '';
+    const weekGroups = {};
     for (const s of weekSessions) {
-      const d = parseDate(s.date);
-      html += `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px"><span style="color:var(--label2)">${d.getMonth()+1}/${d.getDate()} ${escHtml(s.topic || '未命名')}</span><span style="color:var(--label);font-weight:500">${formatDurShort(s.duration)}</span></div>`;
+      const key = s.date + '|' + (s.topic || '未命名');
+      if (!weekGroups[key]) weekGroups[key] = { date: s.date, topic: s.topic || '未命名', duration: 0, count: 0 };
+      weekGroups[key].duration += s.duration;
+      weekGroups[key].count++;
+    }
+    const weekGrouped = Object.values(weekGroups).sort((a,b) => b.date.localeCompare(a.date));
+    let html = '';
+    for (const g of weekGrouped) {
+      const d = parseDate(g.date);
+      const countLabel = g.count > 1 ? ` ×${g.count}` : '';
+      html += `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px"><span style="color:var(--label2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.getMonth()+1}/${d.getDate()} ${escHtml(g.topic)}${countLabel}</span><span style="color:var(--label);font-weight:500;flex-shrink:0;margin-left:8px">${formatDurShort(g.duration)}</span></div>`;
     }
     html += `<div style="text-align:right;font-size:12px;color:var(--label3);margin-top:6px;padding-top:6px;border-top:1px solid var(--sep);font-weight:500">合计 ${formatDuration(weekTotal)}</div>`;
     weekDetail.innerHTML = html;
@@ -1359,7 +1375,7 @@ function renderStats() {
     let thtml = '';
     for (const [topic, dur] of sorted) {
       const pct = totalSec > 0 ? Math.round(dur / totalSec * 100) : 0;
-      thtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px"><span style="color:var(--label);font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(topic)}</span><span style="color:var(--label2);flex-shrink:0;margin-left:10px">${formatDuration(dur)}</span><span style="color:var(--label3);flex-shrink:0;width:40px;text-align:right">${pct}%</span></div>`;
+      thtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px"><span style="color:var(--label);font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(truncMid(topic, 18))}</span><span style="color:var(--label2);flex-shrink:0;margin-left:10px">${formatDuration(dur)}</span><span style="color:var(--label3);flex-shrink:0;width:40px;text-align:right">${pct}%</span></div>`;
     }
     topicBreakdown.innerHTML = thtml;
   }
