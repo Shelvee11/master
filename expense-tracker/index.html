@@ -271,10 +271,9 @@ main {
 
     <p class="card-label">详情</p>
     <div class="card">
-      <div class="form-row" onclick="document.getElementById('record-date').showPicker&&document.getElementById('record-date').showPicker()||document.getElementById('record-date').click()" style="cursor:pointer">
+      <div class="form-row">
         <span class="form-label">日期</span>
-        <span id="record-date-display" style="flex:1;text-align:right;font-size:16px;color:var(--label2);padding:12px 0"></span>
-        <input type="date" id="record-date" style="position:absolute;opacity:0;width:0;height:0" onchange="updateDateDisplay()">
+        <input class="form-input" type="date" id="record-date" style="color:var(--label2)">
       </div>
       <div class="form-row">
         <span class="form-label">金额</span>
@@ -408,14 +407,6 @@ function initDate() {
   const now = new Date();
   const val = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0,10);
   document.getElementById('record-date').value = val;
-  updateDateDisplay();
-}
-
-function updateDateDisplay() {
-  const val = document.getElementById('record-date').value;
-  if (!val) return;
-  const [y, m, d] = val.split('-');
-  document.getElementById('record-date-display').textContent = `${y}年${parseInt(m)}月${parseInt(d)}日`;
 }
 
 function initCatGrid() {
@@ -577,7 +568,6 @@ function editRecord(id) {
   switchTab('record');
   editingId = id;
   document.getElementById('record-date').value = record.date.slice(0,10);
-  updateDateDisplay();
   selectCat(record.largeCat);
   if (selectedCat && selectedCat.subs.length > 1) {
     document.querySelectorAll('.sub-btn').forEach(b => {
