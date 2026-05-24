@@ -1099,16 +1099,16 @@ function renderHeatmap() {
   monthsEl.innerHTML = '';
 
   const today = new Date();
-  const startMonday = isoMonday(new Date(today.getFullYear(), 0, 1));
-  const totalWeeks = Math.ceil((isoMonday(today).getTime() - startMonday.getTime()) / (7 * 86400000)) + 1;
+  const startSunday = weekSunday(new Date(today.getFullYear(), 0, 1));
+  const totalWeeks = Math.ceil((weekSunday(today).getTime() - startSunday.getTime()) / (7 * 86400000)) + 1;
 
   const monthPositions = [];
   let lastMonth = -1;
 
   for (let w = 0; w < totalWeeks; w++) {
     for (let d = 0; d < 7; d++) {
-      const cellDate = new Date(startMonday);
-      cellDate.setDate(startMonday.getDate() + w * 7 + d);
+      const cellDate = new Date(startSunday);
+      cellDate.setDate(startSunday.getDate() + w * 7 + d);
 
       const dateStr = `${cellDate.getFullYear()}-${String(cellDate.getMonth()+1).padStart(2,'0')}-${String(cellDate.getDate()).padStart(2,'0')}`;
 
