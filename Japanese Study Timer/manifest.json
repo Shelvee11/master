@@ -1,0 +1,21 @@
+{
+  "name": "跡",
+  "short_name": "跡",
+  "display": "standalone",
+  "background_color": "#fafbff",
+  "theme_color": "#4853a7",
+  "start_url": "./index.html",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "Icon 1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ]
+}

@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="跡">
 <meta name="theme-color" content="#4853a7">
 <title>跡</title>
-<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22%E8%B7%A1%22%2C%22short_name%22%3A%22%E8%B7%A1%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23fafbff%22%2C%22theme_color%22%3A%22%234853a7%22%2C%22start_url%22%3A%22.%2F%22%7D">
+<link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
@@ -1693,18 +1693,7 @@ function importCSV(event) {
 
 // ── Service Worker ───────────────────────────────────────────
 if ('serviceWorker' in navigator) {
-  const swCode = `
-    const CACHE = 'jp-study-v2';
-    self.addEventListener('install', e => {
-      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html'])));
-    });
-    self.addEventListener('fetch', e => {
-      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
-    });
-  `;
-  const swBlob = new Blob([swCode], { type: 'application/javascript' });
-  const swUrl = URL.createObjectURL(swBlob);
-  navigator.serviceWorker.register(swUrl).catch(() => {});
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
 // ── Init ─────────────────────────────────────────────────────
