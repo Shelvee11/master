@@ -127,7 +127,6 @@ main {
   display: flex; align-items: center; min-height: 48px;
   padding: 0 16px; border-bottom: 1px solid var(--sep); gap: 12px;
 }
-.form-row:last-child { border-bottom: none; }
 .form-label { font-size: 16px; color: var(--label); flex: 0 0 60px; font-weight: 500; }
 .form-input {
   flex: 1; border: none; outline: none; background: none;
@@ -237,6 +236,121 @@ main {
   text-align: center; color: var(--label3); padding: 40px 0; font-size: 14px;
 }
 
+/* Toggle rows */
+.form-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  min-height: 44px; padding: 0 16px;
+  border-bottom: 1px solid var(--sep);
+}
+.form-toggle-row:last-child { border-bottom: none; }
+.form-toggle-row label {
+  font-size: 15px; color: var(--label); cursor: pointer;
+}
+.form-toggle-row .toggle-desc {
+  font-size: 12px; color: var(--label3); margin-top: 1px;
+}
+.toggle-switch {
+  position: relative; width: 44px; height: 26px; flex-shrink: 0;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-switch .slider {
+  position: absolute; inset: 0; border-radius: 13px;
+  background: var(--fill2); transition: background 0.2s;
+  cursor: pointer;
+}
+.toggle-switch .slider::before {
+  content: ''; position: absolute; width: 22px; height: 22px;
+  left: 2px; top: 2px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  transition: transform 0.2s;
+}
+.toggle-switch input:checked + .slider { background: var(--accent); }
+.toggle-switch input:checked + .slider::before { transform: translateX(18px); }
+
+/* Ignored record */
+.record-item.ignored .record-amt { text-decoration: line-through; color: var(--label3); }
+.record-item.ignored .record-cat { color: var(--label3); }
+
+/* Weekly food budget */
+.weekly-budget { padding: 14px 16px; }
+.weekly-budget-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 10px;
+}
+.weekly-budget-title { font-size: 14px; font-weight: 600; color: var(--label); }
+.weekly-budget-range { font-size: 12px; color: var(--label3); }
+.weekly-budget-bar {
+  height: 8px; background: var(--fill); border-radius: 4px;
+  overflow: hidden; margin-bottom: 10px;
+}
+.weekly-budget-bar-fill {
+  height: 100%; border-radius: 4px;
+  transition: width 0.3s, background 0.3s;
+}
+.weekly-budget-nums {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 13px; color: var(--label2);
+}
+.weekly-budget-spent { font-weight: 600; }
+.weekly-budget-limit {
+  cursor: pointer; text-decoration: underline; text-decoration-style: dashed;
+  text-underline-offset: 3px; text-decoration-color: var(--label3);
+}
+
+/* Budget edit modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 100; display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-box {
+  background: var(--bg2); border-radius: var(--radius); padding: 24px;
+  width: 100%; max-width: 300px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.modal-box h3 { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
+.modal-box input {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--sep);
+  border-radius: 10px; font-size: 18px; font-weight: 600;
+  font-family: inherit; color: var(--accent); text-align: center;
+  outline: none; box-sizing: border-box;
+}
+.modal-box input:focus { border-color: var(--accent); }
+.modal-btns {
+  display: flex; gap: 10px; margin-top: 16px;
+}
+.modal-btns button {
+  flex: 1; padding: 10px; border: none; border-radius: 10px;
+  font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
+}
+.modal-btns .modal-cancel { background: var(--fill); color: var(--label2); }
+.modal-btns .modal-confirm { background: var(--accent); color: #fff; }
+
+/* Record badges */
+.record-badge {
+  display: inline-block; font-size: 10px; font-weight: 600;
+  padding: 2px 7px; border-radius: 10px; margin-left: 6px;
+  vertical-align: middle; letter-spacing: 0.02em;
+}
+.record-badge.pending {
+  background: rgba(217,119,6,0.1); color: var(--orange);
+}
+.record-badge.ignored {
+  background: var(--fill); color: var(--label3);
+}
+
+/* Filter bar */
+.filter-bar {
+  display: flex; gap: 8px; padding: 10px 16px;
+}
+.filter-btn {
+  padding: 5px 14px; border: 1px solid var(--sep); border-radius: 20px;
+  background: var(--bg2); color: var(--label2); font-size: 13px;
+  font-family: inherit; cursor: pointer; transition: all 0.12s;
+}
+.filter-btn.active {
+  border-color: var(--accent); background: rgba(61,82,213,0.07); color: var(--accent);
+}
+
 /* Toast */
 .toast {
   position: fixed; top: calc(env(safe-area-inset-top) + 70px);
@@ -289,6 +403,29 @@ main {
       </div>
     </div>
 
+    <div class="card">
+      <div class="form-toggle-row">
+        <div>
+          <label for="pending-check">待确认</label>
+          <div class="toggle-desc">标记后可在明细页快速筛选</div>
+        </div>
+        <div class="toggle-switch">
+          <input type="checkbox" id="pending-check">
+          <span class="slider" onclick="document.getElementById('pending-check').click()"></span>
+        </div>
+      </div>
+      <div class="form-toggle-row">
+        <div>
+          <label for="ignored-check">忽略此笔</label>
+          <div class="toggle-desc">不计入支出总计</div>
+        </div>
+        <div class="toggle-switch">
+          <input type="checkbox" id="ignored-check">
+          <span class="slider" onclick="document.getElementById('ignored-check').click()"></span>
+        </div>
+      </div>
+    </div>
+
     <div class="btn-group">
       <button class="btn btn-primary" id="submit-btn" onclick="saveRecord()" disabled>记一笔</button>
       <button class="btn btn-cancel" id="cancel-btn" onclick="cancelEdit()" style="display:none">取消编辑</button>
@@ -297,7 +434,7 @@ main {
 
   <!-- History Panel -->
   <div id="history-panel" class="panel">
-    <div class="card">
+    <div class="card" id="month-nav-card">
       <div class="month-nav">
         <button onclick="changeMonth(-1)">‹</button>
         <span id="month-label"></span>
@@ -305,7 +442,17 @@ main {
       </div>
     </div>
 
+    <div class="card" id="filter-card" style="display:none">
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="setFilter('all')">全部</button>
+        <button class="filter-btn" id="pending-filter-btn" onclick="setFilter('pending')">待确认</button>
+        <button class="filter-btn" id="ignored-filter-btn" onclick="setFilter('ignored')">已忽略</button>
+      </div>
+    </div>
+
     <div class="card" id="summary-card"></div>
+
+    <div class="card" id="weekly-food-card"></div>
 
     <p class="card-label">数据管理</p>
     <div class="card">
@@ -344,6 +491,7 @@ let selectedCat = null;
 let selectedSub = null;
 let editingId   = null;
 let viewMonth   = new Date().toISOString().slice(0,7);
+let activeFilter = 'all';
 
 // ── Storage ──────────────────────────────────────────────────
 
@@ -375,14 +523,17 @@ function parseAndImportCSV(text) {
   const lines = text.replace(/^﻿/, '').trim().split('\n');
   if (lines.length < 2) { alert('CSV 文件为空'); return; }
   const incoming = [];
+  const header = lines[0].split(',');
+  const ignoredIdx = header.indexOf('忽略');
+  const pendingIdx = header.indexOf('待确认');
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',');
     if (cols.length < 5) continue;
-    const [dateStr, type, largeCat, smallCat, amount, ...rest] = cols;
-    const note = rest.join(',').trim();
+    const [dateStr, type, largeCat, smallCat, amount] = cols;
+    const note = (cols[5] || '').trim();
     const amt = parseFloat(amount);
     if (!dateStr || isNaN(amt)) continue;
-    incoming.push({
+    const rec = {
       id: new Date(dateStr).getTime() + i,
       date: dateStr.trim(),
       dateStr: dateStr.trim(),
@@ -391,7 +542,10 @@ function parseAndImportCSV(text) {
       type: type.trim() || '支出',
       amount: amt,
       note: note
-    });
+    };
+    if (ignoredIdx >= 0 && cols[ignoredIdx] === '1') rec.ignored = true;
+    if (pendingIdx >= 0 && cols[pendingIdx] === '1') rec.pending = true;
+    incoming.push(rec);
   }
   if (!incoming.length) { alert('未找到有效记录'); return; }
   const existing = getRecords();
@@ -463,7 +617,9 @@ function saveRecord() {
     smallCat: selectedSub,
     type:     selectedCat.isIncome ? '收入' : '支出',
     amount:   amt,
-    note:     document.getElementById('note').value.trim()
+    note:     document.getElementById('note').value.trim(),
+    ignored:  document.getElementById('ignored-check').checked,
+    pending:  document.getElementById('pending-check').checked
   };
   const records = getRecords();
   if (editingId) {
@@ -480,6 +636,8 @@ function saveRecord() {
 function resetForm() {
   document.getElementById('amount').value = '';
   document.getElementById('note').value = '';
+  document.getElementById('ignored-check').checked = false;
+  document.getElementById('pending-check').checked = false;
   selectedCat = null; selectedSub = null; editingId = null;
   document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('sub-cats').classList.remove('show');
@@ -506,11 +664,111 @@ function changeMonth(delta) {
   renderHistory();
 }
 
+function getWeekRange() {
+  const now = new Date();
+  const day = now.getDay() || 7;
+  const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const fmt = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const short = d => (d.getMonth()+1) + '/' + d.getDate();
+  return { start: fmt(mon), end: fmt(sun), label: short(mon) + ' - ' + short(sun) };
+}
+
+function getFoodBudget() {
+  return parseFloat(localStorage.getItem('weekly_food_budget')) || 350;
+}
+
+function setFoodBudget() {
+  const cur = getFoodBudget();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal-box">
+    <h3>每周饮食预算</h3>
+    <input type="number" id="budget-input" value="${cur}" inputmode="decimal" step="1">
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="this.closest('.modal-overlay').remove()">取消</button>
+      <button class="modal-confirm" onclick="confirmBudget()">确定</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const inp = document.getElementById('budget-input');
+  inp.focus();
+  inp.select();
+}
+
+function confirmBudget() {
+  const n = parseFloat(document.getElementById('budget-input').value);
+  document.querySelector('.modal-overlay').remove();
+  if (isNaN(n) || n <= 0) return;
+  localStorage.setItem('weekly_food_budget', n);
+  renderHistory();
+}
+
+function renderWeeklyFood(allRecords) {
+  const card = document.getElementById('weekly-food-card');
+  if (activeFilter !== 'all') { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const week = getWeekRange();
+  const budget = getFoodBudget();
+  const spent = allRecords
+    .filter(r => r.largeCat === 'B-食' && !r.ignored && r.type !== '收入' && r.date >= week.start && r.date <= week.end)
+    .reduce((s, r) => s + r.amount, 0);
+
+  const pct = Math.min(spent / budget * 100, 100);
+  const remain = budget - spent;
+  const barColor = pct < 70 ? 'var(--green)' : pct < 100 ? 'var(--orange)' : 'var(--red)';
+  const remainColor = remain >= 0 ? 'var(--green)' : 'var(--red)';
+
+  card.innerHTML = `<div class="weekly-budget">
+    <div class="weekly-budget-header">
+      <span class="weekly-budget-title">本周饮食</span>
+      <span class="weekly-budget-range">${week.label}</span>
+    </div>
+    <div class="weekly-budget-bar">
+      <div class="weekly-budget-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+    </div>
+    <div class="weekly-budget-nums">
+      <span><span class="weekly-budget-spent" style="color:${barColor}">¥${spent.toFixed(2)}</span> / <span class="weekly-budget-limit" onclick="setFoodBudget()">¥${budget.toFixed(0)}</span></span>
+      <span style="color:${remainColor}">${remain >= 0 ? '剩余' : '超支'} ¥${Math.abs(remain).toFixed(2)}</span>
+    </div>
+  </div>`;
+}
+
+function setFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.filter-btn[onclick="setFilter('${f}')"]`).classList.add('active');
+  renderHistory();
+}
+
 function renderHistory() {
   document.getElementById('month-label').textContent = viewMonth;
-  const all = getRecords().filter(r => r.date.startsWith(viewMonth)).sort((a,b) => b.id - a.id);
-  const incRecs = all.filter(r => r.type === '收入');
-  const expRecs = all.filter(r => r.type !== '收入');
+
+  const allRecords = getRecords();
+  const pendingCount = allRecords.filter(r => r.pending).length;
+  const ignoredCount = allRecords.filter(r => r.ignored).length;
+
+  const filterCard = document.getElementById('filter-card');
+  filterCard.style.display = (pendingCount > 0 || ignoredCount > 0) ? '' : 'none';
+  document.getElementById('pending-filter-btn').textContent = `待确认(${pendingCount})`;
+  document.getElementById('pending-filter-btn').style.display = pendingCount > 0 ? '' : 'none';
+  document.getElementById('ignored-filter-btn').textContent = `已忽略(${ignoredCount})`;
+  document.getElementById('ignored-filter-btn').style.display = ignoredCount > 0 ? '' : 'none';
+  document.getElementById('month-nav-card').style.display = (activeFilter === 'pending' || activeFilter === 'ignored') ? 'none' : '';
+
+  let displayRecords;
+  if (activeFilter === 'pending') {
+    displayRecords = allRecords.filter(r => r.pending).sort((a,b) => b.id - a.id);
+  } else if (activeFilter === 'ignored') {
+    displayRecords = allRecords.filter(r => r.ignored).sort((a,b) => b.id - a.id);
+  } else {
+    displayRecords = allRecords.filter(r => r.date.startsWith(viewMonth)).sort((a,b) => b.id - a.id);
+  }
+
+  const all = allRecords.filter(r => r.date.startsWith(viewMonth)).sort((a,b) => b.id - a.id);
+  const incRecs = all.filter(r => r.type === '收入' && !r.ignored);
+  const expRecs = all.filter(r => r.type !== '收入' && !r.ignored);
   const totalInc = incRecs.reduce((s,r) => s+r.amount, 0);
   const totalExp = expRecs.reduce((s,r) => s+r.amount, 0);
   const net = totalInc - totalExp;
@@ -519,9 +777,13 @@ function renderHistory() {
   expRecs.forEach(r => { byLargeCat[r.largeCat] = (byLargeCat[r.largeCat]||0) + r.amount; });
 
   const summaryCard = document.getElementById('summary-card');
-  if (!all.length) {
+  if (activeFilter === 'pending' || activeFilter === 'ignored') {
+    summaryCard.style.display = 'none';
+  } else if (!all.length) {
+    summaryCard.style.display = '';
     summaryCard.innerHTML = '<div class="empty-msg">本月暂无记录</div>';
   } else {
+    summaryCard.style.display = '';
     const netCls = net >= 0 ? 'col-pos' : 'col-neg';
     summaryCard.innerHTML = `
       <div class="summary-row">
@@ -546,15 +808,18 @@ function renderHistory() {
       </div>` : ''}`;
   }
 
+  renderWeeklyFood(allRecords);
+
   const recordsCard = document.getElementById('records-card');
-  if (!all.length) {
-    recordsCard.innerHTML = '<div class="empty-msg">暂无记录</div>';
+  if (!displayRecords.length) {
+    const emptyMsg = activeFilter === 'pending' ? '没有待确认记录' : activeFilter === 'ignored' ? '没有已忽略记录' : '暂无记录';
+    recordsCard.innerHTML = `<div class="empty-msg">${emptyMsg}</div>`;
     return;
   }
-  recordsCard.innerHTML = all.map(r => `
-    <div class="record-item">
+  recordsCard.innerHTML = displayRecords.map(r => `
+    <div class="record-item${r.ignored ? ' ignored' : ''}">
       <div class="record-left">
-        <div class="record-cat">${r.largeCat} · ${r.smallCat}</div>
+        <div class="record-cat">${r.largeCat} · ${r.smallCat}${r.pending ? '<span class="record-badge pending">待确认</span>' : ''}${r.ignored ? '<span class="record-badge ignored">已忽略</span>' : ''}</div>
         <div class="record-meta">${r.dateStr}${r.note ? ' · ' + r.note : ''}</div>
       </div>
       <div class="record-right">
@@ -580,6 +845,8 @@ function editRecord(id) {
   }
   document.getElementById('amount').value = record.amount;
   document.getElementById('note').value   = record.note || '';
+  document.getElementById('ignored-check').checked = !!record.ignored;
+  document.getElementById('pending-check').checked  = !!record.pending;
   document.getElementById('submit-btn').textContent    = '保存修改';
   document.getElementById('cancel-btn').style.display = 'block';
   updateSubmit();
@@ -595,9 +862,9 @@ function delRecord(id) {
 
 function buildCSV(records) {
   const rows = records.sort((a,b)=>a.id-b.id).map(r =>
-    `${r.dateStr},${r.type||'支出'},${r.largeCat},${r.smallCat},${r.amount},${(r.note||'').replace(/,/g,'，')}`
+    `${r.dateStr},${r.type||'支出'},${r.largeCat},${r.smallCat},${r.amount},${(r.note||'').replace(/,/g,'，')},${r.ignored?'1':''},${r.pending?'1':''}`
   );
-  return '日期,类型,大类,小类,金额,备注\n' + rows.join('\n') + '\n';
+  return '日期,类型,大类,小类,金额,备注,忽略,待确认\n' + rows.join('\n') + '\n';
 }
 
 function triggerDownload(csv, filename) {
@@ -638,6 +905,9 @@ function switchTab(tab) {
     document.getElementById('record-panel').classList.add('active');
   } else {
     if (editingId) resetForm();
+    activeFilter = 'all';
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.filter-btn[onclick="setFilter(\'all\')"]').classList.add('active');
     document.getElementById('history-panel').classList.add('active');
     renderHistory();
   }
