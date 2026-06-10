@@ -659,7 +659,13 @@ function refreshToday(rec) {
     showHint('end', rec.start);
   } else {
     document.getElementById('duration-row').style.display = 'none';
-    hideHint();
+    const prevKey = prevDateKey(todayKey());
+    const prevRec = getRecords()[prevKey];
+    if (prevRec && prevRec.end) {
+      showHint('today', prevRec.end);
+    } else {
+      hideHint();
+    }
   }
 }
 
@@ -667,15 +673,17 @@ function refreshToday(rec) {
 
 function showHint(type, t) {
   const card = document.getElementById('hint-card');
-  document.getElementById('hint-label').textContent =
-    type === 'end' ? '建议今日结束进食' : '建议明日开始进食';
   const mode = getMode();
+  const labels = {
+    end:   { eyebrow: '建议今日结束进食', sub: `进食 ${mode.eat}h 后结束，可设置闹钟` },
+    next:  { eyebrow: '建议明日开始进食', sub: `断食 ${mode.fast}h 后开始，可设置明日闹钟` },
+    today: { eyebrow: '建议今日开始进食', sub: `断食 ${mode.fast}h 后开始` },
+  };
+  const l = labels[type];
+  document.getElementById('hint-label').textContent = l.eyebrow;
   document.getElementById('hint-time').textContent =
     addMinutes(t, (type === 'end' ? mode.eat : mode.fast) * 60);
-  document.getElementById('hint-sub').textContent =
-    type === 'end'
-      ? `进食 ${mode.eat}h 后结束，可设置闹钟`
-      : `断食 ${mode.fast}h 后开始，可设置明日闹钟`;
+  document.getElementById('hint-sub').textContent = l.sub;
   card.classList.add('visible');
 }
 
