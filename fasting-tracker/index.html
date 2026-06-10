@@ -357,15 +357,15 @@
     <div class="chart-scroll" id="chart-container"></div>
   </div>
 
-  <p class="card-label" style="margin-top:4px">历史记录 <span style="font-size:11px;color:var(--label3)">(点击可编辑)</span></p>
-  <div class="card">
-    <div id="history-list"></div>
-  </div>
-
   <div class="btn-group">
     <button class="btn btn-export" onclick="exportCSV()">导出 CSV</button>
     <button class="btn btn-export" onclick="document.getElementById('csv-input').click()">导入 CSV</button>
     <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
+  </div>
+
+  <p class="card-label" style="margin-top:4px">历史记录 <span style="font-size:11px;color:var(--label3)">(点击可编辑)</span></p>
+  <div class="card">
+    <div id="history-list"></div>
   </div>
 </main>
 
@@ -696,6 +696,7 @@ function renderChart() {
       <text x="${W-1}" y="${tY-4}" font-size="9" fill="#3d52d5" text-anchor="end" opacity="0.6">${TARGET}h</text>
       ${bars.join('')}${labels.join('')}
     </svg>`;
+  requestAnimationFrame(() => { container.scrollLeft = container.scrollWidth; });
 }
 
 // ── Weekly Goal ──────────────────────────────────────────
