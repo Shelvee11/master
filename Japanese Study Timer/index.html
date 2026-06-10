@@ -1584,7 +1584,14 @@ function saveSession() {
 }
 
 function generateICS(session) {
-  const start = new Date(parseInt(session.id));
+  let start;
+  if (session.date && session.startTime) {
+    const [h, m] = session.startTime.split(':').map(Number);
+    start = parseDate(session.date);
+    start.setHours(h, m, 0, 0);
+  } else {
+    start = new Date(parseInt(session.id));
+  }
   const end = new Date(start.getTime() + session.duration * 1000);
   const fmt = d => `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`;
   const lines = [
