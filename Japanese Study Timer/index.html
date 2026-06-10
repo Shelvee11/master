@@ -937,6 +937,7 @@ body {
       <button class="btn btn-primary" onclick="saveEdit()">保存</button>
       <button class="btn btn-secondary" onclick="closeEdit()">取消</button>
     </div>
+    <button class="btn btn-outline" style="width:100%;margin-top:12px" onclick="exportEditToCalendar()">添加到日历</button>
     <button class="btn btn-danger edit-delete" onclick="deleteSession()">删除此记录</button>
   </div>
 </div>
@@ -1267,6 +1268,14 @@ function saveEdit() {
   saveData(data);
   closeEdit();
   renderHome();
+}
+
+function exportEditToCalendar() {
+  if (!editingId) return;
+  const data = loadData();
+  const session = data.sessions.find(s => s.id === editingId);
+  if (!session) return;
+  downloadICS(session);
 }
 
 function deleteSession() {
