@@ -1145,6 +1145,9 @@ function renderHeatmap() {
     span.style.width = (nextWeek - monthPositions[i].week) * cellSize + 'px';
     monthsEl.appendChild(span);
   }
+
+  const wrap = document.querySelector('.heatmap-wrap');
+  if (wrap) wrap.scrollLeft = wrap.scrollWidth;
 }
 
 function showHeatmapTooltip(dateStr, sessions) {
