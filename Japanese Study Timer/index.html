@@ -1147,7 +1147,7 @@ function renderHeatmap() {
   }
 
   const wrap = document.querySelector('.heatmap-wrap');
-  if (wrap) wrap.scrollLeft = wrap.scrollWidth;
+  if (wrap) requestAnimationFrame(() => { wrap.scrollLeft = wrap.scrollWidth; });
 }
 
 function showHeatmapTooltip(dateStr, sessions) {
