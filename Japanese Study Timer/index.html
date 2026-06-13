@@ -789,9 +789,9 @@ body {
 .weekly-chart {
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
-  height: 160px;
-  padding-top: 20px;
+  gap: 6px;
+  height: 150px;
+  padding-top: 16px;
   min-width: min-content;
 }
 
@@ -802,33 +802,29 @@ body {
   align-items: center;
   justify-content: flex-end;
   height: 100%;
-  min-width: 32px;
+  min-width: 36px;
 }
 
 .wc-val {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--label2);
-  margin-bottom: 4px;
+  color: var(--accent);
+  margin-bottom: 5px;
   white-space: nowrap;
 }
 
 .wc-bar {
-  width: 20px;
-  min-height: 0;
-  border-radius: 5px 5px 2px 2px;
+  width: 28px;
+  min-height: 2px;
+  border-radius: 6px 6px 3px 3px;
   background: var(--accent-light);
   transition: height 0.3s ease;
 }
 
-.wc-bar.current {
-  background: var(--accent);
-}
-
 .wc-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--label3);
-  margin-top: 6px;
+  margin-top: 8px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -1478,7 +1474,7 @@ function renderWeeklyChart() {
     const sat = new Date(sun);
     sat.setDate(sat.getDate() + 6);
     const satStr = `${sat.getFullYear()}-${String(sat.getMonth()+1).padStart(2,'0')}-${String(sat.getDate()).padStart(2,'0')}`;
-    weeks.push({ sun, sunStr, satStr, label: `${sun.getMonth()+1}/${sun.getDate()}`, current: i === numWeeks - 1 });
+    weeks.push({ sun, sunStr, satStr, label: `${sun.getMonth()+1}/${sun.getDate()}` });
   }
 
   for (const w of weeks) {
@@ -1497,7 +1493,7 @@ function renderWeeklyChart() {
     const valLabel = w.hours % 1 === 0 ? String(w.hours) : w.hours.toFixed(1);
     html += `<div class="wc-bar-group">`;
     html += `<span class="wc-val">${valLabel}</span>`;
-    html += `<div class="wc-bar${w.current ? ' current' : ''}" style="height:${h}px"></div>`;
+    html += `<div class="wc-bar" style="height:${h}px"></div>`;
     html += `<span class="wc-label">${w.label}</span>`;
     html += `</div>`;
   }
