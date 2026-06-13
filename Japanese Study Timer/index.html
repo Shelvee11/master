@@ -779,6 +779,59 @@ body {
 }
 
 .confirm-sheet .btn { margin-top: 8px; }
+
+/* Weekly chart */
+.weekly-chart-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.weekly-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 160px;
+  padding-top: 20px;
+  min-width: min-content;
+}
+
+.wc-bar-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  min-width: 32px;
+}
+
+.wc-val {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--label2);
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.wc-bar {
+  width: 20px;
+  min-height: 0;
+  border-radius: 5px 5px 2px 2px;
+  background: var(--accent-light);
+  transition: height 0.3s ease;
+}
+
+.wc-bar.current {
+  background: var(--accent);
+}
+
+.wc-label {
+  font-size: 10px;
+  color: var(--label3);
+  margin-top: 6px;
+  font-weight: 500;
+  white-space: nowrap;
+}
 </style>
 </head>
 <body>
@@ -867,6 +920,12 @@ body {
     <h3>本周学习</h3>
     <div class="card">
       <div class="card-inner" id="weekDetail"></div>
+    </div>
+  </div>
+  <div class="settings-section" style="margin-top:20px">
+    <h3>每周趋势</h3>
+    <div class="card">
+      <div class="card-inner" id="weeklyChart"></div>
     </div>
   </div>
   <div class="settings-section" style="margin-top:20px">
@@ -1391,6 +1450,61 @@ function renderStats() {
     }
     topicBreakdown.innerHTML = thtml;
   }
+
+  renderWeeklyChart();
+}
+
+// ── Weekly Chart ─────────────────────────────────────────────
+function renderWeeklyChart() {
+  const data = loadData();
+  const container = document.getElementById('weeklyChart');
+  const maxBarH = 110;
+
+  if (data.sessions.length === 0) {
+    container.innerHTML = '<div style="color:var(--label3);font-size:13px;text-align:center;padding:12px 0">暂无数据</div>';
+    return;
+  }
+
+  const earliest = data.sessions.reduce((min, s) => s.date < min ? s.date : min, data.sessions[0].date);
+  const firstSunday = weekSunday(parseDate(earliest));
+  const curSunday = weekSunday(new Date());
+  const numWeeks = Math.round((curSunday - firstSunday) / (7 * 86400000)) + 1;
+
+  const weeks = [];
+  for (let i = 0; i < numWeeks; i++) {
+    const sun = new Date(firstSunday);
+    sun.setDate(sun.getDate() + i * 7);
+    const sunStr = `${sun.getFullYear()}-${String(sun.getMonth()+1).padStart(2,'0')}-${String(sun.getDate()).padStart(2,'0')}`;
+    const sat = new Date(sun);
+    sat.setDate(sat.getDate() + 6);
+    const satStr = `${sat.getFullYear()}-${String(sat.getMonth()+1).padStart(2,'0')}-${String(sat.getDate()).padStart(2,'0')}`;
+    weeks.push({ sun, sunStr, satStr, label: `${sun.getMonth()+1}/${sun.getDate()}`, current: i === numWeeks - 1 });
+  }
+
+  for (const w of weeks) {
+    let total = 0;
+    for (const s of data.sessions) {
+      if (s.date >= w.sunStr && s.date <= w.satStr) total += s.duration;
+    }
+    w.hours = Math.round(total / 360) / 10;
+  }
+
+  const maxVal = Math.max(...weeks.map(w => w.hours), 0.1);
+
+  let html = '<div class="weekly-chart-wrap"><div class="weekly-chart">';
+  for (const w of weeks) {
+    const h = Math.round((w.hours / maxVal) * maxBarH);
+    const valLabel = w.hours % 1 === 0 ? String(w.hours) : w.hours.toFixed(1);
+    html += `<div class="wc-bar-group">`;
+    html += `<span class="wc-val">${valLabel}</span>`;
+    html += `<div class="wc-bar${w.current ? ' current' : ''}" style="height:${h}px"></div>`;
+    html += `<span class="wc-label">${w.label}</span>`;
+    html += `</div>`;
+  }
+  html += '</div></div>';
+  container.innerHTML = html;
+  const wrap = container.querySelector('.weekly-chart-wrap');
+  if (wrap) requestAnimationFrame(() => { wrap.scrollLeft = wrap.scrollWidth; });
 }
 
 // ── Timer ────────────────────────────────────────────────────
