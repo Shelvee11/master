@@ -1,4 +1,4 @@
-const CACHE = 'jp-study-v3';
+const CACHE = 'jp-study-v4';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
