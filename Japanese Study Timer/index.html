@@ -1041,9 +1041,8 @@ function formatDuration(seconds) {
 function formatDurShort(seconds) {
   const m = Math.floor(seconds / 60);
   if (m < 60) return `${m}分钟`;
-  const h = Math.floor(m / 60);
-  const rm = m % 60;
-  return rm > 0 ? `${h}.${Math.round(rm/6)}小时` : `${h}小时`;
+  const hours = m / 60;
+  return hours % 1 === 0 ? `${hours}小时` : `${hours.toFixed(1)}小时`;
 }
 
 function formatTimer(seconds) {
