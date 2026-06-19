@@ -362,6 +362,44 @@ main {
   z-index: 999; white-space: nowrap;
 }
 .toast.show { transform: translateX(-50%) translateY(0); }
+
+/* Travel */
+.travel-cat-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+}
+.travel-cat-grid .cat-btn:nth-child(4n) { border-right: 1px solid var(--sep); }
+.travel-cat-grid .cat-btn:nth-child(3n) { border-right: none; }
+.travel-cat-grid .cat-btn:nth-last-child(-n+4) { border-bottom: 1px solid var(--sep); }
+.travel-cat-grid .cat-btn:nth-last-child(-n+3) { border-bottom: none; }
+.trip-header {
+  padding: 16px; border-bottom: 1px solid var(--sep);
+}
+.trip-header h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+.trip-header .trip-total {
+  font-size: 24px; font-weight: 700; color: var(--orange); margin-top: 4px;
+}
+.trip-header .trip-meta {
+  font-size: 13px; color: var(--label2); margin-top: 2px;
+}
+.trip-list-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--sep);
+  cursor: pointer; transition: background 0.1s;
+}
+.trip-list-item:active { background: var(--fill); }
+.trip-list-item:last-child { border-bottom: none; }
+.trip-list-item .trip-name { font-size: 15px; font-weight: 500; }
+.trip-list-item .trip-info { font-size: 12px; color: var(--label3); margin-top: 2px; }
+.trip-list-item .trip-amt { font-size: 16px; font-weight: 600; color: var(--orange); }
+.trip-summary-total {
+  text-align: center; padding: 24px 16px; border-bottom: 1px solid var(--sep);
+}
+.trip-summary-total .label {
+  font-size: 13px; color: var(--label2); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.trip-summary-total .amount {
+  font-size: 32px; font-weight: 700; color: var(--orange); margin-top: 4px;
+}
 </style>
 </head>
 <body>
@@ -376,6 +414,7 @@ main {
 <div class="tab-bar">
   <button class="tab-btn active" onclick="switchTab('record')">记一笔</button>
   <button class="tab-btn" onclick="switchTab('history')">明细</button>
+  <button class="tab-btn" onclick="switchTab('travel')">旅行</button>
 </div>
 
 <main>
@@ -467,6 +506,9 @@ main {
     <div class="card" id="records-card"></div>
 
   </div>
+
+  <!-- Travel Panel -->
+  <div id="travel-panel" class="panel"></div>
 </main>
 
 <div class="toast" id="toast">已记录</div>
@@ -898,19 +940,306 @@ function exportAllCSV() {
 // ── Tab Switch ────────────────────────────────────────────────
 
 function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach((b,i) =>
-    b.classList.toggle('active', (i===0) === (tab==='record')));
+  const tabs = ['record', 'history', 'travel'];
+  document.querySelectorAll('.tab-btn').forEach((b, i) =>
+    b.classList.toggle('active', tabs[i] === tab));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   if (tab === 'record') {
     document.getElementById('record-panel').classList.add('active');
-  } else {
+  } else if (tab === 'history') {
     if (editingId) resetForm();
     activeFilter = 'all';
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('.filter-btn[onclick="setFilter(\'all\')"]').classList.add('active');
     document.getElementById('history-panel').classList.add('active');
     renderHistory();
+  } else if (tab === 'travel') {
+    document.getElementById('travel-panel').classList.add('active');
+    renderTravel();
   }
+}
+
+// ── Travel ───────────────────────────────────────────────────
+
+const TRAVEL_CATS = [
+  { name: "住宿", icon: "🏨" },
+  { name: "出行", icon: "🚃" },
+  { name: "餐饮", icon: "🍱" },
+  { name: "门票", icon: "🎫" },
+  { name: "购物", icon: "🛍️" },
+  { name: "其他", icon: "📦" },
+];
+
+let selectedTravelCat = null;
+let viewingTripId = null;
+
+function getTrips() {
+  try { return JSON.parse(localStorage.getItem('travel_trips') || '[]'); }
+  catch { return []; }
+}
+function saveTrips(trips) {
+  localStorage.setItem('travel_trips', JSON.stringify(trips));
+}
+function getActiveTrip() {
+  return getTrips().find(t => t.status === 'active') || null;
+}
+
+function createTrip() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal-box">
+    <h3>新建行程</h3>
+    <input type="text" id="trip-name-input" placeholder="如：大阪之旅" maxlength="20">
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="this.closest('.modal-overlay').remove()">取消</button>
+      <button class="modal-confirm" onclick="confirmCreateTrip()">创建</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('trip-name-input').focus();
+}
+
+function confirmCreateTrip() {
+  const name = document.getElementById('trip-name-input').value.trim();
+  document.querySelector('.modal-overlay').remove();
+  if (!name) return;
+  const trips = getTrips();
+  if (trips.some(t => t.status === 'active')) return;
+  const now = new Date();
+  const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  trips.push({
+    id: Date.now(),
+    name: name,
+    status: 'active',
+    createdAt: dateStr,
+    archivedAt: null,
+    records: []
+  });
+  saveTrips(trips);
+  renderTravel();
+}
+
+function endTrip(tripId) {
+  if (!confirm('结束这个行程？结束后仍可查看汇总。')) return;
+  const trips = getTrips();
+  const trip = trips.find(t => t.id === tripId);
+  if (!trip) return;
+  const now = new Date();
+  trip.status = 'archived';
+  trip.archivedAt = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  saveTrips(trips);
+  renderTravel();
+}
+
+function deleteTrip(tripId) {
+  if (!confirm('删除这个行程及其所有记录？')) return;
+  saveTrips(getTrips().filter(t => t.id !== tripId));
+  viewingTripId = null;
+  renderTravel();
+}
+
+function selectTravelCat(name) {
+  selectedTravelCat = name;
+  document.querySelectorAll('.travel-cat-grid .cat-btn').forEach(b =>
+    b.classList.toggle('selected', b.dataset.cat === name));
+  updateTravelSubmit();
+}
+
+function updateTravelSubmit() {
+  const amt = document.getElementById('travel-amount').value;
+  const btn = document.getElementById('travel-submit-btn');
+  if (btn) btn.disabled = !(selectedTravelCat && parseFloat(amt) > 0);
+}
+
+function saveTravelRecord() {
+  const amt = parseFloat(document.getElementById('travel-amount').value);
+  if (!selectedTravelCat || !amt) return;
+  const trips = getTrips();
+  const trip = trips.find(t => t.status === 'active');
+  if (!trip) return;
+  trip.records.push({
+    id: Date.now(),
+    date: document.getElementById('travel-date').value,
+    category: selectedTravelCat,
+    amount: amt,
+    note: document.getElementById('travel-note').value.trim()
+  });
+  saveTrips(trips);
+  document.getElementById('travel-amount').value = '';
+  document.getElementById('travel-note').value = '';
+  selectedTravelCat = null;
+  showToast();
+  renderTravel();
+}
+
+function delTravelRecord(tripId, recordId) {
+  if (!confirm('删除这条记录？')) return;
+  const trips = getTrips();
+  const trip = trips.find(t => t.id === tripId);
+  if (!trip) return;
+  trip.records = trip.records.filter(r => r.id !== recordId);
+  saveTrips(trips);
+  renderTravel();
+}
+
+function getTripDateRange(trip) {
+  if (!trip.records.length) return trip.createdAt;
+  const dates = trip.records.map(r => r.date).sort();
+  const s = dates[0], e = dates[dates.length - 1];
+  return s === e ? s : s + ' ~ ' + e;
+}
+
+function getTripTotal(trip) {
+  return trip.records.reduce((s, r) => s + r.amount, 0);
+}
+
+function renderTravel() {
+  if (viewingTripId) {
+    renderTripSummary(viewingTripId);
+  } else {
+    const active = getActiveTrip();
+    if (active) renderTripRecorder(active);
+    else renderTripList();
+  }
+}
+
+function renderTripList() {
+  const panel = document.getElementById('travel-panel');
+  const archived = getTrips().filter(t => t.status === 'archived').sort((a,b) => b.id - a.id);
+  let html = `<div class="btn-group"><button class="btn btn-primary" onclick="createTrip()">新建行程</button></div>`;
+  if (archived.length) {
+    html += `<p class="card-label">历史行程</p><div class="card">`;
+    html += archived.map(t => {
+      const total = getTripTotal(t);
+      return `<div class="trip-list-item" onclick="viewingTripId=${t.id};renderTravel()">
+        <div>
+          <div class="trip-name">${t.name}</div>
+          <div class="trip-info">${getTripDateRange(t)} · ${t.records.length} 笔</div>
+        </div>
+        <div class="trip-amt">¥${total.toFixed(2)}</div>
+      </div>`;
+    }).join('');
+    html += `</div>`;
+  } else {
+    html += `<div class="card"><div class="empty-msg">还没有行程记录</div></div>`;
+  }
+  panel.innerHTML = html;
+}
+
+function renderTripRecorder(trip) {
+  const panel = document.getElementById('travel-panel');
+  const total = getTripTotal(trip);
+  const now = new Date();
+  const today = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  const records = [...trip.records].sort((a,b) => b.id - a.id);
+
+  let html = `
+    <div class="card">
+      <div class="trip-header">
+        <h2>${trip.name}</h2>
+        <div class="trip-total">¥${total.toFixed(2)}</div>
+        <div class="trip-meta">${trip.records.length} 笔记录 · ${getTripDateRange(trip)}</div>
+      </div>
+    </div>
+    <p class="card-label">类别</p>
+    <div class="card">
+      <div class="travel-cat-grid">
+        ${TRAVEL_CATS.map(c =>
+          `<button class="cat-btn${selectedTravelCat===c.name?' selected':''}" data-cat="${c.name}" onclick="selectTravelCat('${c.name}')">
+            <span class="icon">${c.icon}</span>${c.name}
+          </button>`
+        ).join('')}
+      </div>
+    </div>
+    <p class="card-label">详情</p>
+    <div class="card">
+      <div class="form-row">
+        <span class="form-label">日期</span>
+        <input class="form-input" type="date" id="travel-date" value="${today}">
+      </div>
+      <div class="form-row">
+        <span class="form-label">金额</span>
+        <input class="form-input" type="number" id="travel-amount" placeholder="0.00" inputmode="decimal" step="0.01" oninput="updateTravelSubmit()">
+      </div>
+      <div class="form-row">
+        <span class="form-label">备注</span>
+        <input class="form-input" type="text" id="travel-note" placeholder="可选">
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" id="travel-submit-btn" onclick="saveTravelRecord()" disabled>记一笔</button>
+    </div>`;
+
+  if (records.length) {
+    html += `<p class="card-label">记录</p><div class="card">`;
+    html += records.map(r => {
+      const cat = TRAVEL_CATS.find(c => c.name === r.category);
+      return `<div class="record-item">
+        <div class="record-left">
+          <div class="record-cat">${cat ? cat.icon : ''} ${r.category}</div>
+          <div class="record-meta">${r.date}${r.note ? ' · ' + r.note : ''}</div>
+        </div>
+        <div class="record-right">
+          <div class="record-amt">-¥${r.amount.toFixed(2)}</div>
+        </div>
+        <button class="record-del-btn" onclick="delTravelRecord(${trip.id},${r.id})">×</button>
+      </div>`;
+    }).join('');
+    html += `</div>`;
+  }
+
+  html += `<div class="btn-group">
+    <button class="btn btn-secondary" onclick="viewingTripId=${trip.id};renderTravel()">查看汇总</button>
+    <button class="btn btn-cancel" onclick="endTrip(${trip.id})">结束行程</button>
+  </div>`;
+
+  panel.innerHTML = html;
+}
+
+function renderTripSummary(tripId) {
+  const panel = document.getElementById('travel-panel');
+  const trip = getTrips().find(t => t.id === tripId);
+  if (!trip) { viewingTripId = null; renderTripList(); return; }
+
+  const total = getTripTotal(trip);
+  const byCat = {};
+  trip.records.forEach(r => { byCat[r.category] = (byCat[r.category] || 0) + r.amount; });
+
+  let html = `
+    <div class="card">
+      <div class="trip-summary-total">
+        <div class="label">${trip.name}</div>
+        <div class="amount">¥${total.toFixed(2)}</div>
+      </div>
+      <div style="padding:8px 16px;font-size:12px;color:var(--label3);text-align:center;border-bottom:1px solid var(--sep)">
+        ${getTripDateRange(trip)} · 共 ${trip.records.length} 笔
+      </div>
+      ${Object.keys(byCat).length ? `<div class="cat-breakdown">
+        ${Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([cat,amt]) => {
+          const c = TRAVEL_CATS.find(tc => tc.name === cat);
+          return `<div class="cat-breakdown-row"><span>${c ? c.icon : ''} ${cat}</span><span class="amt">¥${amt.toFixed(2)}</span></div>`;
+        }).join('')}
+      </div>` : ''}
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="exportTripCSV(${trip.id})">导出 CSV</button>
+      <button class="btn btn-secondary" onclick="viewingTripId=null;renderTravel()">返回</button>
+      <button class="btn btn-cancel" onclick="deleteTrip(${trip.id})">删除行程</button>
+    </div>`;
+
+  panel.innerHTML = html;
+}
+
+function exportTripCSV(tripId) {
+  const trip = getTrips().find(t => t.id === tripId);
+  if (!trip || !trip.records.length) { alert('没有记录'); return; }
+  const rows = [...trip.records].sort((a,b) => a.date.localeCompare(b.date)).map(r =>
+    `${r.date},${r.category},${r.amount},${(r.note||'').replace(/,/g,'，')}`
+  );
+  const csv = '日期,类别,金额,备注\n' + rows.join('\n') + '\n';
+  const dates = trip.records.map(r => r.date).sort();
+  const range = dates[0] === dates[dates.length-1] ? dates[0] : dates[0] + '_' + dates[dates.length-1];
+  triggerDownload(csv, `trip_${trip.name}_${range}.csv`);
 }
 
 // ── Init ──────────────────────────────────────────────────────
@@ -932,18 +1261,6 @@ function init() {
   if ('serviceWorker' in navigator)
     navigator.serviceWorker.register('service-worker.js');
 
-  let touchStartX = 0, touchStartY = 0;
-  document.body.addEventListener('touchstart', e => {
-    touchStartX = e.changedTouches[0].screenX;
-    touchStartY = e.changedTouches[0].screenY;
-  }, {passive: true});
-  document.body.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].screenX - touchStartX;
-    const dy = e.changedTouches[0].screenY - touchStartY;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-      switchTab(dx < 0 ? 'history' : 'record');
-    }
-  }, {passive: true});
 }
 
 init();

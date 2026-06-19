@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spendex-v10';
+const CACHE_NAME = 'spendex-v11';
 const BASE = '/master/expense-tracker/';
 const ASSETS = [BASE, BASE + 'index.html', BASE + 'manifest.json', BASE + 'owl.png', BASE + 'icon-192.png', BASE + 'apple-touch-icon.png'];
 
