@@ -1038,6 +1038,37 @@ function deleteTrip(tripId) {
   renderTravel();
 }
 
+function renameTripModal(tripId) {
+  const trip = getTrips().find(t => t.id === tripId);
+  if (!trip) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal-box">
+    <h3>修改行程名称</h3>
+    <input type="text" id="rename-trip-input" value="${trip.name}" maxlength="20">
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="this.closest('.modal-overlay').remove()">取消</button>
+      <button class="modal-confirm" onclick="confirmRenameTrip(${tripId})">确定</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const inp = document.getElementById('rename-trip-input');
+  inp.focus();
+  inp.select();
+}
+
+function confirmRenameTrip(tripId) {
+  const name = document.getElementById('rename-trip-input').value.trim();
+  document.querySelector('.modal-overlay').remove();
+  if (!name) return;
+  const trips = getTrips();
+  const trip = trips.find(t => t.id === tripId);
+  if (!trip) return;
+  trip.name = name;
+  saveTrips(trips);
+  renderTravel();
+}
+
 function selectTravelCat(name) {
   selectedTravelCat = name;
   document.querySelectorAll('.travel-cat-grid .cat-btn').forEach(b =>
@@ -1138,7 +1169,7 @@ function renderTripRecorder(trip) {
   let html = `
     <div class="card">
       <div class="trip-header">
-        <h2>${trip.name}</h2>
+        <h2>${trip.name} <button class="record-edit-btn" onclick="renameTripModal(${trip.id})">✏️</button></h2>
         <div class="trip-total">¥${total.toFixed(2)}</div>
         <div class="trip-meta">${trip.records.length} 笔记录 · ${getTripDateRange(trip)}</div>
       </div>
