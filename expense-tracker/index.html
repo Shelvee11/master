@@ -1235,6 +1235,7 @@ function renderTripRecorder(trip) {
 
   html += `<div class="btn-group">
     <button class="btn btn-secondary" onclick="viewingTripId=${trip.id};renderTravel()">查看汇总</button>
+    <button class="btn btn-secondary" onclick="importTripCSV(${trip.id})">导入 CSV</button>
     <button class="btn btn-cancel" onclick="endTrip(${trip.id})">结束行程</button>
   </div>`;
 
@@ -1285,6 +1286,56 @@ function exportTripCSV(tripId) {
   const dates = trip.records.map(r => r.date).sort();
   const range = dates[0] === dates[dates.length-1] ? dates[0] : dates[0] + '_' + dates[dates.length-1];
   triggerDownload(csv, `trip_${trip.name}_${range}.csv`);
+}
+
+function importTripCSV(tripId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,text/csv';
+  input.onchange = () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => parseAndImportTripCSV(tripId, reader.result);
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function parseAndImportTripCSV(tripId, text) {
+  const lines = text.replace(/^﻿/, '').trim().split('\n');
+  if (lines.length < 2) { alert('CSV 文件为空'); return; }
+  const header = lines[0].split(',');
+  const pendingIdx = header.indexOf('待确认');
+  const incoming = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    if (cols.length < 3) continue;
+    const [dateStr, category, amount] = cols;
+    const amt = parseFloat(amount);
+    if (!dateStr || isNaN(amt)) continue;
+    const rec = {
+      id: Date.now() + i,
+      date: dateStr.trim(),
+      category: category.trim(),
+      amount: amt,
+      note: (cols[3] || '').trim()
+    };
+    if (pendingIdx >= 0 && cols[pendingIdx] === '1') rec.pending = true;
+    incoming.push(rec);
+  }
+  if (!incoming.length) { alert('未找到有效记录'); return; }
+  const trips = getTrips();
+  const trip = trips.find(t => t.id === tripId);
+  if (!trip) return;
+  const existSet = new Set(trip.records.map(r => `${r.date}_${r.category}_${r.amount}`));
+  const newRecs = incoming.filter(r => !existSet.has(`${r.date}_${r.category}_${r.amount}`));
+  if (!newRecs.length) { alert('所有记录已存在，无需导入。'); return; }
+  if (!confirm(`发现 ${newRecs.length} 条新记录，导入到「${trip.name}」？`)) return;
+  trip.records.push(...newRecs);
+  saveTrips(trips);
+  renderTravel();
+  alert(`已导入 ${newRecs.length} 条记录！`);
 }
 
 // ── Init ──────────────────────────────────────────────────────
