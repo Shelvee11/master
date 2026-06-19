@@ -1062,11 +1062,13 @@ function saveTravelRecord() {
     date: document.getElementById('travel-date').value,
     category: selectedTravelCat,
     amount: amt,
-    note: document.getElementById('travel-note').value.trim()
+    note: document.getElementById('travel-note').value.trim(),
+    pending: document.getElementById('travel-pending-check').checked
   });
   saveTrips(trips);
   document.getElementById('travel-amount').value = '';
   document.getElementById('travel-note').value = '';
+  document.getElementById('travel-pending-check').checked = false;
   selectedTravelCat = null;
   showToast();
   renderTravel();
@@ -1166,6 +1168,18 @@ function renderTripRecorder(trip) {
         <input class="form-input" type="text" id="travel-note" placeholder="可选">
       </div>
     </div>
+    <div class="card">
+      <div class="form-toggle-row">
+        <div>
+          <label for="travel-pending-check">待确认</label>
+          <div class="toggle-desc">标记后可快速识别</div>
+        </div>
+        <div class="toggle-switch">
+          <input type="checkbox" id="travel-pending-check">
+          <span class="slider" onclick="document.getElementById('travel-pending-check').click()"></span>
+        </div>
+      </div>
+    </div>
     <div class="btn-group">
       <button class="btn btn-primary" id="travel-submit-btn" onclick="saveTravelRecord()" disabled>记一笔</button>
     </div>`;
@@ -1176,7 +1190,7 @@ function renderTripRecorder(trip) {
       const cat = TRAVEL_CATS.find(c => c.name === r.category);
       return `<div class="record-item">
         <div class="record-left">
-          <div class="record-cat">${cat ? cat.icon : ''} ${r.category}</div>
+          <div class="record-cat">${cat ? cat.icon : ''} ${r.category}${r.pending ? '<span class="record-badge pending">待确认</span>' : ''}</div>
           <div class="record-meta">${r.date}${r.note ? ' · ' + r.note : ''}</div>
         </div>
         <div class="record-right">
@@ -1234,9 +1248,9 @@ function exportTripCSV(tripId) {
   const trip = getTrips().find(t => t.id === tripId);
   if (!trip || !trip.records.length) { alert('没有记录'); return; }
   const rows = [...trip.records].sort((a,b) => a.date.localeCompare(b.date)).map(r =>
-    `${r.date},${r.category},${r.amount},${(r.note||'').replace(/,/g,'，')}`
+    `${r.date},${r.category},${r.amount},${(r.note||'').replace(/,/g,'，')},${r.pending?'1':''}`
   );
-  const csv = '日期,类别,金额,备注\n' + rows.join('\n') + '\n';
+  const csv = '日期,类别,金额,备注,待确认\n' + rows.join('\n') + '\n';
   const dates = trip.records.map(r => r.date).sort();
   const range = dates[0] === dates[dates.length-1] ? dates[0] : dates[0] + '_' + dates[dates.length-1];
   triggerDownload(csv, `trip_${trip.name}_${range}.csv`);
