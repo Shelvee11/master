@@ -1,0 +1,21 @@
+{
+  "name": "ProteinBit — 蛋白质追踪",
+  "short_name": "ProteinBit",
+  "description": "ProteinBit — 每日蛋白质摄入追踪",
+  "start_url": "/master/protein-tracker/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3d52d5",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
