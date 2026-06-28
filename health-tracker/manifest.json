@@ -1,0 +1,13 @@
+{
+  "name": "HealthBit — 健康追踪",
+  "short_name": "HealthBit",
+  "description": "蛋白质摄入 + 轻断食追踪",
+  "start_url": "/master/health-tracker/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3d52d5",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
