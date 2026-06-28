@@ -1,4 +1,4 @@
-const CACHE_NAME = 'healthbit-v1';
+const CACHE_NAME = 'profast-v2';
 const BASE = '/master/health-tracker/';
 const ASSETS = [BASE, BASE + 'index.html', BASE + 'manifest.json'];
 
