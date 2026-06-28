@@ -37,7 +37,7 @@
       background: var(--bg);
       color: var(--label);
       min-height: 100dvh;
-      padding-bottom: calc(env(safe-area-inset-bottom) + 72px);
+      padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
       -webkit-font-smoothing: antialiased;
     }
 
@@ -76,23 +76,28 @@
     /* ── Tab Bar (bottom) ── */
     .tab-bar {
       position: fixed; bottom: 0; left: 0; right: 0;
-      display: flex; background: rgba(245,245,247,0.95);
+      display: flex; background: rgba(255,255,255,0.94);
       backdrop-filter: saturate(180%) blur(20px);
       -webkit-backdrop-filter: saturate(180%) blur(20px);
       border-top: 1px solid var(--sep);
-      padding-bottom: env(safe-area-inset-bottom);
+      padding: 6px 0 calc(env(safe-area-inset-bottom) + 6px);
       z-index: 10;
     }
     .tab-btn {
-      flex: 1; padding: 7px 4px 5px; border: none; background: none;
+      flex: 1; padding: 4px 0; border: none; background: none;
       font-size: 10px; font-weight: 500; font-family: inherit;
       color: var(--label3); cursor: pointer;
-      display: flex; flex-direction: column; align-items: center; gap: 1px;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
       transition: color 0.15s; letter-spacing: 0.02em;
+      -webkit-user-select: none; user-select: none;
     }
-    .tab-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-    .tab-btn.active { color: var(--label); }
-    .tab-btn.active svg { stroke-width: 2.2; }
+    .tab-icon {
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .tab-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .tab-btn.active { color: var(--accent); }
+    .tab-btn.active svg { stroke-width: 1.8; }
 
     /* ── Habit Cards (Today) ── */
     .habit-card {
@@ -534,20 +539,20 @@
 </main>
 
 <!-- ── Bottom Tab Bar ── -->
-<div class="tab-bar">
+<nav class="tab-bar">
   <button class="tab-btn active" onclick="switchTab('today')">
-    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span>今日</span>
+    <div class="tab-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><span>今日</span>
   </button>
   <button class="tab-btn" onclick="switchTab('weekly')">
-    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg><span>周报</span>
+    <div class="tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg></div><span>周报</span>
   </button>
   <button class="tab-btn" onclick="switchTab('heatmap')">
-    <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 4 5-8"/></svg><span>趋势</span>
+    <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 4 5-8"/></svg></div><span>趋势</span>
   </button>
   <button class="tab-btn" onclick="switchTab('manage')">
-    <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg><span>管理</span>
+    <div class="tab-icon"><svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg></div><span>管理</span>
   </button>
-</div>
+</nav>
 
 <!-- ── Add/Edit Habit Modal ── -->
 <div class="modal-overlay" id="habit-modal" onclick="if(event.target===this)closeHabitModal()">
