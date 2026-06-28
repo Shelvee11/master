@@ -1,6 +1,6 @@
 {
-  "name": "HealthBit — 健康追踪",
-  "short_name": "HealthBit",
+  "name": "ProFast — 健康追踪",
+  "short_name": "ProFast",
   "description": "蛋白质摄入 + 轻断食追踪",
   "start_url": "/master/health-tracker/",
   "display": "standalone",
