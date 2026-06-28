@@ -1,4 +1,4 @@
-const CACHE_NAME = 'habitbit-v2';
+const CACHE_NAME = 'habitbit-v3';
 const BASE = '/master/habit-tracker/';
 const ASSETS = [BASE, BASE + 'index.html', BASE + 'manifest.json'];
 
