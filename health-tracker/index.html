@@ -262,6 +262,13 @@ main {
 }
 .manage-btn:active { background: var(--fill); }
 .manage-btn.danger { color: var(--red); border-color: rgba(224,62,62,0.2); }
+.manage-btn.move { color: var(--accent); border-color: rgba(61,82,213,0.2); }
+.manage-btn.move:disabled { opacity: 0.2; pointer-events: none; }
+
+.reorder-link {
+  font-size: 12px; color: var(--accent); font-weight: 500;
+  cursor: pointer; margin-left: auto; padding: 2px 0;
+}
 
 /* ── Buttons ── */
 .btn {
@@ -522,6 +529,8 @@ const DEFAULT_FOODS = [
   { id: 'f11', name: '奶酪',     emoji: '\u{1F9C0}', unit: '克',  proteinPer: 22,   perAmount: 100 },
   { id: 'f6',  name: '牛奶',     emoji: '\u{1F95B}', unit: '毫升', proteinPer: 3.3,  perAmount: 100 },
   { id: 'f12', name: '纳豆',     emoji: '\u{1F35B}', unit: '克',  proteinPer: 17,   perAmount: 100 },
+  { id: 'f13', name: '肥牛卷',   emoji: '\u{1F969}', unit: '克',  proteinPer: 15,   perAmount: 100 },
+  { id: 'f14', name: '三文鱼',   emoji: '\u{1F363}', unit: '克',  proteinPer: 20,   perAmount: 100 },
 ];
 
 function calcProtein(food, qty) {
@@ -622,10 +631,44 @@ function QuantityModal({ food, onConfirm, onClose }) {
   );
 }
 
+function ReorderSheet({ foods, setFoods, onClose }) {
+  function move(idx, dir) {
+    setFoods(prev => {
+      const next = [...prev];
+      const target = idx + dir;
+      if (target < 0 || target >= next.length) return prev;
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
+  }
+  return (
+    <>
+      <div className="sheet-overlay open" onClick={onClose} />
+      <div className="sheet open">
+        <div className="sheet-title">调整排序</div>
+        {foods.map((f, i) => (
+          <div key={f.id} className="manage-row">
+            <span className="manage-emoji">{f.emoji}</span>
+            <div className="manage-info">
+              <div className="manage-name">{f.name}</div>
+            </div>
+            <div className="manage-actions">
+              <button className="manage-btn move" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
+              <button className="manage-btn move" disabled={i === foods.length - 1} onClick={() => move(i, 1)}>↓</button>
+            </div>
+          </div>
+        ))}
+        <button className="btn btn-primary" style={{ marginTop: '12px' }} onClick={onClose}>完成</button>
+      </div>
+    </>
+  );
+}
+
 function RecordPanel({ foods, setFoods, records, setRecords, target, setTarget, showToast }) {
   const [modalFood, setModalFood] = useState(null);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [editFood, setEditFood] = useState(null);
+  const [showReorder, setShowReorder] = useState(false);
   const longPressTimer = useRef(null);
   const tk = todayKey();
   const todayEntries = records[tk]?.entries || [];
@@ -681,7 +724,10 @@ function RecordPanel({ foods, setFoods, records, setRecords, target, setTarget, 
         </div>
         <div className="progress-status" style={{ color: statusColor }}>{statusText}</div>
       </div>
-      <div className="card-label">快速记录 <span style={{ fontSize: '11px', color: 'var(--label3)', fontWeight: 400 }}>长按可编辑</span></div>
+      <div className="card-label" style={{ display: 'flex', alignItems: 'baseline' }}>
+        <span>快速记录 <span style={{ fontSize: '11px', color: 'var(--label3)', fontWeight: 400 }}>长按可编辑</span></span>
+        <span className="reorder-link" onClick={() => setShowReorder(true)}>排序</span>
+      </div>
       <div className="card">
         <div className="food-grid">
           {foods.map(f => (
@@ -722,6 +768,7 @@ function RecordPanel({ foods, setFoods, records, setRecords, target, setTarget, 
         setShowAddSheet(false);
         showToast('已添加');
       }} onClose={() => setShowAddSheet(false)} />}
+      {showReorder && <ReorderSheet foods={foods} setFoods={setFoods} onClose={() => setShowReorder(false)} />}
       {editFood && <AddFoodSheet food={editFood} onSave={f => {
         setFoods(prev => prev.map(x => x.id === f.id ? f : x));
         setEditFood(null);
