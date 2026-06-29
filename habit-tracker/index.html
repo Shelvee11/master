@@ -1204,6 +1204,7 @@ function seedDefaults() {
   const now = todayKey();
   const presets = [
     { name: '深蹲', emoji: '🏋', type: 'count', unit: '个' },
+    { name: '俯卧撑', emoji: '💪', type: 'count', unit: '个' },
     { name: '跑步', emoji: '🏃', type: 'check', unit: '' },
   ];
   presets.forEach((p, i) => {
@@ -1217,6 +1218,16 @@ function init() {
   document.getElementById('today-label').textContent =
     `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
   seedDefaults();
+  // One-time migration: add 俯卧撑 if missing, ensure order: 深蹲, 俯卧撑, 跑步
+  (function() {
+    const data = getData();
+    if (!data.habits.find(h => h.name === '俯卧撑')) {
+      const squat = data.habits.findIndex(h => h.name === '深蹲');
+      const pushup = { id: 'h_pushup', name: '俯卧撑', emoji: '💪', type: 'count', unit: '个', createdAt: todayKey(), archived: false };
+      data.habits.splice(squat >= 0 ? squat + 1 : 0, 0, pushup);
+      saveData(data);
+    }
+  })();
   renderAll();
   if ('serviceWorker' in navigator)
     navigator.serviceWorker.register('service-worker.js');
