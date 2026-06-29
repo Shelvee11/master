@@ -202,10 +202,10 @@
       background: var(--fill);
     }
     .heatmap-cell.future { background: none; }
-    .heatmap-cell.lv1 { background: #c6e48b; }
-    .heatmap-cell.lv2 { background: #7bc96f; }
-    .heatmap-cell.lv3 { background: #239a3b; }
-    .heatmap-cell.lv4 { background: #196127; }
+    .heatmap-cell.lv1 { background: #c8cde8; }
+    .heatmap-cell.lv2 { background: #8b93cc; }
+    .heatmap-cell.lv3 { background: #5c68c4; }
+    .heatmap-cell.lv4 { background: #3a44a0; }
 
     .heatmap-legend {
       display: flex; align-items: center; gap: 4px;
@@ -862,11 +862,12 @@ function renderWeekly() {
 }
 
 // ── Heatmap Panel ──
-let heatmapFilter = 'all';
+let heatmapFilter = null;
 
 function renderHeatmap() {
   const data = getData();
   const active = data.habits.filter(h => !h.archived);
+  if (heatmapFilter === null && active.length > 0) heatmapFilter = active[0].id;
 
   // Filter buttons
   const filterHtml = `<button class="heatmap-filter-btn${heatmapFilter === 'all' ? ' active' : ''}" onclick="setHeatmapFilter('all')">全部</button>` +
@@ -967,10 +968,10 @@ function renderHeatmap() {
       <div class="heatmap-legend">
         <span>少</span>
         <div class="heatmap-legend-cell" style="background:var(--fill)"></div>
-        <div class="heatmap-legend-cell" style="background:#c6e48b"></div>
-        <div class="heatmap-legend-cell" style="background:#7bc96f"></div>
-        <div class="heatmap-legend-cell" style="background:#239a3b"></div>
-        <div class="heatmap-legend-cell" style="background:#196127"></div>
+        <div class="heatmap-legend-cell" style="background:#c8cde8"></div>
+        <div class="heatmap-legend-cell" style="background:#8b93cc"></div>
+        <div class="heatmap-legend-cell" style="background:#5c68c4"></div>
+        <div class="heatmap-legend-cell" style="background:#3a44a0"></div>
         <span>多</span>
       </div>
     </div>`;
