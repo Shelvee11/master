@@ -518,19 +518,27 @@ const TARGET_KEY = 'protein-target';
 const DEFAULT_TARGET = 80;
 
 const DEFAULT_FOODS = [
-  { id: 'f1',  name: '鸡蛋',     emoji: '\u{1F95A}', unit: '个',  proteinPer: 7,    perAmount: 1 },
-  { id: 'f3',  name: '牛腱子',   emoji: '\u{1F969}', unit: '克',  proteinPer: 20,   perAmount: 100 },
-  { id: 'f4',  name: '鸡胸肉',   emoji: '\u{1F357}', unit: '克',  proteinPer: 23,   perAmount: 100 },
-  { id: 'f7',  name: '黑鱼片',   emoji: '\u{1F41F}', unit: '克',  proteinPer: 18,   perAmount: 100 },
-  { id: 'f8',  name: '脆肉鲩鱼', emoji: '\u{1F41F}', unit: '克',  proteinPer: 15,   perAmount: 100 },
-  { id: 'f9',  name: '虾滑',     emoji: '\u{1F990}', unit: '克',  proteinPer: 13,   perAmount: 100 },
-  { id: 'f5',  name: '老豆腐',   emoji: '\u{1F9C8}', unit: '克',  proteinPer: 9,    perAmount: 100 },
+  // 乳制品
+  { id: 'f6',  name: '牛奶',     emoji: '\u{1F95B}', unit: '毫升', proteinPer: 3.3,  perAmount: 100 },
   { id: 'f10', name: '希腊酸奶', emoji: '\u{1F95B}', unit: '克',  proteinPer: 10.2, perAmount: 100 },
   { id: 'f11', name: '奶酪',     emoji: '\u{1F9C0}', unit: '克',  proteinPer: 22,   perAmount: 100 },
-  { id: 'f6',  name: '牛奶',     emoji: '\u{1F95B}', unit: '毫升', proteinPer: 3.3,  perAmount: 100 },
-  { id: 'f12', name: '纳豆',     emoji: '\u{1F35B}', unit: '克',  proteinPer: 17,   perAmount: 100 },
+  // 禽蛋
+  { id: 'f1',  name: '鸡蛋',     emoji: '\u{1F95A}', unit: '个',  proteinPer: 7,    perAmount: 1 },
+  { id: 'f4',  name: '鸡胸肉',   emoji: '\u{1F356}', unit: '克',  proteinPer: 23,   perAmount: 100 },
+  { id: 'f15', name: '鸡腿肉',   emoji: '\u{1F357}', unit: '克',  proteinPer: 20,   perAmount: 100 },
+  // 牛肉
+  { id: 'f3',  name: '牛腱子',   emoji: '\u{1F969}', unit: '克',  proteinPer: 20,   perAmount: 100 },
   { id: 'f13', name: '肥牛卷',   emoji: '\u{1F969}', unit: '克',  proteinPer: 15,   perAmount: 100 },
+  // 鱼虾
+  { id: 'f7',  name: '黑鱼片',   emoji: '\u{1F41F}', unit: '克',  proteinPer: 18,   perAmount: 100 },
+  { id: 'f8',  name: '脆肉鲩鱼', emoji: '\u{1F41F}', unit: '克',  proteinPer: 15,   perAmount: 100 },
   { id: 'f14', name: '三文鱼',   emoji: '\u{1F363}', unit: '克',  proteinPer: 20,   perAmount: 100 },
+  { id: 'f9',  name: '虾滑',     emoji: '\u{1F990}', unit: '克',  proteinPer: 13,   perAmount: 100 },
+  { id: 'f17', name: '虾类',     emoji: '\u{1F990}', unit: '克',  proteinPer: 18,   perAmount: 100 },
+  { id: 'f16', name: '虾饼',     emoji: '\u{1F990}', unit: '克',  proteinPer: 12,   perAmount: 100 },
+  // 植物性
+  { id: 'f5',  name: '老豆腐',   emoji: '\u{1F9C8}', unit: '克',  proteinPer: 9,    perAmount: 100 },
+  { id: 'f12', name: '纳豆',     emoji: '\u{1F35B}', unit: '克',  proteinPer: 17,   perAmount: 100 },
 ];
 
 function calcProtein(food, qty) {
