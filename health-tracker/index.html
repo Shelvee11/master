@@ -870,9 +870,9 @@ function TrendPanel({ records, target }) {
     return result;
   }, [records]);
 
-  const BW = 9, GAP = 3, CH = 120, LH = 20;
+  const BW = 9, GAP = 3, CH = 120, LH = 20, PAD = 16;
   const MAXV = Math.max(target * 1.3, ...chartDays.map(d => d.total)) || target * 1.3;
-  const chartW = chartDays.length * (BW + GAP) - GAP + 2;
+  const chartW = chartDays.length * (BW + GAP) - GAP + 2 + PAD * 2;
   const tY = CH - (target / MAXV) * CH;
   const chartRef = useRef(null);
 
@@ -906,10 +906,10 @@ function TrendPanel({ records, target }) {
             <p style={{ textAlign: 'center', color: 'var(--label3)', fontSize: '13px', padding: '20px 0' }}>暂无数据</p>
           ) : (
             <svg width={chartW} height={CH + LH + 4} viewBox={`0 0 ${chartW} ${CH + LH + 4}`}>
-              <line x1="0" y1={tY} x2={chartW} y2={tY} stroke="#3d52d5" strokeWidth="1" strokeDasharray="3,3" opacity="0.3" />
-              <text x={chartW - 1} y={tY - 4} fontSize="9" fill="#3d52d5" textAnchor="end" opacity="0.6">{target}g</text>
+              <line x1={PAD} y1={tY} x2={chartW - PAD} y2={tY} stroke="#3d52d5" strokeWidth="1" strokeDasharray="3,3" opacity="0.3" />
+              <text x={chartW - PAD} y={tY - 4} fontSize="9" fill="#3d52d5" textAnchor="end" opacity="0.6">{target}g</text>
               {chartDays.map((d, i) => {
-                const x = i * (BW + GAP) + 1;
+                const x = PAD + i * (BW + GAP) + 1;
                 if (d.total === 0) {
                   return <rect key={d.date} x={x} y={CH - 3} width={BW} height={3} rx={1.5} fill="#d1d1d6" />;
                 }
@@ -918,12 +918,19 @@ function TrendPanel({ records, target }) {
                 return <rect key={d.date} x={x} y={CH - barH} width={BW} height={barH} rx={2}
                   fill={d.total >= target ? '#2a9d5c' : '#3d52d5'} />;
               })}
-              {chartDays.map((d, i) => {
-                const [, m, day] = d.date.split('-').map(Number);
-                if (day !== 1 && i !== 0 && i !== chartDays.length - 1) return null;
-                const x = i * (BW + GAP) + 1 + BW / 2;
-                return <text key={d.date} x={x} y={CH + LH - 2} fontSize="9" fill="#adadb8" textAnchor="middle">{m}/{day}</text>;
-              })}
+              {(() => {
+                const interval = 7;
+                const last = chartDays.length - 1;
+                return chartDays.map((d, i) => {
+                  const isLast = i === last;
+                  const isInterval = i % interval === 0;
+                  const tooCloseToLast = !isLast && last - i < 3;
+                  if ((!isInterval && !isLast) || tooCloseToLast) return null;
+                  const [, m, day] = d.date.split('-').map(Number);
+                  const x = PAD + i * (BW + GAP) + 1 + BW / 2;
+                  return <text key={d.date} x={x} y={CH + LH - 2} fontSize="9" fill="#adadb8" textAnchor="middle">{m}/{day}</text>;
+                });
+              })()}
             </svg>
           )}
         </div>
@@ -1098,7 +1105,13 @@ function SettingsPanel({ foods, setFoods, records, setRecords, showToast }) {
     reader.onload = () => {
       try {
         const obj = JSON.parse(reader.result);
-        if (obj.foods) setFoods(obj.foods);
+        if (obj.foods) {
+          setFoods(prev => {
+            const currentIds = new Set(prev.map(f => f.id));
+            const extras = obj.foods.filter(f => !currentIds.has(f.id));
+            return extras.length ? [...prev, ...extras] : prev;
+          });
+        }
         if (obj.records) setRecords(obj.records);
         showToast('已导入');
       } catch { showToast('导入失败'); }
@@ -1553,7 +1566,13 @@ function App() {
     reader.onload = () => {
       try {
         const obj = JSON.parse(reader.result);
-        if (obj.foods) setFoods(obj.foods);
+        if (obj.foods) {
+          setFoods(prev => {
+            const currentIds = new Set(prev.map(f => f.id));
+            const extras = obj.foods.filter(f => !currentIds.has(f.id));
+            return extras.length ? [...prev, ...extras] : prev;
+          });
+        }
         if (obj.records) setRecords(obj.records);
         if (obj.target > 0) setTarget(obj.target);
         if (obj.fastRecords) setFastRecords(obj.fastRecords);
