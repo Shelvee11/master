@@ -121,6 +121,7 @@ main {
   -webkit-user-select: none; user-select: none;
 }
 .food-item:active { background: var(--fill); }
+.food-grid-sep { grid-column: 1 / -1; height: 1px; background: var(--sep); margin: 2px 0; }
 .food-emoji { font-size: 28px; line-height: 1; }
 .food-name { font-size: 13px; font-weight: 600; color: var(--label); }
 .food-protein { font-size: 11px; color: var(--label3); }
@@ -515,31 +516,31 @@ const DAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
 const FOODS_KEY = 'protein-foods';
 const RECORDS_KEY = 'protein-records';
 const TARGET_KEY = 'protein-target';
-const DEFAULT_TARGET = 80;
+const DEFAULT_TARGET = 95;
 
 const DEFAULT_FOODS = [
-  // 乳制品
-  { id: 'f6',  name: '牛奶',     emoji: '\u{1F95B}', unit: '毫升', proteinPer: 3.3,  perAmount: 100 },
-  { id: 'f10', name: '希腊酸奶', emoji: '\u{1F95B}', unit: '克',  proteinPer: 10.2, perAmount: 100 },
-  { id: 'f18', name: '蛋白粉',   emoji: '\u{1F4AA}', unit: '克',  proteinPer: 86,   perAmount: 100 },
-  { id: 'f11', name: '奶酪',     emoji: '\u{1F9C0}', unit: '克',  proteinPer: 22,   perAmount: 100 },
-  // 禽蛋
-  { id: 'f1',  name: '鸡蛋',     emoji: '\u{1F95A}', unit: '个',  proteinPer: 7,    perAmount: 1 },
-  { id: 'f4',  name: '鸡胸肉',   emoji: '\u{1F356}', unit: '克',  proteinPer: 23,   perAmount: 100 },
-  { id: 'f15', name: '鸡腿肉',   emoji: '\u{1F357}', unit: '克',  proteinPer: 20,   perAmount: 100 },
+  // 奶蛋
+  { id: 'f1',  name: '鸡蛋',     emoji: '\u{1F95A}', unit: '个',  proteinPer: 7,    perAmount: 1,   cat: '奶蛋' },
+  { id: 'f10', name: '希腊酸奶', emoji: '\u{1F376}', unit: '克',  proteinPer: 10.2, perAmount: 100, cat: '奶蛋' },
+  { id: 'f6',  name: '牛奶',     emoji: '\u{1F95B}', unit: '毫升', proteinPer: 3.3,  perAmount: 100, cat: '奶蛋' },
+  // 禽肉
+  { id: 'f4',  name: '鸡胸肉',   emoji: '\u{1F356}', unit: '克',  proteinPer: 23,   perAmount: 100, cat: '禽肉' },
+  { id: 'f15', name: '鸡腿肉',   emoji: '\u{1F357}', unit: '克',  proteinPer: 20,   perAmount: 100, cat: '禽肉' },
   // 牛肉
-  { id: 'f3',  name: '牛腱子',   emoji: '\u{1F969}', unit: '克',  proteinPer: 20,   perAmount: 100 },
-  { id: 'f13', name: '肥牛卷',   emoji: '\u{1F969}', unit: '克',  proteinPer: 15,   perAmount: 100 },
-  // 鱼虾
-  { id: 'f7',  name: '黑鱼片',   emoji: '\u{1F41F}', unit: '克',  proteinPer: 18,   perAmount: 100 },
-  { id: 'f8',  name: '脆肉鲩鱼', emoji: '\u{1F41F}', unit: '克',  proteinPer: 15,   perAmount: 100 },
-  { id: 'f14', name: '三文鱼',   emoji: '\u{1F363}', unit: '克',  proteinPer: 20,   perAmount: 100 },
-  { id: 'f9',  name: '虾滑',     emoji: '\u{1F990}', unit: '克',  proteinPer: 13,   perAmount: 100 },
-  { id: 'f17', name: '虾类',     emoji: '\u{1F990}', unit: '克',  proteinPer: 18,   perAmount: 100 },
-  { id: 'f16', name: '虾饼',     emoji: '\u{1F990}', unit: '克',  proteinPer: 12,   perAmount: 100 },
+  { id: 'f3',  name: '牛排/牛腱', emoji: '\u{1F969}', unit: '克',  proteinPer: 20,   perAmount: 100, cat: '牛肉' },
+  { id: 'f13', name: '肥牛卷',   emoji: '\u{1F953}', unit: '克',  proteinPer: 15,   perAmount: 100, cat: '牛肉' },
+  // 鱼
+  { id: 'f7',  name: '鱼类',     emoji: '\u{1F420}', unit: '克',  proteinPer: 16,   perAmount: 100, cat: '鱼' },
+  { id: 'f14', name: '三文鱼',   emoji: '\u{1F363}', unit: '克',  proteinPer: 20,   perAmount: 100, cat: '鱼' },
+  // 虾
+  { id: 'f17', name: '虾类',     emoji: '\u{1F990}', unit: '克',  proteinPer: 18,   perAmount: 100, cat: '虾' },
+  { id: 'f9',  name: '虾滑/虾饼', emoji: '\u{1F364}', unit: '克',  proteinPer: 12,   perAmount: 100, cat: '虾' },
   // 植物性
-  { id: 'f5',  name: '老豆腐',   emoji: '\u{1F9C8}', unit: '克',  proteinPer: 9,    perAmount: 100 },
-  { id: 'f12', name: '纳豆',     emoji: '\u{1F35B}', unit: '克',  proteinPer: 17,   perAmount: 100 },
+  { id: 'f5',  name: '老豆腐',   emoji: '\u{1F9C8}', unit: '克',  proteinPer: 9,    perAmount: 100, cat: '植物' },
+  { id: 'f12', name: '纳豆',     emoji: '\u{1F35B}', unit: '克',  proteinPer: 17,   perAmount: 100, cat: '植物' },
+  // 兜底
+  { id: 'f18', name: '蛋白粉',   emoji: '\u{1F4AA}', unit: '克',  proteinPer: 86,   perAmount: 100, cat: '其他' },
+  { id: 'f20', name: '其他',     emoji: '\u{1F37D}\u{FE0F}', unit: '克',  proteinPer: 1,    perAmount: 1,   cat: '其他' },
 ];
 
 function calcProtein(food, qty) {
@@ -605,14 +606,20 @@ function Toast({ msg }) {
 
 function QuantityModal({ food, onConfirm, onClose }) {
   const [qty, setQty] = useState(food.perAmount === 1 ? '1' : '');
+  const [note, setNote] = useState('');
+  const isOther = food.id === 'f20';
   const inputRef = useRef(null);
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
 
   const num = parseFloat(qty) || 0;
   const protein = calcProtein(food, num);
-  const desc = food.perAmount === 1
-    ? `每${food.unit}含蛋白质 ${food.proteinPer}g`
-    : `每${food.perAmount}${food.unit}含蛋白质 ${food.proteinPer}g`;
+  const desc = isOther
+    ? '直接输入蛋白质克数'
+    : food.perAmount === 1
+      ? `每${food.unit}含蛋白质 ${food.proteinPer}g`
+      : `每${food.perAmount}${food.unit}含蛋白质 ${food.proteinPer}g`;
+
+  const handleConfirm = () => { if (num > 0) onConfirm(num, protein, note.trim() || undefined); };
 
   return (
     <div className="modal-overlay open" onClick={onClose}>
@@ -625,15 +632,18 @@ function QuantityModal({ food, onConfirm, onClose }) {
         <div className="modal-body">
           <input ref={inputRef} className="modal-input" type="number" inputMode="decimal"
             min="0" step={food.perAmount === 1 ? '1' : '10'} value={qty}
-            onChange={e => setQty(e.target.value)} placeholder={food.unit}
-            onKeyDown={e => { if (e.key === 'Enter' && num > 0) onConfirm(num, protein); }} />
+            onChange={e => setQty(e.target.value)} placeholder={isOther ? '蛋白质 g' : food.unit}
+            onKeyDown={e => { if (e.key === 'Enter' && num > 0) handleConfirm(); }} />
           <div className="modal-calc">
             {num > 0 ? `= ${protein % 1 === 0 ? protein : protein.toFixed(1)}g 蛋白质` : ''}
           </div>
+          {isOther && <input className="form-input" style={{ marginTop: '10px', fontSize: '14px' }}
+            value={note} onChange={e => setNote(e.target.value)} placeholder="备注：吃了什么？（选填）"
+            onKeyDown={e => { if (e.key === 'Enter' && num > 0) handleConfirm(); }} />}
         </div>
         <div className="modal-actions">
           <button className="modal-btn modal-btn-cancel" onClick={onClose}>取消</button>
-          <button className="modal-btn modal-btn-confirm" onClick={() => { if (num > 0) onConfirm(num, protein); }}>确定</button>
+          <button className="modal-btn modal-btn-confirm" onClick={handleConfirm}>确定</button>
         </div>
       </div>
     </div>
@@ -685,9 +695,10 @@ function RecordPanel({ foods, setFoods, records, setRecords, target, setTarget, 
   const pct = Math.min((total / target) * 100, 100);
   const met = total >= target;
 
-  function addEntry(qty, protein) {
-    const entry = { id: genId(), foodId: modalFood.id, foodName: modalFood.name, quantity: qty,
+  function addEntry(qty, protein, note) {
+    const entry = { id: genId(), foodId: modalFood.id, foodName: note || modalFood.name, quantity: qty,
       protein: Math.round(protein * 10) / 10, timestamp: nowTime() };
+    if (note) entry.note = note;
     setRecords(prev => {
       const day = prev[tk] || { entries: [] };
       return { ...prev, [tk]: { entries: [...day.entries, entry] } };
@@ -739,16 +750,22 @@ function RecordPanel({ foods, setFoods, records, setRecords, target, setTarget, 
       </div>
       <div className="card">
         <div className="food-grid">
-          {foods.map(f => (
-            <div key={f.id} className="food-item"
-              onPointerDown={e => handleFoodPointerDown(f, e)}
-              onPointerUp={() => handleFoodPointerUp(f)}
-              onPointerCancel={() => { clearTimeout(longPressTimer.current); longPressTimer.current = null; }}>
-              <span className="food-emoji">{f.emoji}</span>
-              <span className="food-name">{f.name}</span>
-              <span className="food-protein">{f.proteinPer}g/{f.perAmount === 1 ? f.unit : `${f.perAmount}${f.unit}`}</span>
-            </div>
-          ))}
+          {foods.map((f, i) => {
+            const prevCat = i > 0 ? (foods[i - 1].cat || '') : null;
+            const curCat = f.cat || '';
+            const showSep = i > 0 && curCat !== prevCat;
+            return <React.Fragment key={f.id}>
+              {showSep && <div className="food-grid-sep" />}
+              <div className="food-item"
+                onPointerDown={e => handleFoodPointerDown(f, e)}
+                onPointerUp={() => handleFoodPointerUp(f)}
+                onPointerCancel={() => { clearTimeout(longPressTimer.current); longPressTimer.current = null; }}>
+                <span className="food-emoji">{f.emoji}</span>
+                <span className="food-name">{f.name}</span>
+                <span className="food-protein">{f.proteinPer}g/{f.perAmount === 1 ? f.unit : `${f.perAmount}${f.unit}`}</span>
+              </div>
+            </React.Fragment>;
+          })}
           <div className="food-item" onClick={() => setShowAddSheet(true)}>
             <span className="food-emoji" style={{ color: 'var(--label3)' }}>+</span>
             <span className="food-name" style={{ color: 'var(--label3)' }}>添加</span>
@@ -1105,14 +1122,41 @@ function SettingsPanel({ foods, setFoods, records, setRecords, showToast }) {
     reader.onload = () => {
       try {
         const obj = JSON.parse(reader.result);
+        const idMap = {};
         if (obj.foods) {
           setFoods(prev => {
-            const currentIds = new Set(prev.map(f => f.id));
-            const extras = obj.foods.filter(f => !currentIds.has(f.id));
+            const nameMap = {};
+            prev.forEach(f => { nameMap[f.name] = f; });
+            const extras = [];
+            obj.foods.forEach(f => {
+              const existing = nameMap[f.name] || prev.find(x => x.id === f.id);
+              if (existing) {
+                idMap[f.id] = existing.id;
+              } else {
+                extras.push(f);
+              }
+            });
             return extras.length ? [...prev, ...extras] : prev;
           });
         }
-        if (obj.records) setRecords(obj.records);
+        if (obj.records) {
+          setRecords(prev => {
+            const merged = { ...prev };
+            for (const [dk, day] of Object.entries(obj.records)) {
+              if (!day.entries) continue;
+              const remapped = day.entries.map(e => {
+                const newId = idMap[e.foodId];
+                return newId ? { ...e, foodId: newId } : e;
+              });
+              if (merged[dk] && merged[dk].entries && merged[dk].entries.length) {
+                merged[dk] = { entries: [...merged[dk].entries, ...remapped] };
+              } else {
+                merged[dk] = { entries: remapped };
+              }
+            }
+            return merged;
+          });
+        }
         showToast('已导入');
       } catch { showToast('导入失败'); }
     };
@@ -1488,7 +1532,85 @@ function FastSettingsPanel({ fastRecords, setFastRecords, modeIndex, openActionS
 function App() {
   const [appMode, setAppMode] = useState(() => localStorage.getItem('health-mode') || 'protein');
 
-  const [foods, setFoods] = useState(() => loadJSON(FOODS_KEY, DEFAULT_FOODS));
+  const [foods, setFoods] = useState(() => {
+    const saved = loadJSON(FOODS_KEY, null);
+    if (!saved) return DEFAULT_FOODS;
+    const migrationVersion = parseInt(localStorage.getItem('foods-migration') || '0');
+    if (migrationVersion < 1) {
+      let migrated = saved.filter(f => f.id !== 'f11' && f.id !== 'f16');
+      const f9 = migrated.find(f => f.id === 'f9');
+      if (f9) { f9.name = '虾滑/虾饼'; f9.proteinPer = 12; }
+      const f3 = migrated.find(f => f.id === 'f3');
+      if (f3) f3.name = '牛排/牛腱';
+      migrated = migrated.filter(f => f.id !== 'f19');
+      const defaultMap = {};
+      DEFAULT_FOODS.forEach(f => { defaultMap[f.id] = f; });
+      migrated.forEach(f => { if (defaultMap[f.id]) f.cat = defaultMap[f.id].cat; });
+      DEFAULT_FOODS.forEach(df => {
+        if (!migrated.find(f => f.id === df.id)) migrated.push(df);
+      });
+      const catOrder = ['奶蛋', '禽肉', '牛肉', '鱼', '虾', '植物', '其他'];
+      const idOrder = DEFAULT_FOODS.map(f => f.id);
+      migrated.sort((a, b) => {
+        const ca = catOrder.indexOf(a.cat || '其他'), cb = catOrder.indexOf(b.cat || '其他');
+        if (ca !== cb) return ca - cb;
+        const ia = idOrder.indexOf(a.id), ib = idOrder.indexOf(b.id);
+        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+      });
+      localStorage.setItem('foods-migration', '4');
+      return migrated;
+    }
+    if (migrationVersion < 2) {
+      let migrated = saved.filter(f => f.id !== 'f8');
+      const f7 = migrated.find(f => f.id === 'f7');
+      if (f7) { f7.name = '鱼类'; f7.emoji = '\u{1F420}'; f7.proteinPer = 16; }
+      const f13 = migrated.find(f => f.id === 'f13');
+      if (f13) f13.emoji = '\u{1F953}';
+      const f9 = migrated.find(f => f.id === 'f9');
+      if (f9) f9.emoji = '\u{1F364}';
+      const f17 = migrated.find(f => f.id === 'f17');
+      if (f17) f17.emoji = '\u{1F990}';
+      migrated.forEach(f => {
+        if (f.id === 'f7' || f.id === 'f14') f.cat = '鱼';
+        else if (f.id === 'f9' || f.id === 'f17') f.cat = '虾';
+        else if (f.cat === '鱼虾') f.cat = '鱼';
+      });
+      const f10m = migrated.find(f => f.id === 'f10');
+      if (f10m) f10m.emoji = '\u{1F376}';
+      const f9m = migrated.find(f => f.id === 'f9');
+      const f17m = migrated.find(f => f.id === 'f17');
+      if (f9m && f17m) {
+        const i9 = migrated.indexOf(f9m), i17 = migrated.indexOf(f17m);
+        if (i9 < i17) { migrated.splice(i9, 1); migrated.splice(i17, 0, f9m); }
+      }
+      localStorage.setItem('foods-migration', '4');
+      return migrated;
+    }
+    if (migrationVersion < 3) {
+      let migrated = [...saved];
+      migrated.forEach(f => {
+        if (f.id === 'f7' || f.id === 'f14') f.cat = '鱼';
+        else if (f.id === 'f9' || f.id === 'f17') f.cat = '虾';
+        else if (f.cat === '鱼虾') f.cat = '鱼';
+      });
+      const f9m = migrated.find(f => f.id === 'f9');
+      const f17m = migrated.find(f => f.id === 'f17');
+      if (f9m && f17m) {
+        const i9 = migrated.indexOf(f9m), i17 = migrated.indexOf(f17m);
+        if (i9 < i17) { migrated.splice(i9, 1); migrated.splice(i17, 0, f9m); }
+      }
+      localStorage.setItem('foods-migration', '4');
+      return migrated;
+    }
+    if (migrationVersion < 4) {
+      let migrated = [...saved];
+      const f10 = migrated.find(f => f.id === 'f10');
+      if (f10) f10.emoji = '\u{1F376}';
+      localStorage.setItem('foods-migration', '4');
+      return migrated;
+    }
+    return saved;
+  });
   const [records, setRecords] = useState(() => loadJSON(RECORDS_KEY, {}));
   const [target, setTarget] = useState(() => {
     const v = parseFloat(localStorage.getItem(TARGET_KEY));
