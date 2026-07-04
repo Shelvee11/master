@@ -1,4 +1,4 @@
-const CACHE_NAME = 'habitbit-v3';
+const CACHE_NAME = 'habitbit-v4';
 const BASE = '/master/habit-tracker/';
 const ASSETS = [BASE, BASE + 'index.html', BASE + 'manifest.json'];
 
@@ -14,8 +14,13 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// network-first：在线永远拿最新版，离线回退到最近一次成功加载的缓存
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request).then(r => {
+      const clone = r.clone();
+      caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      return r;
+    }).catch(() => caches.match(e.request))
   );
 });

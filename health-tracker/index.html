@@ -50,7 +50,7 @@ header {
   padding-top: calc(env(safe-area-inset-top) + 14px);
   position: sticky; top: 0; z-index: 10;
 }
-header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; color: var(--label); }
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent); }
 header p  { font-size: 12px; color: var(--label3); margin-top: 2px; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
 
 main {
@@ -58,6 +58,9 @@ main {
   padding: 20px 16px 0;
   display: flex; flex-direction: column; gap: 12px;
 }
+
+.panel { display: none; }
+.panel.active { display: contents; }
 
 .card {
   background: var(--bg2); border-radius: var(--radius);
@@ -69,27 +72,6 @@ main {
   padding: 0 4px 6px;
   text-transform: uppercase; letter-spacing: 0.08em;
 }
-
-/* ── Tab Bar ── */
-.tab-bar {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  display: flex; background: rgba(245,245,247,0.95);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border-top: 1px solid var(--sep);
-  padding-bottom: env(safe-area-inset-bottom);
-  z-index: 10;
-}
-.tab-btn {
-  flex: 1; padding: 7px 4px 5px; border: none; background: none;
-  font-size: 10px; font-weight: 500; font-family: inherit;
-  color: var(--label3); cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 1px;
-  transition: color 0.15s; letter-spacing: 0.02em;
-}
-.tab-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.tab-btn.active { color: var(--label); }
-.tab-btn.active svg { stroke-width: 2.2; }
 
 /* ── Segment Control ── */
 .seg-ctrl {
@@ -201,7 +183,6 @@ main {
   transform: translateY(100%); transition: transform 0.25s;
   max-height: 80dvh; overflow-y: auto;
 }
-.sheet-overlay.open + .sheet,
 .sheet.open { transform: translateY(0); }
 .sheet-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
 .form-group { margin-bottom: 14px; }
@@ -215,20 +196,10 @@ main {
 .form-row { display: flex; gap: 10px; }
 .form-row .form-group { flex: 1; }
 
-/* ── Chart Card ── */
-.chart-wrap { padding: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.chart-wrap svg { display: block; }
+/* ── Chart ── */
+.chart-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 4px 0 0; }
 
-/* ── Stats Row ── */
-.stats-row { display: flex; gap: 8px; padding: 0 12px 12px; }
-.stat-chip {
-  flex: 1; background: var(--fill); border-radius: 10px;
-  padding: 10px; text-align: center;
-}
-.stat-val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.stat-label { font-size: 11px; color: var(--label3); margin-top: 2px; }
-
-/* ── Week Nav (Protein) ── */
+/* ── Week Nav ── */
 .week-nav {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 16px;
@@ -282,7 +253,6 @@ main {
 .btn-outline { background: none; border: 1.5px solid var(--sep); color: var(--label2); }
 .btn-start  { background: var(--accent); color: #fff; }
 .btn-end    { background: var(--label); color: #fff; }
-.btn-export { background: var(--bg2); color: var(--label2); border: 1px solid var(--sep); font-weight: 500; }
 .btn:disabled { background: var(--fill); color: var(--label3); border: 1px solid var(--sep); cursor: default; }
 .btn:disabled:active { opacity: 1; }
 
@@ -346,7 +316,7 @@ main {
 .hint-time { font-size: 34px; font-weight: 700; letter-spacing: -1.5px; line-height: 1; color: var(--label); }
 .hint-sub  { font-size: 13px; color: var(--label2); margin-top: 6px; }
 
-/* Weekly goal (Fasting) */
+/* Weekly goal */
 .fweek-header { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 16px 0; }
 .fweek-title { font-size: 15px; font-weight: 600; color: var(--label); }
 .fweek-count { font-size: 13px; color: var(--label2); }
@@ -368,9 +338,6 @@ main {
 .fweek-progress { margin: 0 16px 14px; height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
 .fweek-progress-bar { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.3s ease; }
 .fweek-met .fweek-progress-bar { background: var(--green); }
-
-/* Chart scroll */
-.chart-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 4px 0 0; }
 
 /* History (Fasting) */
 .history-item {
@@ -472,15 +439,126 @@ main {
 </style>
 </head>
 <body>
-<div id="root"></div>
 
-<script crossorigin src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
-<script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
-<script crossorigin src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.10/babel.min.js"></script>
+<header>
+  <h1>ProFast</h1>
+  <p id="today-label"></p>
+  <div class="seg-ctrl" style="margin:10px 0 0">
+    <button class="seg-btn" id="seg-protein" onclick="setAppMode('protein')">蛋白质</button>
+    <button class="seg-btn" id="seg-fasting" onclick="setAppMode('fasting')">断食</button>
+  </div>
+</header>
 
-<script type="text/babel">
-const { useState, useEffect, useRef, useCallback, useMemo } = React;
+<main>
+  <div class="panel" id="protein-panel"></div>
+  <div class="panel" id="fasting-panel"></div>
+</main>
 
+<!-- ── Quantity Modal (Protein) ── -->
+<div class="modal-overlay" id="qty-modal" onclick="if(event.target===this)closeQtyModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-emoji" id="qty-emoji"></div>
+      <div class="modal-title" id="qty-title"></div>
+      <div class="modal-subtitle" id="qty-desc"></div>
+    </div>
+    <div class="modal-body">
+      <input class="modal-input" type="number" inputmode="decimal" min="0" id="qty-input"
+        oninput="updateQtyCalc()" onkeydown="if(event.key==='Enter')confirmQty()">
+      <div class="modal-calc" id="qty-calc"></div>
+      <input class="form-input" id="qty-note" style="margin-top:10px;font-size:14px;display:none"
+        placeholder="备注：吃了什么？（选填）" onkeydown="if(event.key==='Enter')confirmQty()">
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn modal-btn-cancel" onclick="closeQtyModal()">取消</button>
+      <button class="modal-btn modal-btn-confirm" onclick="confirmQty()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add/Edit Food Sheet (Protein) ── -->
+<div class="sheet-overlay" id="food-sheet-overlay" onclick="closeFoodSheet()"></div>
+<div class="sheet" id="food-sheet">
+  <div class="sheet-title" id="food-sheet-title">添加食物</div>
+  <div class="form-row">
+    <div class="form-group" style="flex:0 0 72px">
+      <label class="form-label">图标</label>
+      <input class="form-input" id="food-emoji-input" style="text-align:center;font-size:24px;padding:6px">
+    </div>
+    <div class="form-group">
+      <label class="form-label">名称</label>
+      <input class="form-input" id="food-name-input" placeholder="食物名称" oninput="updateFoodDesc()">
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="form-label">类型</label>
+    <div class="seg-ctrl" style="margin:0">
+      <button class="seg-btn" id="food-type-piece" onclick="setFoodUnitType('piece')">按个数</button>
+      <button class="seg-btn" id="food-type-weight" onclick="setFoodUnitType('weight')">按重量/体积</button>
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label">单位</label>
+      <input class="form-input" id="food-unit-input" oninput="updateFoodDesc()">
+    </div>
+    <div class="form-group">
+      <label class="form-label">蛋白质 (g)</label>
+      <input class="form-input" type="number" inputmode="decimal" id="food-protein-input" oninput="updateFoodDesc()">
+    </div>
+    <div class="form-group" style="flex:0 0 70px" id="food-per-group">
+      <label class="form-label">每</label>
+      <input class="form-input" type="number" inputmode="numeric" id="food-per-input" oninput="updateFoodDesc()">
+    </div>
+  </div>
+  <div id="food-desc-live" style="font-size:13px;color:var(--label2);padding:4px 0 8px;text-align:center;display:none"></div>
+  <button class="btn btn-primary" style="margin-top:8px" onclick="saveFoodSheet()">保存</button>
+  <button class="btn btn-outline" id="food-delete-btn" style="margin-top:8px;color:var(--red);border-color:rgba(224,62,62,0.3)" onclick="deleteFoodFromSheet()">删除</button>
+  <button class="btn btn-outline" style="margin-top:8px" onclick="closeFoodSheet()">取消</button>
+</div>
+
+<!-- ── Reorder Sheet (Protein) ── -->
+<div class="sheet-overlay" id="reorder-overlay" onclick="closeReorder()"></div>
+<div class="sheet" id="reorder-sheet">
+  <div class="sheet-title">调整排序</div>
+  <div id="reorder-list"></div>
+  <button class="btn btn-primary" style="margin-top:12px" onclick="closeReorder()">完成</button>
+</div>
+
+<!-- ── Time Picker (Fasting) ── -->
+<div class="picker-overlay" id="picker" onclick="if(event.target===this)closePicker()">
+  <div class="picker-sheet">
+    <div class="picker-header">
+      <button class="picker-hbtn picker-hbtn-cancel" onclick="closePicker()">取消</button>
+      <span class="picker-title" id="picker-title">选择时间</span>
+      <button class="picker-hbtn picker-hbtn-done" onclick="confirmPicker()">确定</button>
+    </div>
+    <div class="time-picker-cols">
+      <div class="picker-col" id="picker-hours"></div>
+      <div class="picker-separator">:</div>
+      <div class="picker-col" id="picker-mins"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Action Sheet (Fasting) ── -->
+<div class="action-overlay" id="fast-action" onclick="if(event.target===this)closeFastAction()">
+  <div class="action-sheet">
+    <div class="action-group">
+      <div class="action-title" id="fast-action-title"></div>
+      <button class="action-btn action-btn-blue" onclick="fastActionEdit('start')">修改开始时间</button>
+      <button class="action-btn action-btn-blue" onclick="fastActionEdit('end')">修改结束时间</button>
+      <button class="action-btn action-btn-red" onclick="fastActionDelete()">删除这天的记录</button>
+    </div>
+    <div class="action-group">
+      <button class="action-btn action-btn-cancel" onclick="closeFastAction()">取消</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
 /* ═══════════════════ Shared Utilities ═══════════════════ */
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -492,24 +570,27 @@ function loadJSON(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
   catch { return fallback; }
 }
-function formatDate(dk) { const [, m, d] = dk.split('-').map(Number); return `${m}月${d}日`; }
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
-function getMonday(d) {
+function getWeekStart(d) {
+  // 周起始日统一为周日（见 PWA_DESIGN_GUIDE.md）
   const dt = new Date(d);
-  const day = dt.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  dt.setDate(dt.getDate() + diff);
+  dt.setDate(dt.getDate() - dt.getDay());
   dt.setHours(0, 0, 0, 0);
   return dt;
 }
-function getWeekDates(monday) {
+function getWeekDates(weekStart) {
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
+    const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
     return dateKey(d);
   });
 }
-const DAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
+const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
 /* ═══════════════════ Protein Constants & Utils ═══════════════════ */
 
@@ -517,6 +598,7 @@ const FOODS_KEY = 'protein-foods';
 const RECORDS_KEY = 'protein-records';
 const TARGET_KEY = 'protein-target';
 const DEFAULT_TARGET = 95;
+const WEEK_GOAL = 5;
 
 const DEFAULT_FOODS = [
   // 奶蛋
@@ -547,8 +629,8 @@ function calcProtein(food, qty) {
   if (food.perAmount === 1) return qty * food.proteinPer;
   return (qty / food.perAmount) * food.proteinPer;
 }
-function getDailyTotal(records, dk) {
-  const day = records[dk];
+function getDailyTotal(recs, dk) {
+  const day = recs[dk];
   if (!day || !day.entries || !day.entries.length) return 0;
   return day.entries.reduce((s, e) => s + e.protein, 0);
 }
@@ -580,10 +662,10 @@ function prevDateKey(dk) {
   d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
-function calcFastHours(dk, records) {
-  const today = records[dk];
+function calcFastHours(dk, recs) {
+  const today = recs[dk];
   if (!today || !today.start) return null;
-  const prev = records[prevDateKey(dk)];
+  const prev = recs[prevDateKey(dk)];
   if (!prev || !prev.end) return null;
   const [eh,em] = prev.end.split(':').map(Number);
   const [sh,sm] = today.start.split(':').map(Number);
@@ -598,713 +680,526 @@ function nowHHMM() {
 }
 function fmtKey(key) { const [, m, d] = key.split('-'); return `${parseInt(m)}/${parseInt(d)}`; }
 
-/* ═══════════════════ Protein Components ═══════════════════ */
+/* ═══════════════════ State & Persistence ═══════════════════ */
 
-function Toast({ msg }) {
-  return <div className={`toast${msg ? ' show' : ''}`}>{msg}</div>;
+function loadFoods() {
+  const saved = loadJSON(FOODS_KEY, null);
+  if (!saved) return DEFAULT_FOODS.map(f => ({ ...f }));
+  const migrationVersion = parseInt(localStorage.getItem('foods-migration') || '0');
+  if (migrationVersion < 1) {
+    let migrated = saved.filter(f => f.id !== 'f11' && f.id !== 'f16');
+    const f9 = migrated.find(f => f.id === 'f9');
+    if (f9) { f9.name = '虾滑/虾饼'; f9.proteinPer = 12; }
+    const f3 = migrated.find(f => f.id === 'f3');
+    if (f3) f3.name = '牛排/牛腱';
+    migrated = migrated.filter(f => f.id !== 'f19');
+    const defaultMap = {};
+    DEFAULT_FOODS.forEach(f => { defaultMap[f.id] = f; });
+    migrated.forEach(f => { if (defaultMap[f.id]) f.cat = defaultMap[f.id].cat; });
+    DEFAULT_FOODS.forEach(df => {
+      if (!migrated.find(f => f.id === df.id)) migrated.push({ ...df });
+    });
+    const catOrder = ['奶蛋', '禽肉', '牛肉', '鱼', '虾', '植物', '其他'];
+    const idOrder = DEFAULT_FOODS.map(f => f.id);
+    migrated.sort((a, b) => {
+      const ca = catOrder.indexOf(a.cat || '其他'), cb = catOrder.indexOf(b.cat || '其他');
+      if (ca !== cb) return ca - cb;
+      const ia = idOrder.indexOf(a.id), ib = idOrder.indexOf(b.id);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+    localStorage.setItem('foods-migration', '4');
+    return migrated;
+  }
+  if (migrationVersion < 2) {
+    let migrated = saved.filter(f => f.id !== 'f8');
+    const f7 = migrated.find(f => f.id === 'f7');
+    if (f7) { f7.name = '鱼类'; f7.emoji = '\u{1F420}'; f7.proteinPer = 16; }
+    const f13 = migrated.find(f => f.id === 'f13');
+    if (f13) f13.emoji = '\u{1F953}';
+    const f9 = migrated.find(f => f.id === 'f9');
+    if (f9) f9.emoji = '\u{1F364}';
+    const f17 = migrated.find(f => f.id === 'f17');
+    if (f17) f17.emoji = '\u{1F990}';
+    migrated.forEach(f => {
+      if (f.id === 'f7' || f.id === 'f14') f.cat = '鱼';
+      else if (f.id === 'f9' || f.id === 'f17') f.cat = '虾';
+      else if (f.cat === '鱼虾') f.cat = '鱼';
+    });
+    const f10m = migrated.find(f => f.id === 'f10');
+    if (f10m) f10m.emoji = '\u{1F376}';
+    const f9m = migrated.find(f => f.id === 'f9');
+    const f17m = migrated.find(f => f.id === 'f17');
+    if (f9m && f17m) {
+      const i9 = migrated.indexOf(f9m), i17 = migrated.indexOf(f17m);
+      if (i9 < i17) { migrated.splice(i9, 1); migrated.splice(i17, 0, f9m); }
+    }
+    localStorage.setItem('foods-migration', '4');
+    return migrated;
+  }
+  if (migrationVersion < 3) {
+    let migrated = [...saved];
+    migrated.forEach(f => {
+      if (f.id === 'f7' || f.id === 'f14') f.cat = '鱼';
+      else if (f.id === 'f9' || f.id === 'f17') f.cat = '虾';
+      else if (f.cat === '鱼虾') f.cat = '鱼';
+    });
+    const f9m = migrated.find(f => f.id === 'f9');
+    const f17m = migrated.find(f => f.id === 'f17');
+    if (f9m && f17m) {
+      const i9 = migrated.indexOf(f9m), i17 = migrated.indexOf(f17m);
+      if (i9 < i17) { migrated.splice(i9, 1); migrated.splice(i17, 0, f9m); }
+    }
+    localStorage.setItem('foods-migration', '4');
+    return migrated;
+  }
+  if (migrationVersion < 4) {
+    let migrated = [...saved];
+    const f10 = migrated.find(f => f.id === 'f10');
+    if (f10) f10.emoji = '\u{1F376}';
+    localStorage.setItem('foods-migration', '4');
+    return migrated;
+  }
+  return saved;
 }
 
-function QuantityModal({ food, onConfirm, onClose }) {
-  const [qty, setQty] = useState(food.perAmount === 1 ? '1' : '');
-  const [note, setNote] = useState('');
-  const isOther = food.id === 'f20';
-  const inputRef = useRef(null);
-  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
+let appMode = localStorage.getItem('health-mode') || 'protein';
+let foods = loadFoods();
+let records = loadJSON(RECORDS_KEY, {});
+let target = (() => {
+  const v = parseFloat(localStorage.getItem(TARGET_KEY));
+  return v > 0 ? v : DEFAULT_TARGET;
+})();
+let fastModeIndex = (() => {
+  const i = parseInt(localStorage.getItem('fasting-mode') || '0');
+  return isNaN(i) ? 0 : i;
+})();
+let fastRecords = loadJSON('fasting-records', {});
 
-  const num = parseFloat(qty) || 0;
-  const protein = calcProtein(food, num);
-  const desc = isOther
-    ? '直接输入蛋白质克数'
-    : food.perAmount === 1
-      ? `每${food.unit}含蛋白质 ${food.proteinPer}g`
-      : `每${food.perAmount}${food.unit}含蛋白质 ${food.proteinPer}g`;
+function saveFoods()       { localStorage.setItem(FOODS_KEY, JSON.stringify(foods)); }
+function saveRecords()     { localStorage.setItem(RECORDS_KEY, JSON.stringify(records)); }
+function saveTarget()      { localStorage.setItem(TARGET_KEY, String(target)); }
+function saveFastMode()    { localStorage.setItem('fasting-mode', String(fastModeIndex)); }
+function saveFastRecords() { localStorage.setItem('fasting-records', JSON.stringify(fastRecords)); }
 
-  const handleConfirm = () => { if (num > 0) onConfirm(num, protein, note.trim() || undefined); };
+saveFoods(); // 持久化迁移结果
 
-  return (
-    <div className="modal-overlay open" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-emoji">{food.emoji}</div>
-          <div className="modal-title">{food.name}</div>
-          <div className="modal-subtitle">{desc}</div>
-        </div>
-        <div className="modal-body">
-          <input ref={inputRef} className="modal-input" type="number" inputMode="decimal"
-            min="0" step={food.perAmount === 1 ? '1' : '10'} value={qty}
-            onChange={e => setQty(e.target.value)} placeholder={isOther ? '蛋白质 g' : food.unit}
-            onKeyDown={e => { if (e.key === 'Enter' && num > 0) handleConfirm(); }} />
-          <div className="modal-calc">
-            {num > 0 ? `= ${protein % 1 === 0 ? protein : protein.toFixed(1)}g 蛋白质` : ''}
-          </div>
-          {isOther && <input className="form-input" style={{ marginTop: '10px', fontSize: '14px' }}
-            value={note} onChange={e => setNote(e.target.value)} placeholder="备注：吃了什么？（选填）"
-            onKeyDown={e => { if (e.key === 'Enter' && num > 0) handleConfirm(); }} />}
-        </div>
-        <div className="modal-actions">
-          <button className="modal-btn modal-btn-cancel" onClick={onClose}>取消</button>
-          <button className="modal-btn modal-btn-confirm" onClick={handleConfirm}>确定</button>
+/* ═══════════════════ Toast ═══════════════════ */
+
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ═══════════════════ Protein: Render ═══════════════════ */
+
+function fmtG(n) { return n % 1 === 0 ? n : n.toFixed(1); }
+
+function renderProtein() {
+  const tk = todayKey();
+  const entries = (records[tk] && records[tk].entries) || [];
+  const total = entries.reduce((s, e) => s + e.protein, 0);
+  const pct = Math.min((total / target) * 100, 100);
+  const met = total >= target;
+  const statusText = met ? '已达标!' : `还差 ${(target - total).toFixed(1)}g`;
+  const statusColor = met ? 'var(--green)' : 'var(--accent)';
+
+  let html = `
+    <div class="card progress-card">
+      <div class="progress-value" style="color:${met ? 'var(--green)' : 'var(--accent)'}">${fmtG(total)}g</div>
+      <div class="progress-target" onclick="editTarget()" style="cursor:pointer">目标 ${target}g ✎</div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" style="width:${pct}%;background:${met ? 'var(--green)' : 'var(--accent)'}"></div>
+      </div>
+      <div class="progress-status" style="color:${statusColor}">${statusText}</div>
+    </div>
+    <div class="card-label" style="display:flex;align-items:baseline">
+      <span>快速记录 <span style="font-size:11px;color:var(--label3);font-weight:400">长按可编辑</span></span>
+      <span class="reorder-link" onclick="openReorder()">排序</span>
+    </div>
+    <div class="card">
+      <div class="food-grid">`;
+
+  foods.forEach((f, i) => {
+    const prevCat = i > 0 ? (foods[i - 1].cat || '') : null;
+    const curCat = f.cat || '';
+    if (i > 0 && curCat !== prevCat) html += '<div class="food-grid-sep"></div>';
+    const per = f.perAmount === 1 ? esc(f.unit) : `${f.perAmount}${esc(f.unit)}`;
+    html += `
+      <div class="food-item"
+        onpointerdown="foodPointerDown('${f.id}')"
+        onpointerup="foodPointerUp('${f.id}')"
+        onpointercancel="foodPointerCancel()">
+        <span class="food-emoji">${esc(f.emoji)}</span>
+        <span class="food-name">${esc(f.name)}</span>
+        <span class="food-protein">${f.proteinPer}g/${per}</span>
+      </div>`;
+  });
+
+  html += `
+        <div class="food-item" onclick="openFoodSheet(null)">
+          <span class="food-emoji" style="color:var(--label3)">+</span>
+          <span class="food-name" style="color:var(--label3)">添加</span>
         </div>
       </div>
     </div>
-  );
-}
+    <div class="card-label">今日记录</div>
+    <div class="card">`;
 
-function ReorderSheet({ foods, setFoods, onClose }) {
-  function move(idx, dir) {
-    setFoods(prev => {
-      const next = [...prev];
-      const target = idx + dir;
-      if (target < 0 || target >= next.length) return prev;
-      [next[idx], next[target]] = [next[target], next[idx]];
-      return next;
+  if (!entries.length) {
+    html += '<div class="empty-msg">还没有记录，点击上方食物开始</div>';
+  } else {
+    entries.forEach(e => {
+      const unit = (foods.find(f => f.id === e.foodId) || {}).unit || '';
+      html += `
+        <div class="entry-row">
+          <span class="entry-time">${e.timestamp}</span>
+          <span class="entry-food">${esc(e.foodName)}</span>
+          <span class="entry-qty">${e.quantity}${esc(unit)}</span>
+          <span class="entry-protein">${e.protein}g</span>
+          <button class="entry-del" onclick="delEntry('${e.id}')">&times;</button>
+        </div>`;
     });
   }
-  return (
-    <>
-      <div className="sheet-overlay open" onClick={onClose} />
-      <div className="sheet open">
-        <div className="sheet-title">调整排序</div>
-        {foods.map((f, i) => (
-          <div key={f.id} className="manage-row">
-            <span className="manage-emoji">{f.emoji}</span>
-            <div className="manage-info">
-              <div className="manage-name">{f.name}</div>
-            </div>
-            <div className="manage-actions">
-              <button className="manage-btn move" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
-              <button className="manage-btn move" disabled={i === foods.length - 1} onClick={() => move(i, 1)}>↓</button>
-            </div>
-          </div>
-        ))}
-        <button className="btn btn-primary" style={{ marginTop: '12px' }} onClick={onClose}>完成</button>
-      </div>
-    </>
-  );
+  html += '</div>';
+
+  html += proteinWeekHtml();
+  html += proteinChartHtml();
+
+  html += `
+    <div class="card-label" style="margin-top:8px">数据管理</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" style="flex:1" onclick="exportJSON()">导出 JSON</button>
+      <label class="btn btn-outline" style="flex:1;text-align:center;cursor:pointer">
+        导入 JSON
+        <input type="file" accept=".json" style="display:none" onchange="importJSON(event)">
+      </label>
+    </div>`;
+
+  document.getElementById('protein-panel').innerHTML = html;
+  const sc = document.getElementById('p-chart-scroll');
+  if (sc) sc.scrollLeft = sc.scrollWidth;
 }
 
-function RecordPanel({ foods, setFoods, records, setRecords, target, setTarget, showToast }) {
-  const [modalFood, setModalFood] = useState(null);
-  const [showAddSheet, setShowAddSheet] = useState(false);
-  const [editFood, setEditFood] = useState(null);
-  const [showReorder, setShowReorder] = useState(false);
-  const longPressTimer = useRef(null);
+function proteinWeekHtml() {
   const tk = todayKey();
-  const todayEntries = records[tk]?.entries || [];
-  const total = todayEntries.reduce((s, e) => s + e.protein, 0);
-  const pct = Math.min((total / target) * 100, 100);
-  const met = total >= target;
-
-  function addEntry(qty, protein, note) {
-    const entry = { id: genId(), foodId: modalFood.id, foodName: note || modalFood.name, quantity: qty,
-      protein: Math.round(protein * 10) / 10, timestamp: nowTime() };
-    if (note) entry.note = note;
-    setRecords(prev => {
-      const day = prev[tk] || { entries: [] };
-      return { ...prev, [tk]: { entries: [...day.entries, entry] } };
-    });
-    setModalFood(null);
-    showToast(`+${entry.protein}g 蛋白质`);
-  }
-  function delEntry(id) {
-    setRecords(prev => {
-      const day = prev[tk];
-      if (!day) return prev;
-      return { ...prev, [tk]: { entries: day.entries.filter(e => e.id !== id) } };
-    });
-  }
-  function handleFoodPointerDown(f, e) {
-    longPressTimer.current = setTimeout(() => { longPressTimer.current = 'fired'; setEditFood(f); }, 500);
-  }
-  function handleFoodPointerUp(f) {
-    if (longPressTimer.current === 'fired') { longPressTimer.current = null; return; }
-    clearTimeout(longPressTimer.current);
-    longPressTimer.current = null;
-    setModalFood(f);
-  }
-  function handleTargetClick() {
-    const val = prompt('设置每日蛋白质目标 (g)', target);
-    const num = parseFloat(val);
-    if (num > 0) setTarget(num);
-  }
-
-  let statusText, statusColor;
-  if (met) { statusText = '已达标!'; statusColor = 'var(--green)'; }
-  else { statusText = `还差 ${(target - total).toFixed(1)}g`; statusColor = 'var(--accent)'; }
-
-  return (
-    <>
-      <div className="card progress-card">
-        <div className="progress-value" style={{ color: met ? 'var(--green)' : 'var(--accent)' }}>
-          {total % 1 === 0 ? total : total.toFixed(1)}g
-        </div>
-        <div className="progress-target" onClick={handleTargetClick} style={{ cursor: 'pointer' }}>目标 {target}g ✎</div>
-        <div className="progress-bar-wrap">
-          <div className="progress-bar" style={{ width: `${pct}%`, background: met ? 'var(--green)' : 'var(--accent)' }} />
-        </div>
-        <div className="progress-status" style={{ color: statusColor }}>{statusText}</div>
-      </div>
-      <div className="card-label" style={{ display: 'flex', alignItems: 'baseline' }}>
-        <span>快速记录 <span style={{ fontSize: '11px', color: 'var(--label3)', fontWeight: 400 }}>长按可编辑</span></span>
-        <span className="reorder-link" onClick={() => setShowReorder(true)}>排序</span>
-      </div>
-      <div className="card">
-        <div className="food-grid">
-          {foods.map((f, i) => {
-            const prevCat = i > 0 ? (foods[i - 1].cat || '') : null;
-            const curCat = f.cat || '';
-            const showSep = i > 0 && curCat !== prevCat;
-            return <React.Fragment key={f.id}>
-              {showSep && <div className="food-grid-sep" />}
-              <div className="food-item"
-                onPointerDown={e => handleFoodPointerDown(f, e)}
-                onPointerUp={() => handleFoodPointerUp(f)}
-                onPointerCancel={() => { clearTimeout(longPressTimer.current); longPressTimer.current = null; }}>
-                <span className="food-emoji">{f.emoji}</span>
-                <span className="food-name">{f.name}</span>
-                <span className="food-protein">{f.proteinPer}g/{f.perAmount === 1 ? f.unit : `${f.perAmount}${f.unit}`}</span>
-              </div>
-            </React.Fragment>;
-          })}
-          <div className="food-item" onClick={() => setShowAddSheet(true)}>
-            <span className="food-emoji" style={{ color: 'var(--label3)' }}>+</span>
-            <span className="food-name" style={{ color: 'var(--label3)' }}>添加</span>
-          </div>
-        </div>
-      </div>
-      <div className="card-label">今日记录</div>
-      <div className="card">
-        {todayEntries.length === 0 ? (
-          <div className="empty-msg">还没有记录，点击上方食物开始</div>
-        ) : (
-          todayEntries.map(e => (
-            <div key={e.id} className="entry-row">
-              <span className="entry-time">{e.timestamp}</span>
-              <span className="entry-food">{e.foodName}</span>
-              <span className="entry-qty">{e.quantity}{foods.find(f => f.id === e.foodId)?.unit || ''}</span>
-              <span className="entry-protein">{e.protein}g</span>
-              <button className="entry-del" onClick={() => delEntry(e.id)}>&times;</button>
-            </div>
-          ))
-        )}
-      </div>
-      {modalFood && <QuantityModal food={modalFood} onConfirm={addEntry} onClose={() => setModalFood(null)} />}
-      {showAddSheet && <AddFoodSheet food={null} onSave={f => {
-        setFoods(prev => [...prev, f]);
-        setShowAddSheet(false);
-        showToast('已添加');
-      }} onClose={() => setShowAddSheet(false)} />}
-      {showReorder && <ReorderSheet foods={foods} setFoods={setFoods} onClose={() => setShowReorder(false)} />}
-      {editFood && <AddFoodSheet food={editFood} onSave={f => {
-        setFoods(prev => prev.map(x => x.id === f.id ? f : x));
-        setEditFood(null);
-        showToast('已保存');
-      }} onDelete={() => {
-        if (confirm(`删除「${editFood.name}」？已有记录不受影响。`)) {
-          setFoods(prev => prev.filter(x => x.id !== editFood.id));
-          setEditFood(null);
-          showToast('已删除');
-        }
-      }} onClose={() => setEditFood(null)} />}
-    </>
-  );
-}
-
-/* ─── Line Chart (Protein Trend) ─── */
-function LineChart({ data, target }) {
-  const W = Math.max(data.length * 28, 300);
-  const H = 180, PL = 36, PR = 12, PT = 16, PB = 28;
-  const cw = W - PL - PR, ch = H - PT - PB;
-  const maxY = Math.max(target + 20, ...data.map(d => d.total)) * 1.1;
-  const yScale = v => PT + ch - (v / maxY) * ch;
-  const xScale = i => PL + (data.length > 1 ? (i / (data.length - 1)) * cw : cw / 2);
-  const targetY = yScale(target);
-  const points = data.map((d, i) => `${xScale(i).toFixed(1)},${yScale(d.total).toFixed(1)}`).join(' ');
-  const areaD = data.length > 0
-    ? `M${xScale(0).toFixed(1)},${yScale(data[0].total).toFixed(1)} ` +
-      data.map((d, i) => `L${xScale(i).toFixed(1)},${yScale(d.total).toFixed(1)}`).join(' ') +
-      ` L${xScale(data.length - 1).toFixed(1)},${(PT + ch).toFixed(1)} L${xScale(0).toFixed(1)},${(PT + ch).toFixed(1)} Z`
-    : '';
-  const gridLines = [];
-  for (let v = 0; v <= maxY; v += 20) gridLines.push(v);
-  const labelInterval = Math.max(1, Math.ceil(data.length / 8));
-
-  return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      {gridLines.map(v => (
-        <line key={v} x1={PL} y1={yScale(v)} x2={W - PR} y2={yScale(v)} stroke="var(--sep)" strokeWidth="0.5" />
-      ))}
-      {[0, 40, 80, Math.ceil(maxY / 20) * 20].filter((v, i, a) => a.indexOf(v) === i && v <= maxY).map(v => (
-        <text key={v} x={PL - 4} y={yScale(v) + 3} fontSize="9" fill="var(--label3)" textAnchor="end">{v}</text>
-      ))}
-      <line x1={PL} y1={targetY} x2={W - PR} y2={targetY} stroke="var(--accent)" strokeWidth="1" strokeDasharray="4,3" opacity="0.4" />
-      <text x={W - PR} y={targetY - 4} fontSize="9" fill="var(--accent)" textAnchor="end" opacity="0.6">{target}g</text>
-      {data.length > 1 && <path d={areaD} fill="rgba(61,82,213,0.06)" />}
-      {data.length > 1 && <polyline points={points} stroke="var(--accent)" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-      {data.map((d, i) => (
-        <circle key={i} cx={xScale(i)} cy={yScale(d.total)} r="3.5" fill={d.total >= target ? 'var(--green)' : 'var(--accent)'} />
-      ))}
-      {data.map((d, i) => {
-        if (i % labelInterval !== 0 && i !== data.length - 1) return null;
-        const [, m, day] = d.date.split('-').map(Number);
-        return <text key={i} x={xScale(i)} y={H - 6} fontSize="9" fill="var(--label3)" textAnchor="middle">{m}/{day}</text>;
-      })}
-    </svg>
-  );
-}
-
-function TrendPanel({ records, target }) {
-  const tk = todayKey();
-  const WEEK_GOAL = 5;
-
-  const monday = useMemo(() => getMonday(new Date()), []);
-  const weekDates = useMemo(() => getWeekDates(monday), [monday]);
-
+  const weekDates = getWeekDates(getWeekStart(new Date()));
   let okCount = 0;
   const dots = weekDates.map((k, i) => {
-    const total = getDailyTotal(records, k);
+    const t = getDailyTotal(records, k);
     let cls = 'fdot-future', text = '';
-    if (total >= target) { cls = 'fdot-ok'; okCount++; text = '✓'; }
-    else if (total > 0) { cls = 'fdot-over'; text = '✗'; }
+    if (t >= target) { cls = 'fdot-ok'; okCount++; text = '✓'; }
+    else if (t > 0) { cls = 'fdot-over'; text = '✗'; }
     else if (k <= tk) { cls = 'fdot-empty'; }
     const todayCls = k === tk ? ' fdot-today' : '';
-    return { key: k, label: DAY_LABELS[i], cls: `${cls}${todayCls}`, text };
-  });
+    return `<div class="fweek-day">
+      <span class="fweek-day-label">${DAY_LABELS[i]}</span>
+      <div class="fweek-day-dot ${cls}${todayCls}">${text}</div>
+    </div>`;
+  }).join('');
 
   const [, m1, d1] = weekDates[0].split('-').map(Number);
   const [, m2, d2] = weekDates[6].split('-').map(Number);
   const weekPct = Math.min(okCount / WEEK_GOAL * 100, 100);
 
-  const chartDays = useMemo(() => {
-    const result = [];
-    const end = new Date();
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(end); d.setDate(d.getDate() - i);
-      const dk = dateKey(d);
-      const total = getDailyTotal(records, dk);
-      if (total > 0 || i < 7) result.push({ date: dk, total });
-    }
-    return result;
-  }, [records]);
-
-  const BW = 9, GAP = 3, CH = 120, LH = 20, PAD = 16;
-  const MAXV = Math.max(target * 1.3, ...chartDays.map(d => d.total)) || target * 1.3;
-  const chartW = chartDays.length * (BW + GAP) - GAP + 2 + PAD * 2;
-  const tY = CH - (target / MAXV) * CH;
-  const chartRef = useRef(null);
-
-  useEffect(() => {
-    if (chartRef.current) chartRef.current.scrollLeft = chartRef.current.scrollWidth;
-  }, [chartDays]);
-
-  return (
-    <>
-      <div className="card-label">本周达标</div>
-      <div className={`card${okCount >= WEEK_GOAL ? ' fweek-met' : ''}`}>
-        <div className="fweek-header">
-          <span className="fweek-title">{m1}/{d1} – {m2}/{d2}</span>
-          <span className="fweek-count"><strong>{okCount}</strong> / {WEEK_GOAL} 天</span>
-        </div>
-        <div className="fweek-days">
-          {dots.map(d => (
-            <div key={d.key} className="fweek-day">
-              <span className="fweek-day-label">{d.label}</span>
-              <div className={`fweek-day-dot ${d.cls}`}>{d.text}</div>
-            </div>
-          ))}
-        </div>
-        <div className="fweek-progress"><div className="fweek-progress-bar" style={{ width: `${weekPct}%` }} /></div>
+  return `
+    <div class="card-label">本周达标</div>
+    <div class="card${okCount >= WEEK_GOAL ? ' fweek-met' : ''}">
+      <div class="fweek-header">
+        <span class="fweek-title">${m1}/${d1} – ${m2}/${d2}</span>
+        <span class="fweek-count"><strong>${okCount}</strong> / ${WEEK_GOAL} 天</span>
       </div>
-
-      <div className="card-label" style={{ marginTop: '4px' }}>过去 30 天蛋白质摄入</div>
-      <div className="card" style={{ padding: '16px' }}>
-        <div className="chart-scroll" ref={chartRef}>
-          {chartDays.length === 0 ? (
-            <p style={{ textAlign: 'center', color: 'var(--label3)', fontSize: '13px', padding: '20px 0' }}>暂无数据</p>
-          ) : (
-            <svg width={chartW} height={CH + LH + 4} viewBox={`0 0 ${chartW} ${CH + LH + 4}`}>
-              <line x1={PAD} y1={tY} x2={chartW - PAD} y2={tY} stroke="#3d52d5" strokeWidth="1" strokeDasharray="3,3" opacity="0.3" />
-              <text x={chartW - PAD} y={tY - 4} fontSize="9" fill="#3d52d5" textAnchor="end" opacity="0.6">{target}g</text>
-              {chartDays.map((d, i) => {
-                const x = PAD + i * (BW + GAP) + 1;
-                if (d.total === 0) {
-                  return <rect key={d.date} x={x} y={CH - 3} width={BW} height={3} rx={1.5} fill="#d1d1d6" />;
-                }
-                const v = Math.min(d.total, MAXV);
-                const barH = Math.max((v / MAXV) * CH, 4);
-                return <rect key={d.date} x={x} y={CH - barH} width={BW} height={barH} rx={2}
-                  fill={d.total >= target ? '#2a9d5c' : '#3d52d5'} />;
-              })}
-              {(() => {
-                const interval = 7;
-                const last = chartDays.length - 1;
-                return chartDays.map((d, i) => {
-                  const isLast = i === last;
-                  const isInterval = i % interval === 0;
-                  const tooCloseToLast = !isLast && last - i < 3;
-                  if ((!isInterval && !isLast) || tooCloseToLast) return null;
-                  const [, m, day] = d.date.split('-').map(Number);
-                  const x = PAD + i * (BW + GAP) + 1 + BW / 2;
-                  return <text key={d.date} x={x} y={CH + LH - 2} fontSize="9" fill="#adadb8" textAnchor="middle">{m}/{day}</text>;
-                });
-              })()}
-            </svg>
-          )}
-        </div>
-      </div>
-    </>
-  );
+      <div class="fweek-days">${dots}</div>
+      <div class="fweek-progress"><div class="fweek-progress-bar" style="width:${weekPct}%"></div></div>
+    </div>`;
 }
 
-/* ─── Bar Chart (Protein Weekly) ─── */
-function WeekBarChart({ weekData }) {
-  const W = 340, H = 170, PT = 20, PB = 24;
-  const ch = H - PT - PB;
-  const maxY = Math.max(TARGET + 20, ...weekData.map(d => d.total)) * 1.1;
-  const step = W / 7, bw = step * 0.5;
-  const yScale = v => PT + ch - (v / maxY) * ch;
-  const targetY = yScale(TARGET);
-
-  return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
-      <line x1="0" y1={targetY} x2={W} y2={targetY} stroke="var(--accent)" strokeWidth="1" strokeDasharray="4,3" opacity="0.3" />
-      {weekData.map((d, i) => {
-        const x = step * i + (step - bw) / 2;
-        const barH = d.total > 0 ? Math.max((d.total / maxY) * ch, 4) : 3;
-        const color = d.total >= TARGET ? 'var(--green)' : d.total > 0 ? 'var(--accent)' : 'var(--label3)';
-        const isToday = d.date === todayKey();
-        return (
-          <React.Fragment key={i}>
-            <rect x={x} y={PT + ch - barH} width={bw} height={barH} rx={3} fill={color} opacity={d.total > 0 ? 1 : 0.2} />
-            {d.total > 0 && (
-              <text x={x + bw / 2} y={PT + ch - barH - 5} fontSize="10" fill={color} textAnchor="middle" fontWeight="600">{Math.round(d.total)}</text>
-            )}
-            <text x={x + bw / 2} y={H - 6} fontSize="11" fill={isToday ? 'var(--label)' : 'var(--label3)'}
-              textAnchor="middle" fontWeight={isToday ? '700' : '400'}>{DAY_LABELS[i]}</text>
-            {isToday && <circle cx={x + bw / 2} cy={H - 1} r="2" fill="var(--accent)" />}
-          </React.Fragment>
-        );
-      })}
-    </svg>
-  );
-}
-
-function WeeklyPanel({ records }) {
-  const [weekOffset, setWeekOffset] = useState(0);
-  const monday = useMemo(() => {
-    const m = getMonday(new Date()); m.setDate(m.getDate() + weekOffset * 7); return m;
-  }, [weekOffset]);
-  const weekDates = useMemo(() => getWeekDates(monday), [monday]);
-  const weekData = weekDates.map((dk, i) => ({ date: dk, dayLabel: DAY_LABELS[i], total: getDailyTotal(records, dk) }));
-  const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6);
-  const rangeLabel = `${monday.getMonth() + 1}/${monday.getDate()} – ${sunday.getMonth() + 1}/${sunday.getDate()}`;
-  const weekTotal = weekData.reduce((s, d) => s + d.total, 0);
-  const daysWithData = weekData.filter(d => d.total > 0).length;
-  const weekAvg = daysWithData > 0 ? weekTotal / daysWithData : 0;
-  const metDays = weekData.filter(d => d.total >= TARGET).length;
-
-  return (
-    <div className="card">
-      <div className="week-nav">
-        <button className="week-nav-btn" onClick={() => setWeekOffset(o => o - 1)}>&lsaquo;</button>
-        <span className="week-range">{rangeLabel}</span>
-        <button className="week-nav-btn" disabled={weekOffset === 0} onClick={() => setWeekOffset(o => o + 1)}>&rsaquo;</button>
-      </div>
-      <div className="chart-wrap"><WeekBarChart weekData={weekData} /></div>
-      <div className="stats-row">
-        <div className="stat-chip"><div className="stat-val">{weekTotal % 1 === 0 ? weekTotal : weekTotal.toFixed(1)}g</div><div className="stat-label">周总摄入</div></div>
-        <div className="stat-chip"><div className="stat-val">{weekAvg.toFixed(1)}g</div><div className="stat-label">日均</div></div>
-        <div className="stat-chip"><div className="stat-val" style={{ color: 'var(--green)' }}>{metDays}/7</div><div className="stat-label">达标天数</div></div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Settings Panel (Protein) ─── */
-function AddFoodSheet({ food, onSave, onDelete, onClose }) {
-  const [name, setName] = useState(food?.name || '');
-  const [emoji, setEmoji] = useState(food?.emoji || '\u{1F372}');
-  const [unit, setUnit] = useState(food?.unit || '克');
-  const [proteinPer, setProteinPer] = useState(food?.proteinPer?.toString() || '');
-  const [perAmount, setPerAmount] = useState(food?.perAmount?.toString() || '100');
-  const [unitType, setUnitType] = useState(food?.perAmount === 1 ? 'piece' : 'weight');
-
-  useEffect(() => {
-    if (unitType === 'piece') { setPerAmount('1'); if (!food) setUnit('个'); }
-    else { setPerAmount('100'); if (!food) setUnit('克'); }
-  }, [unitType]);
-
-  function handleSave() {
-    if (!name.trim() || !proteinPer) return;
-    onSave({ id: food?.id || genId(), name: name.trim(), emoji, unit,
-      proteinPer: parseFloat(proteinPer), perAmount: parseInt(perAmount) || (unitType === 'piece' ? 1 : 100) });
+function proteinChartHtml() {
+  const chartDays = [];
+  const end = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(end); d.setDate(d.getDate() - i);
+    const dk = dateKey(d);
+    const t = getDailyTotal(records, dk);
+    if (t > 0 || i < 7) chartDays.push({ date: dk, total: t });
   }
 
-  return (
-    <>
-      <div className="sheet-overlay open" onClick={onClose} />
-      <div className="sheet open">
-        <div className="sheet-title">{food ? '编辑食物' : '添加食物'}</div>
-        <div className="form-row">
-          <div className="form-group" style={{ flex: '0 0 72px' }}>
-            <label className="form-label">图标</label>
-            <input className="form-input" style={{ textAlign: 'center', fontSize: '24px', padding: '6px' }}
-              value={emoji} onChange={e => setEmoji(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">名称</label>
-            <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="食物名称" />
-          </div>
-        </div>
-        <div className="form-group">
-          <label className="form-label">类型</label>
-          <div className="seg-ctrl" style={{ margin: 0 }}>
-            <button className={`seg-btn${unitType === 'piece' ? ' active' : ''}`} onClick={() => setUnitType('piece')}>按个数</button>
-            <button className={`seg-btn${unitType === 'weight' ? ' active' : ''}`} onClick={() => setUnitType('weight')}>按重量/体积</button>
-          </div>
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">单位</label>
-            <input className="form-input" value={unit} onChange={e => setUnit(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">蛋白质 (g)</label>
-            <input className="form-input" type="number" inputMode="decimal" value={proteinPer} onChange={e => setProteinPer(e.target.value)} />
-          </div>
-          {unitType === 'weight' && (
-            <div className="form-group" style={{ flex: '0 0 70px' }}>
-              <label className="form-label">每</label>
-              <input className="form-input" type="number" inputMode="numeric" value={perAmount} onChange={e => setPerAmount(e.target.value)} />
-            </div>
-          )}
-        </div>
-        {name && proteinPer && (
-          <div style={{ fontSize: '13px', color: 'var(--label2)', padding: '4px 0 8px', textAlign: 'center' }}>
-            每{perAmount}{unit}含蛋白质 {proteinPer}g
-          </div>
-        )}
-        <button className="btn btn-primary" style={{ marginTop: '8px' }} onClick={handleSave}>保存</button>
-        {food && onDelete && <button className="btn btn-outline" style={{ marginTop: '8px', color: 'var(--red)', borderColor: 'rgba(224,62,62,0.3)' }} onClick={onDelete}>删除</button>}
-        <button className="btn btn-outline" style={{ marginTop: '8px' }} onClick={onClose}>取消</button>
-      </div>
-    </>
-  );
-}
+  let inner;
+  if (!chartDays.length) {
+    inner = '<p style="text-align:center;color:var(--label3);font-size:13px;padding:20px 0">暂无数据</p>';
+  } else {
+    const BW = 9, GAP = 3, CH = 120, LH = 20, PAD = 16;
+    const MAXV = Math.max(target * 1.3, ...chartDays.map(d => d.total)) || target * 1.3;
+    const chartW = chartDays.length * (BW + GAP) - GAP + 2 + PAD * 2;
+    const tY = CH - (target / MAXV) * CH;
 
-function SettingsPanel({ foods, setFoods, records, setRecords, showToast }) {
-  const [editFood, setEditFood] = useState(null);
-  const [showSheet, setShowSheet] = useState(false);
-
-  function saveFood(f) {
-    setFoods(prev => {
-      const idx = prev.findIndex(x => x.id === f.id);
-      if (idx >= 0) { const next = [...prev]; next[idx] = f; return next; }
-      return [...prev, f];
+    let bars = '', labels = '';
+    const interval = 7, last = chartDays.length - 1;
+    chartDays.forEach((d, i) => {
+      const x = PAD + i * (BW + GAP) + 1;
+      if (d.total === 0) {
+        bars += `<rect x="${x}" y="${CH - 3}" width="${BW}" height="3" rx="1.5" fill="#d1d1d6"/>`;
+      } else {
+        const v = Math.min(d.total, MAXV);
+        const barH = Math.max((v / MAXV) * CH, 4);
+        bars += `<rect x="${x}" y="${CH - barH}" width="${BW}" height="${barH}" rx="2" fill="${d.total >= target ? '#2a9d5c' : '#3d52d5'}"/>`;
+      }
+      const isLast = i === last;
+      const isInterval = i % interval === 0;
+      const tooCloseToLast = !isLast && last - i < 3;
+      if ((isInterval || isLast) && !tooCloseToLast) {
+        const [, m, day] = d.date.split('-').map(Number);
+        labels += `<text x="${x + BW / 2}" y="${CH + LH - 2}" font-size="9" fill="#adadb8" text-anchor="middle">${m}/${day}</text>`;
+      }
     });
-    setShowSheet(false); setEditFood(null); showToast('已保存');
-  }
-  function deleteFood(id) {
-    if (!confirm('删除后已有的记录不受影响，确认删除？')) return;
-    setFoods(prev => prev.filter(f => f.id !== id));
-  }
-  function exportData() {
-    const data = JSON.stringify({ foods, records }, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `proteinbit-${todayKey()}.json`; a.click();
-    URL.revokeObjectURL(url); showToast('已导出');
-  }
-  function importData(e) {
-    const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const obj = JSON.parse(reader.result);
-        const idMap = {};
-        if (obj.foods) {
-          setFoods(prev => {
-            const nameMap = {};
-            prev.forEach(f => { nameMap[f.name] = f; });
-            const extras = [];
-            obj.foods.forEach(f => {
-              const existing = nameMap[f.name] || prev.find(x => x.id === f.id);
-              if (existing) {
-                idMap[f.id] = existing.id;
-              } else {
-                extras.push(f);
-              }
-            });
-            return extras.length ? [...prev, ...extras] : prev;
-          });
-        }
-        if (obj.records) {
-          setRecords(prev => {
-            const merged = { ...prev };
-            for (const [dk, day] of Object.entries(obj.records)) {
-              if (!day.entries) continue;
-              const remapped = day.entries.map(e => {
-                const newId = idMap[e.foodId];
-                return newId ? { ...e, foodId: newId } : e;
-              });
-              if (merged[dk] && merged[dk].entries && merged[dk].entries.length) {
-                merged[dk] = { entries: [...merged[dk].entries, ...remapped] };
-              } else {
-                merged[dk] = { entries: remapped };
-              }
-            }
-            return merged;
-          });
-        }
-        showToast('已导入');
-      } catch { showToast('导入失败'); }
-    };
-    reader.readAsText(file); e.target.value = '';
+
+    inner = `<svg width="${chartW}" height="${CH + LH + 4}" viewBox="0 0 ${chartW} ${CH + LH + 4}">
+      <line x1="${PAD}" y1="${tY}" x2="${chartW - PAD}" y2="${tY}" stroke="#3d52d5" stroke-width="1" stroke-dasharray="3,3" opacity="0.3"/>
+      <text x="${chartW - PAD}" y="${tY - 4}" font-size="9" fill="#3d52d5" text-anchor="end" opacity="0.6">${target}g</text>
+      ${bars}${labels}
+    </svg>`;
   }
 
-  return (
-    <>
-      <div className="card-label">食物数据库</div>
-      <div className="card">
-        {foods.map(f => (
-          <div key={f.id} className="manage-row">
-            <span className="manage-emoji">{f.emoji}</span>
-            <div className="manage-info">
-              <div className="manage-name">{f.name}</div>
-              <div className="manage-detail">{f.proteinPer}g / {f.perAmount === 1 ? f.unit : `${f.perAmount}${f.unit}`}</div>
-            </div>
-            <div className="manage-actions">
-              <button className="manage-btn" onClick={() => { setEditFood(f); setShowSheet(true); }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </button>
-              <button className="manage-btn danger" onClick={() => deleteFood(f.id)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-      <button className="btn btn-primary" onClick={() => { setEditFood(null); setShowSheet(true); }}>+ 添加食物</button>
-      <div className="card-label" style={{ marginTop: '8px' }}>数据管理</div>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button className="btn btn-outline" style={{ flex: 1 }} onClick={exportData}>导出 JSON</button>
-        <label className="btn btn-outline" style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }}>
-          导入 JSON
-          <input type="file" accept=".json" style={{ display: 'none' }} onChange={importData} />
-        </label>
-      </div>
-      {showSheet && <AddFoodSheet food={editFood} onSave={saveFood} onClose={() => { setShowSheet(false); setEditFood(null); }} />}
-    </>
-  );
+  return `
+    <div class="card-label" style="margin-top:4px">过去 30 天蛋白质摄入</div>
+    <div class="card" style="padding:16px">
+      <div class="chart-scroll" id="p-chart-scroll">${inner}</div>
+    </div>`;
 }
 
-/* ═══════════════════ Fasting Components ═══════════════════ */
+/* ═══════════════════ Protein: Actions ═══════════════════ */
 
-/* ─── Time Picker Modal ─── */
-function TimePickerModal({ isOpen, title, initialTime, onConfirm, onClose }) {
-  const hourRef = useRef(null);
-  const minRef = useRef(null);
+function editTarget() {
+  const val = prompt('设置每日蛋白质目标 (g)', target);
+  const num = parseFloat(val);
+  if (num > 0) { target = num; saveTarget(); renderProtein(); }
+}
 
-  useEffect(() => {
-    if (isOpen) {
-      const [h, m] = (initialTime || nowHHMM()).split(':').map(Number);
-      const hours = Array.from({ length: 24 }, (_, i) => i);
-      const minutes = Array.from({ length: 60 / FAST_MINUTE_STEP }, (_, i) => i * FAST_MINUTE_STEP);
-      requestAnimationFrame(() => {
-        if (hourRef.current) hourRef.current.scrollTop = h * 44;
-        if (minRef.current) minRef.current.scrollTop = Math.round(m / FAST_MINUTE_STEP) * 44;
-      });
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => { document.body.style.overflow = ''; };
-  }, [isOpen, initialTime]);
+function delEntry(id) {
+  const tk = todayKey();
+  const day = records[tk];
+  if (!day) return;
+  records[tk] = { entries: day.entries.filter(e => e.id !== id) };
+  saveRecords();
+  renderProtein();
+}
 
-  function getVal() {
-    const hours = Array.from({ length: 24 }, (_, i) => pad(i));
-    const minutes = Array.from({ length: 60 / FAST_MINUTE_STEP }, (_, i) => pad(i * FAST_MINUTE_STEP));
-    const hIdx = Math.min(Math.round((hourRef.current?.scrollTop || 0) / 44), hours.length - 1);
-    const mIdx = Math.min(Math.round((minRef.current?.scrollTop || 0) / 44), minutes.length - 1);
-    return `${hours[hIdx]}:${minutes[mIdx]}`;
+/* ── Long press on food grid ── */
+let longPressTimer = null;
+function foodPointerDown(id) {
+  longPressTimer = setTimeout(() => { longPressTimer = 'fired'; openFoodSheet(id); }, 500);
+}
+function foodPointerUp(id) {
+  if (longPressTimer === 'fired') { longPressTimer = null; return; }
+  clearTimeout(longPressTimer);
+  longPressTimer = null;
+  openQtyModal(id);
+}
+function foodPointerCancel() {
+  clearTimeout(longPressTimer);
+  longPressTimer = null;
+}
+
+/* ── Quantity Modal ── */
+let qtyFoodId = null;
+
+function openQtyModal(id) {
+  const f = foods.find(x => x.id === id);
+  if (!f) return;
+  qtyFoodId = id;
+  const isOther = f.id === 'f20';
+  document.getElementById('qty-emoji').textContent = f.emoji;
+  document.getElementById('qty-title').textContent = f.name;
+  document.getElementById('qty-desc').textContent = isOther
+    ? '直接输入蛋白质克数'
+    : f.perAmount === 1
+      ? `每${f.unit}含蛋白质 ${f.proteinPer}g`
+      : `每${f.perAmount}${f.unit}含蛋白质 ${f.proteinPer}g`;
+  const inp = document.getElementById('qty-input');
+  inp.value = f.perAmount === 1 ? '1' : '';
+  inp.step = f.perAmount === 1 ? '1' : '10';
+  inp.placeholder = isOther ? '蛋白质 g' : f.unit;
+  const note = document.getElementById('qty-note');
+  note.value = '';
+  note.style.display = isOther ? '' : 'none';
+  updateQtyCalc();
+  document.getElementById('qty-modal').classList.add('open');
+  setTimeout(() => inp.focus(), 100);
+}
+
+function updateQtyCalc() {
+  const f = foods.find(x => x.id === qtyFoodId);
+  if (!f) return;
+  const num = parseFloat(document.getElementById('qty-input').value) || 0;
+  const p = calcProtein(f, num);
+  document.getElementById('qty-calc').textContent = num > 0 ? `= ${fmtG(p)}g 蛋白质` : '';
+}
+
+function closeQtyModal() {
+  document.getElementById('qty-modal').classList.remove('open');
+  qtyFoodId = null;
+}
+
+function confirmQty() {
+  const f = foods.find(x => x.id === qtyFoodId);
+  if (!f) return;
+  const num = parseFloat(document.getElementById('qty-input').value) || 0;
+  if (num <= 0) return;
+  const note = document.getElementById('qty-note').value.trim();
+  const entry = {
+    id: genId(), foodId: f.id, foodName: note || f.name, quantity: num,
+    protein: Math.round(calcProtein(f, num) * 10) / 10, timestamp: nowTime()
+  };
+  if (note) entry.note = note;
+  const tk = todayKey();
+  if (!records[tk]) records[tk] = { entries: [] };
+  records[tk].entries.push(entry);
+  saveRecords();
+  closeQtyModal();
+  showToast(`+${entry.protein}g 蛋白质`);
+  renderProtein();
+}
+
+/* ── Add/Edit Food Sheet ── */
+let sheetFoodId = null;      // null = 添加新食物
+let sheetUnitType = 'weight';
+
+function openFoodSheet(id) {
+  sheetFoodId = id;
+  const f = id ? foods.find(x => x.id === id) : null;
+  sheetUnitType = f && f.perAmount === 1 ? 'piece' : 'weight';
+  document.getElementById('food-sheet-title').textContent = f ? '编辑食物' : '添加食物';
+  document.getElementById('food-emoji-input').value = f ? f.emoji : '\u{1F372}';
+  document.getElementById('food-name-input').value = f ? f.name : '';
+  document.getElementById('food-unit-input').value = f ? f.unit : '克';
+  document.getElementById('food-protein-input').value = f ? f.proteinPer : '';
+  document.getElementById('food-per-input').value = f ? f.perAmount : '100';
+  document.getElementById('food-delete-btn').style.display = f ? '' : 'none';
+  applyUnitTypeUI();
+  updateFoodDesc();
+  document.getElementById('food-sheet-overlay').classList.add('open');
+  document.getElementById('food-sheet').classList.add('open');
+}
+
+function setFoodUnitType(t) {
+  sheetUnitType = t;
+  // 用户手动切换类型时重置默认值（打开编辑时不重置，保留原值）
+  if (t === 'piece') {
+    document.getElementById('food-per-input').value = '1';
+    if (!sheetFoodId) document.getElementById('food-unit-input').value = '个';
+  } else {
+    document.getElementById('food-per-input').value = '100';
+    if (!sheetFoodId) document.getElementById('food-unit-input').value = '克';
   }
-
-  const hours = Array.from({ length: 24 }, (_, i) => pad(i));
-  const minutes = Array.from({ length: 60 / FAST_MINUTE_STEP }, (_, i) => pad(i * FAST_MINUTE_STEP));
-
-  return (
-    <div className={`picker-overlay${isOpen ? ' open' : ''}`}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="picker-sheet">
-        <div className="picker-header">
-          <button className="picker-hbtn picker-hbtn-cancel" onClick={onClose}>取消</button>
-          <span className="picker-title">{title || '选择时间'}</span>
-          <button className="picker-hbtn picker-hbtn-done" onClick={() => onConfirm(getVal())}>确定</button>
-        </div>
-        <div className="time-picker-cols">
-          <div className="picker-col" ref={hourRef}>
-            <div className="picker-spacer" />
-            {hours.map(h => <div key={h} className="picker-item">{h}</div>)}
-            <div className="picker-spacer" />
-          </div>
-          <div className="picker-separator">:</div>
-          <div className="picker-col" ref={minRef}>
-            <div className="picker-spacer" />
-            {minutes.map(m => <div key={m} className="picker-item">{m}</div>)}
-            <div className="picker-spacer" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  applyUnitTypeUI();
+  updateFoodDesc();
 }
 
-/* ─── Action Sheet ─── */
-function ActionSheet({ isOpen, dateKey: dk, record, onEditField, onDelete, onClose }) {
-  useEffect(() => {
-    if (isOpen) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = '';
-    return () => { document.body.style.overflow = ''; };
-  }, [isOpen]);
-
-  const win = record?.start && record?.end ? `${record.start} – ${record.end}`
-    : record?.start ? `${record.start} – 未结束` : '无记录';
-
-  return (
-    <div className={`action-overlay${isOpen ? ' open' : ''}`}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="action-sheet">
-        <div className="action-group">
-          <div className="action-title">{dk ? fmtKey(dk) : ''}  {win}</div>
-          <button className="action-btn action-btn-blue" onClick={() => onEditField('start')}>修改开始时间</button>
-          <button className="action-btn action-btn-blue" onClick={() => onEditField('end')}>修改结束时间</button>
-          <button className="action-btn action-btn-red" onClick={onDelete}>删除这天的记录</button>
-        </div>
-        <div className="action-group">
-          <button className="action-btn action-btn-cancel" onClick={onClose}>取消</button>
-        </div>
-      </div>
-    </div>
-  );
+function applyUnitTypeUI() {
+  document.getElementById('food-type-piece').classList.toggle('active', sheetUnitType === 'piece');
+  document.getElementById('food-type-weight').classList.toggle('active', sheetUnitType === 'weight');
+  document.getElementById('food-per-group').style.display = sheetUnitType === 'weight' ? '' : 'none';
 }
 
-/* ─── Fast Record Panel ─── */
-function FastRecordPanel({ modeIndex, setModeIndex, fastRecords, setFastRecords, openPicker, showToast }) {
+function updateFoodDesc() {
+  const name = document.getElementById('food-name-input').value.trim();
+  const proteinPer = document.getElementById('food-protein-input').value;
+  const unit = document.getElementById('food-unit-input').value;
+  const per = document.getElementById('food-per-input').value;
+  const el = document.getElementById('food-desc-live');
+  if (name && proteinPer) {
+    el.style.display = '';
+    el.textContent = `每${per}${unit}含蛋白质 ${proteinPer}g`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function saveFoodSheet() {
+  const name = document.getElementById('food-name-input').value.trim();
+  const proteinPer = document.getElementById('food-protein-input').value;
+  if (!name || !proteinPer) return;
+  const existing = sheetFoodId ? foods.find(x => x.id === sheetFoodId) : null;
+  const f = {
+    id: existing ? existing.id : genId(),
+    name,
+    emoji: document.getElementById('food-emoji-input').value,
+    unit: document.getElementById('food-unit-input').value,
+    proteinPer: parseFloat(proteinPer),
+    perAmount: parseInt(document.getElementById('food-per-input').value) || (sheetUnitType === 'piece' ? 1 : 100)
+  };
+  if (existing && existing.cat) f.cat = existing.cat;
+  if (existing) {
+    foods = foods.map(x => x.id === f.id ? f : x);
+    showToast('已保存');
+  } else {
+    foods.push(f);
+    showToast('已添加');
+  }
+  saveFoods();
+  closeFoodSheet();
+  renderProtein();
+}
+
+function deleteFoodFromSheet() {
+  const f = foods.find(x => x.id === sheetFoodId);
+  if (!f) return;
+  if (!confirm(`删除「${f.name}」？已有记录不受影响。`)) return;
+  foods = foods.filter(x => x.id !== f.id);
+  saveFoods();
+  closeFoodSheet();
+  showToast('已删除');
+  renderProtein();
+}
+
+function closeFoodSheet() {
+  document.getElementById('food-sheet-overlay').classList.remove('open');
+  document.getElementById('food-sheet').classList.remove('open');
+  sheetFoodId = null;
+}
+
+/* ── Reorder Sheet ── */
+function openReorder() {
+  renderReorderList();
+  document.getElementById('reorder-overlay').classList.add('open');
+  document.getElementById('reorder-sheet').classList.add('open');
+}
+
+function renderReorderList() {
+  document.getElementById('reorder-list').innerHTML = foods.map((f, i) => `
+    <div class="manage-row">
+      <span class="manage-emoji">${esc(f.emoji)}</span>
+      <div class="manage-info"><div class="manage-name">${esc(f.name)}</div></div>
+      <div class="manage-actions">
+        <button class="manage-btn move" ${i === 0 ? 'disabled' : ''} onclick="reorderMove(${i},-1)">↑</button>
+        <button class="manage-btn move" ${i === foods.length - 1 ? 'disabled' : ''} onclick="reorderMove(${i},1)">↓</button>
+      </div>
+    </div>`).join('');
+}
+
+function reorderMove(idx, dir) {
+  const t = idx + dir;
+  if (t < 0 || t >= foods.length) return;
+  [foods[idx], foods[t]] = [foods[t], foods[idx]];
+  saveFoods();
+  renderReorderList();
+}
+
+function closeReorder() {
+  document.getElementById('reorder-overlay').classList.remove('open');
+  document.getElementById('reorder-sheet').classList.remove('open');
+  renderProtein();
+}
+
+/* ═══════════════════ Fasting: Render ═══════════════════ */
+
+function renderFasting() {
   const tk = todayKey();
   const rec = fastRecords[tk] || {};
-  const mode = FAST_MODES[modeIndex];
-
-  function recordNow(field) {
-    const val = nowHHMM();
-    setFastRecords(prev => {
-      const updated = { ...prev };
-      if (!updated[tk]) updated[tk] = {};
-      updated[tk] = { ...updated[tk], [field]: val };
-      return updated;
-    });
-    showToast(field === 'start' ? '已记录开始时间' : '已记录结束时间');
-  }
+  const mode = FAST_MODES[fastModeIndex];
 
   let eatH = null, fastH = null;
   if (rec.start && rec.end) {
@@ -1329,70 +1224,99 @@ function FastRecordPanel({ modeIndex, setModeIndex, fastRecords, setFastRecords,
     }
   }
 
-  return (
-    <>
-      <div className="card-label">断食模式</div>
-      <div className="card">
-        <div className="fmode-row">
-          {FAST_MODES.map((m, i) => (
-            <button key={i} className={`fmode-btn${i === modeIndex ? ' active' : ''}`}
-              onClick={() => setModeIndex(i)}>
-              {m.label}<small>断食 {m.fast}h / 进食 {m.eat}h</small>
-            </button>
-          ))}
-        </div>
+  let html = `
+    <div class="card-label">断食模式</div>
+    <div class="card">
+      <div class="fmode-row">
+        ${FAST_MODES.map((m, i) => `
+          <button class="fmode-btn${i === fastModeIndex ? ' active' : ''}" onclick="setFastMode(${i})">
+            ${m.label}<small>断食 ${m.fast}h / 进食 ${m.eat}h</small>
+          </button>`).join('')}
       </div>
+    </div>
 
-      <div className="card-label">今日进食窗口</div>
-      <div className="card">
-        <div className="time-row" onClick={() => openPicker('start', tk)}>
-          <span className="row-label">开始进食</span>
-          {rec.start
-            ? <span className="time-val">{rec.start}</span>
-            : <span className="time-placeholder">点击记录</span>}
-        </div>
-        <div className="time-row" onClick={() => openPicker('end', tk)}>
-          <span className="row-label">结束进食</span>
-          {rec.end
-            ? <span className="time-val">{rec.end}</span>
-            : <span className="time-placeholder">点击记录</span>}
-        </div>
-        {(eatH !== null || fastH !== null) && (
-          <div className="dur-row">
-            <div className="dur-chip dur-chip-eat">
-              <strong>{eatH !== null ? `${eatH.toFixed(1)}h` : '--'}</strong><span>进食时长</span>
-            </div>
-            <div className="dur-chip dur-chip-fast">
-              <strong>{fastH !== null ? `${fastH.toFixed(1)}h` : '--'}</strong><span>断食时长</span>
-            </div>
+    <div class="card-label">今日进食窗口</div>
+    <div class="card">
+      <div class="time-row" onclick="openPicker('start','${tk}')">
+        <span class="row-label">开始进食</span>
+        ${rec.start ? `<span class="time-val">${rec.start}</span>` : '<span class="time-placeholder">点击记录</span>'}
+      </div>
+      <div class="time-row" onclick="openPicker('end','${tk}')">
+        <span class="row-label">结束进食</span>
+        ${rec.end ? `<span class="time-val">${rec.end}</span>` : '<span class="time-placeholder">点击记录</span>'}
+      </div>
+      ${(eatH !== null || fastH !== null) ? `
+        <div class="dur-row">
+          <div class="dur-chip dur-chip-eat">
+            <strong>${eatH !== null ? eatH.toFixed(1) + 'h' : '--'}</strong><span>进食时长</span>
           </div>
-        )}
-      </div>
+          <div class="dur-chip dur-chip-fast">
+            <strong>${fastH !== null ? fastH.toFixed(1) + 'h' : '--'}</strong><span>断食时长</span>
+          </div>
+        </div>` : ''}
+    </div>
 
-      {hint && (
-        <div className="hint-banner">
-          <div className="hint-eyebrow">{hint.eyebrow}</div>
-          <div className="hint-time">{hint.time}</div>
-          <div className="hint-sub">{hint.sub}</div>
-        </div>
-      )}
+    ${hint ? `
+      <div class="hint-banner">
+        <div class="hint-eyebrow">${hint.eyebrow}</div>
+        <div class="hint-time">${hint.time}</div>
+        <div class="hint-sub">${hint.sub}</div>
+      </div>` : ''}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <button className="btn btn-start" onClick={() => recordNow('start')}>开始进食</button>
-        <button className="btn btn-end" disabled={!rec.start} onClick={() => recordNow('end')}>结束进食</button>
-      </div>
-    </>
-  );
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-start" onclick="recordNow('start')">开始进食</button>
+      <button class="btn btn-end" ${!rec.start ? 'disabled' : ''} onclick="recordNow('end')">结束进食</button>
+    </div>`;
+
+  html += fastWeekHtml(mode);
+  html += fastChartHtml(mode);
+
+  html += `
+    <div class="card-label">数据管理</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" style="flex:1" onclick="exportJSON()">导出 JSON</button>
+      <label class="btn btn-outline" style="flex:1;text-align:center;cursor:pointer">
+        导入 JSON
+        <input type="file" accept=".json" style="display:none" onchange="importJSON(event)">
+      </label>
+    </div>
+
+    <div class="card-label" style="margin-top:4px">历史记录 <span style="font-size:11px;color:var(--label3)">(点击可编辑)</span></div>
+    <div class="card">`;
+
+  const historyKeys = Object.keys(fastRecords).sort().reverse().slice(0, 30);
+  if (!historyKeys.length) {
+    html += '<div style="padding:16px;text-align:center;font-size:15px;color:var(--label3)">暂无记录</div>';
+  } else {
+    historyKeys.forEach(k => {
+      const r = fastRecords[k];
+      const win = r.start && r.end ? `${r.start} – ${r.end}` : r.start ? `${r.start} – …` : '未记录';
+      let dur = '', cls = 'h-part';
+      if (r.start && r.end) {
+        const h = calcEatHours(r.start, r.end);
+        dur = `${h.toFixed(1)}h`;
+        cls = h <= mode.eat ? 'h-ok' : 'h-over';
+      }
+      const fH = calcFastHours(k, fastRecords);
+      html += `
+        <div class="history-item" onclick="openFastAction('${k}')">
+          <span class="h-date">${fmtKey(k)}</span>
+          <span class="h-win">${win}</span>
+          <span class="h-dur ${cls}">${dur}</span>
+          ${fH != null ? `<span class="h-dur" style="color:var(--label2);min-width:42px;text-align:right">🌙${fH.toFixed(1)}h</span>` : ''}
+        </div>`;
+    });
+  }
+  html += '</div>';
+
+  document.getElementById('fasting-panel').innerHTML = html;
+  const sc = document.getElementById('f-chart-scroll');
+  if (sc) sc.scrollLeft = sc.scrollWidth;
 }
 
-/* ─── Fast Chart Panel ─── */
-function FastChartPanel({ modeIndex, fastRecords }) {
-  const mode = FAST_MODES[modeIndex];
+function fastWeekHtml(mode) {
   const tk = todayKey();
-
-  const monday = useMemo(() => getMonday(new Date()), []);
-  const weekDates = useMemo(() => getWeekDates(monday), [monday]);
-
+  const weekDates = getWeekDates(getWeekStart(new Date()));
   let okCount = 0;
   const dots = weekDates.map((k, i) => {
     const r = fastRecords[k];
@@ -1405,364 +1329,264 @@ function FastChartPanel({ modeIndex, fastRecords }) {
       cls = 'fdot-empty';
     }
     const todayCls = k === tk ? ' fdot-today' : '';
-    return { key: k, label: DAY_LABELS[i], cls: `${cls}${todayCls}`, text };
-  });
+    return `<div class="fweek-day">
+      <span class="fweek-day-label">${DAY_LABELS[i]}</span>
+      <div class="fweek-day-dot ${cls}${todayCls}">${text}</div>
+    </div>`;
+  }).join('');
 
   const [, m1, d1] = weekDates[0].split('-').map(Number);
   const [, m2, d2] = weekDates[6].split('-').map(Number);
   const weekPct = Math.min(okCount / FAST_WEEK_GOAL * 100, 100);
 
-  const chartDays = useMemo(() => {
-    return Object.keys(fastRecords).sort().slice(-30);
-  }, [fastRecords]);
-
-  const BW = 9, GAP = 3, CH = 120, LH = 20, MAXV = 12;
-  const chartW = chartDays.length * (BW + GAP) - GAP + 2;
-  const tY = CH - (mode.eat / MAXV) * CH;
-  const chartRef = useRef(null);
-
-  useEffect(() => {
-    if (chartRef.current) chartRef.current.scrollLeft = chartRef.current.scrollWidth;
-  }, [chartDays]);
-
-  return (
-    <>
-      <div className="card-label">本周达标</div>
-      <div className={`card${okCount >= FAST_WEEK_GOAL ? ' fweek-met' : ''}`}>
-        <div className="fweek-header">
-          <span className="fweek-title">{m1}/{d1} – {m2}/{d2}</span>
-          <span className="fweek-count"><strong>{okCount}</strong> / {FAST_WEEK_GOAL} 天</span>
-        </div>
-        <div className="fweek-days">
-          {dots.map(d => (
-            <div key={d.key} className="fweek-day">
-              <span className="fweek-day-label">{d.label}</span>
-              <div className={`fweek-day-dot ${d.cls}`}>{d.text}</div>
-            </div>
-          ))}
-        </div>
-        <div className="fweek-progress"><div className="fweek-progress-bar" style={{ width: `${weekPct}%` }} /></div>
+  return `
+    <div class="card-label">本周达标</div>
+    <div class="card${okCount >= FAST_WEEK_GOAL ? ' fweek-met' : ''}">
+      <div class="fweek-header">
+        <span class="fweek-title">${m1}/${d1} – ${m2}/${d2}</span>
+        <span class="fweek-count"><strong>${okCount}</strong> / ${FAST_WEEK_GOAL} 天</span>
       </div>
-
-      <div className="card-label" style={{ marginTop: '4px' }}>过去 30 天进食时长</div>
-      <div className="card" style={{ padding: '16px' }}>
-        <div className="chart-scroll" ref={chartRef}>
-          {chartDays.length === 0 ? (
-            <p style={{ textAlign: 'center', color: 'var(--label3)', fontSize: '13px', padding: '20px 0' }}>暂无数据</p>
-          ) : (
-            <svg width={chartW} height={CH + LH + 4} viewBox={`0 0 ${chartW} ${CH + LH + 4}`}>
-              <line x1="0" y1={tY} x2={chartW} y2={tY} stroke="#3d52d5" strokeWidth="1" strokeDasharray="3,3" opacity="0.3" />
-              <text x={chartW - 1} y={tY - 4} fontSize="9" fill="#3d52d5" textAnchor="end" opacity="0.6">{mode.eat}h</text>
-              {chartDays.map((k, i) => {
-                const r = fastRecords[k];
-                const x = i * (BW + GAP) + 1;
-                if (!r || !r.start || !r.end) {
-                  return <rect key={k} x={x} y={CH - 3} width={BW} height={3} rx={1.5} fill="#d1d1d6" />;
-                }
-                const h = Math.min(calcEatHours(r.start, r.end), MAXV);
-                const barH = Math.max((h / MAXV) * CH, 4);
-                return <rect key={k} x={x} y={CH - barH} width={BW} height={barH} rx={2}
-                  fill={h <= mode.eat ? '#3d52d5' : '#e03e3e'} />;
-              })}
-              {chartDays.map((k, i) => {
-                const [, m, d] = k.split('-').map(Number);
-                if (d !== 1 && i !== 0 && i !== chartDays.length - 1) return null;
-                const x = i * (BW + GAP) + 1 + BW / 2;
-                return <text key={k} x={x} y={CH + LH - 2} fontSize="9" fill="#adadb8" textAnchor="middle">{m}/{d}</text>;
-              })}
-            </svg>
-          )}
-        </div>
-      </div>
-    </>
-  );
+      <div class="fweek-days">${dots}</div>
+      <div class="fweek-progress"><div class="fweek-progress-bar" style="width:${weekPct}%"></div></div>
+    </div>`;
 }
 
-/* ─── Fast Settings Panel ─── */
-function FastSettingsPanel({ fastRecords, setFastRecords, modeIndex, openActionSheet, onExport, onImport }) {
-  const mode = FAST_MODES[modeIndex];
+function fastChartHtml(mode) {
+  const chartDays = Object.keys(fastRecords).sort().slice(-30);
 
-  const historyKeys = useMemo(() => {
-    return Object.keys(fastRecords).sort().reverse().slice(0, 30);
-  }, [fastRecords]);
+  let inner;
+  if (!chartDays.length) {
+    inner = '<p style="text-align:center;color:var(--label3);font-size:13px;padding:20px 0">暂无数据</p>';
+  } else {
+    const BW = 9, GAP = 3, CH = 120, LH = 20, MAXV = 12;
+    const chartW = chartDays.length * (BW + GAP) - GAP + 2;
+    const tY = CH - (mode.eat / MAXV) * CH;
 
-  return (
-    <>
-      <div className="card-label">数据管理</div>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button className="btn btn-outline" style={{ flex: 1 }} onClick={onExport}>导出 JSON</button>
-        <label className="btn btn-outline" style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }}>
-          导入 JSON
-          <input type="file" accept=".json" style={{ display: 'none' }} onChange={onImport} />
-        </label>
-      </div>
+    let bars = '', labels = '';
+    chartDays.forEach((k, i) => {
+      const r = fastRecords[k];
+      const x = i * (BW + GAP) + 1;
+      if (!r || !r.start || !r.end) {
+        bars += `<rect x="${x}" y="${CH - 3}" width="${BW}" height="3" rx="1.5" fill="#d1d1d6"/>`;
+      } else {
+        const h = Math.min(calcEatHours(r.start, r.end), MAXV);
+        const barH = Math.max((h / MAXV) * CH, 4);
+        bars += `<rect x="${x}" y="${CH - barH}" width="${BW}" height="${barH}" rx="2" fill="${h <= mode.eat ? '#3d52d5' : '#e03e3e'}"/>`;
+      }
+      const [, m, d] = k.split('-').map(Number);
+      if (d === 1 || i === 0 || i === chartDays.length - 1) {
+        labels += `<text x="${x + BW / 2}" y="${CH + LH - 2}" font-size="9" fill="#adadb8" text-anchor="middle">${m}/${d}</text>`;
+      }
+    });
 
-      <div className="card-label" style={{ marginTop: '4px' }}>历史记录 <span style={{ fontSize: '11px', color: 'var(--label3)' }}>(点击可编辑)</span></div>
-      <div className="card">
-        {historyKeys.length === 0 ? (
-          <div style={{ padding: '16px', textAlign: 'center', fontSize: '15px', color: 'var(--label3)' }}>暂无记录</div>
-        ) : (
-          historyKeys.map(k => {
-            const r = fastRecords[k];
-            const win = r.start && r.end ? `${r.start} – ${r.end}` : r.start ? `${r.start} – …` : '未记录';
-            let dur = '', cls = 'h-part';
-            if (r.start && r.end) {
-              const h = calcEatHours(r.start, r.end);
-              dur = `${h.toFixed(1)}h`;
-              cls = h <= mode.eat ? 'h-ok' : 'h-over';
-            }
-            const fH = calcFastHours(k, fastRecords);
-            return (
-              <div key={k} className="history-item" onClick={() => openActionSheet(k)}>
-                <span className="h-date">{fmtKey(k)}</span>
-                <span className="h-win">{win}</span>
-                <span className={`h-dur ${cls}`}>{dur}</span>
-                {fH != null && <span className="h-dur" style={{ color: 'var(--label2)', minWidth: '42px', textAlign: 'right' }}>🌙{fH.toFixed(1)}h</span>}
-              </div>
-            );
-          })
-        )}
-      </div>
-    </>
-  );
+    inner = `<svg width="${chartW}" height="${CH + LH + 4}" viewBox="0 0 ${chartW} ${CH + LH + 4}">
+      <line x1="0" y1="${tY}" x2="${chartW}" y2="${tY}" stroke="#3d52d5" stroke-width="1" stroke-dasharray="3,3" opacity="0.3"/>
+      <text x="${chartW - 1}" y="${tY - 4}" font-size="9" fill="#3d52d5" text-anchor="end" opacity="0.6">${mode.eat}h</text>
+      ${bars}${labels}
+    </svg>`;
+  }
+
+  return `
+    <div class="card-label" style="margin-top:4px">过去 30 天进食时长</div>
+    <div class="card" style="padding:16px">
+      <div class="chart-scroll" id="f-chart-scroll">${inner}</div>
+    </div>`;
 }
 
-/* ═══════════════════ App ═══════════════════ */
+/* ═══════════════════ Fasting: Actions ═══════════════════ */
 
-function App() {
-  const [appMode, setAppMode] = useState(() => localStorage.getItem('health-mode') || 'protein');
+function setFastMode(i) {
+  fastModeIndex = i;
+  saveFastMode();
+  renderFasting();
+}
 
-  const [foods, setFoods] = useState(() => {
-    const saved = loadJSON(FOODS_KEY, null);
-    if (!saved) return DEFAULT_FOODS;
-    const migrationVersion = parseInt(localStorage.getItem('foods-migration') || '0');
-    if (migrationVersion < 1) {
-      let migrated = saved.filter(f => f.id !== 'f11' && f.id !== 'f16');
-      const f9 = migrated.find(f => f.id === 'f9');
-      if (f9) { f9.name = '虾滑/虾饼'; f9.proteinPer = 12; }
-      const f3 = migrated.find(f => f.id === 'f3');
-      if (f3) f3.name = '牛排/牛腱';
-      migrated = migrated.filter(f => f.id !== 'f19');
-      const defaultMap = {};
-      DEFAULT_FOODS.forEach(f => { defaultMap[f.id] = f; });
-      migrated.forEach(f => { if (defaultMap[f.id]) f.cat = defaultMap[f.id].cat; });
-      DEFAULT_FOODS.forEach(df => {
-        if (!migrated.find(f => f.id === df.id)) migrated.push(df);
-      });
-      const catOrder = ['奶蛋', '禽肉', '牛肉', '鱼', '虾', '植物', '其他'];
-      const idOrder = DEFAULT_FOODS.map(f => f.id);
-      migrated.sort((a, b) => {
-        const ca = catOrder.indexOf(a.cat || '其他'), cb = catOrder.indexOf(b.cat || '其他');
-        if (ca !== cb) return ca - cb;
-        const ia = idOrder.indexOf(a.id), ib = idOrder.indexOf(b.id);
-        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-      });
-      localStorage.setItem('foods-migration', '4');
-      return migrated;
-    }
-    if (migrationVersion < 2) {
-      let migrated = saved.filter(f => f.id !== 'f8');
-      const f7 = migrated.find(f => f.id === 'f7');
-      if (f7) { f7.name = '鱼类'; f7.emoji = '\u{1F420}'; f7.proteinPer = 16; }
-      const f13 = migrated.find(f => f.id === 'f13');
-      if (f13) f13.emoji = '\u{1F953}';
-      const f9 = migrated.find(f => f.id === 'f9');
-      if (f9) f9.emoji = '\u{1F364}';
-      const f17 = migrated.find(f => f.id === 'f17');
-      if (f17) f17.emoji = '\u{1F990}';
-      migrated.forEach(f => {
-        if (f.id === 'f7' || f.id === 'f14') f.cat = '鱼';
-        else if (f.id === 'f9' || f.id === 'f17') f.cat = '虾';
-        else if (f.cat === '鱼虾') f.cat = '鱼';
-      });
-      const f10m = migrated.find(f => f.id === 'f10');
-      if (f10m) f10m.emoji = '\u{1F376}';
-      const f9m = migrated.find(f => f.id === 'f9');
-      const f17m = migrated.find(f => f.id === 'f17');
-      if (f9m && f17m) {
-        const i9 = migrated.indexOf(f9m), i17 = migrated.indexOf(f17m);
-        if (i9 < i17) { migrated.splice(i9, 1); migrated.splice(i17, 0, f9m); }
+function recordNow(field) {
+  const tk = todayKey();
+  if (!fastRecords[tk]) fastRecords[tk] = {};
+  fastRecords[tk][field] = nowHHMM();
+  saveFastRecords();
+  showToast(field === 'start' ? '已记录开始时间' : '已记录结束时间');
+  renderFasting();
+}
+
+/* ── Time Picker ── */
+let pickerField = null, pickerDateKey = null;
+
+function buildPickerCols() {
+  const spacer = '<div class="picker-spacer"></div>';
+  document.getElementById('picker-hours').innerHTML = spacer +
+    Array.from({ length: 24 }, (_, i) => `<div class="picker-item">${pad(i)}</div>`).join('') + spacer;
+  document.getElementById('picker-mins').innerHTML = spacer +
+    Array.from({ length: 60 / FAST_MINUTE_STEP }, (_, i) => `<div class="picker-item">${pad(i * FAST_MINUTE_STEP)}</div>`).join('') + spacer;
+}
+
+function openPicker(field, dk) {
+  pickerField = field;
+  pickerDateKey = dk;
+  document.getElementById('picker-title').textContent = field === 'start' ? '开始进食时间' : '结束进食时间';
+  const initial = (fastRecords[dk] || {})[field] || nowHHMM();
+  const [h, m] = initial.split(':').map(Number);
+  document.getElementById('picker').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => {
+    document.getElementById('picker-hours').scrollTop = h * 44;
+    document.getElementById('picker-mins').scrollTop = Math.round(m / FAST_MINUTE_STEP) * 44;
+  });
+}
+
+function closePicker() {
+  document.getElementById('picker').classList.remove('open');
+  document.body.style.overflow = '';
+  pickerField = null;
+  pickerDateKey = null;
+}
+
+function confirmPicker() {
+  const hIdx = Math.min(Math.round(document.getElementById('picker-hours').scrollTop / 44), 23);
+  const mIdx = Math.min(Math.round(document.getElementById('picker-mins').scrollTop / 44), 60 / FAST_MINUTE_STEP - 1);
+  const val = `${pad(hIdx)}:${pad(mIdx * FAST_MINUTE_STEP)}`;
+  const dk = pickerDateKey, field = pickerField;
+  closePicker();
+  if (!dk || !field) return;
+  if (!fastRecords[dk]) fastRecords[dk] = {};
+  fastRecords[dk][field] = val;
+  saveFastRecords();
+  renderFasting();
+}
+
+/* ── Action Sheet ── */
+let actionDateKey = null;
+
+function openFastAction(dk) {
+  actionDateKey = dk;
+  const r = fastRecords[dk];
+  const win = r && r.start && r.end ? `${r.start} – ${r.end}`
+    : r && r.start ? `${r.start} – 未结束` : '无记录';
+  document.getElementById('fast-action-title').textContent = `${fmtKey(dk)}  ${win}`;
+  document.getElementById('fast-action').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeFastAction() {
+  document.getElementById('fast-action').classList.remove('open');
+  document.body.style.overflow = '';
+  actionDateKey = null;
+}
+
+function fastActionEdit(field) {
+  const dk = actionDateKey;
+  closeFastAction();
+  if (dk) openPicker(field, dk);
+}
+
+function fastActionDelete() {
+  const dk = actionDateKey;
+  closeFastAction();
+  if (!dk) return;
+  delete fastRecords[dk];
+  saveFastRecords();
+  renderFasting();
+}
+
+/* ═══════════════════ Export / Import ═══════════════════ */
+
+function shareOrDownload(content, filename, mime) {
+  // 优先走 iOS 分享面板（一步直达），不支持或分享失败时退回 <a download>；用户主动取消不触发下载
+  const file = new File([content], filename, { type: mime });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: filename })
+      .catch(err => { if (!err || err.name !== 'AbortError') fallbackDownload(content, filename, mime); });
+  } else {
+    fallbackDownload(content, filename, mime);
+  }
+}
+
+function fallbackDownload(content, filename, mime) {
+  const url = URL.createObjectURL(new Blob([content], { type: mime }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportJSON() {
+  const data = JSON.stringify({ foods, records, target, fastModeIndex, fastRecords }, null, 2);
+  shareOrDownload(data, `profast-${todayKey()}.json`, 'application/json');
+  showToast('已导出');
+}
+
+function importJSON(e) {
+  // 导入约定（方案A，见 PWA_DESIGN_GUIDE.md）：唯独食材库不碰；
+  // 历史记录按天合并去重；目标值/断食模式随备份恢复。
+  // 记录条目自带 protein/foodName 快照，历史摄入量的计算不依赖食材库。
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const obj = JSON.parse(reader.result);
+      let addedEntries = 0, addedFastDays = 0;
+      if (obj.target > 0) { target = obj.target; saveTarget(); }
+      if (obj.fastModeIndex != null && FAST_MODES[obj.fastModeIndex]) {
+        fastModeIndex = obj.fastModeIndex; saveFastMode();
       }
-      localStorage.setItem('foods-migration', '4');
-      return migrated;
-    }
-    if (migrationVersion < 3) {
-      let migrated = [...saved];
-      migrated.forEach(f => {
-        if (f.id === 'f7' || f.id === 'f14') f.cat = '鱼';
-        else if (f.id === 'f9' || f.id === 'f17') f.cat = '虾';
-        else if (f.cat === '鱼虾') f.cat = '鱼';
-      });
-      const f9m = migrated.find(f => f.id === 'f9');
-      const f17m = migrated.find(f => f.id === 'f17');
-      if (f9m && f17m) {
-        const i9 = migrated.indexOf(f9m), i17 = migrated.indexOf(f17m);
-        if (i9 < i17) { migrated.splice(i9, 1); migrated.splice(i17, 0, f9m); }
-      }
-      localStorage.setItem('foods-migration', '4');
-      return migrated;
-    }
-    if (migrationVersion < 4) {
-      let migrated = [...saved];
-      const f10 = migrated.find(f => f.id === 'f10');
-      if (f10) f10.emoji = '\u{1F376}';
-      localStorage.setItem('foods-migration', '4');
-      return migrated;
-    }
-    return saved;
-  });
-  const [records, setRecords] = useState(() => loadJSON(RECORDS_KEY, {}));
-  const [target, setTarget] = useState(() => {
-    const v = parseFloat(localStorage.getItem(TARGET_KEY));
-    return v > 0 ? v : DEFAULT_TARGET;
-  });
-
-  const [fastModeIndex, setFastModeIndex] = useState(() => {
-    const i = parseInt(localStorage.getItem('fasting-mode') || '0');
-    return isNaN(i) ? 0 : i;
-  });
-  const [fastRecords, setFastRecords] = useState(() => loadJSON('fasting-records', {}));
-
-  const [toast, setToast] = useState('');
-  const toastTimer = useRef(null);
-
-  const [picker, setPicker] = useState({ open: false, field: null, dateKey: null });
-  const [actionSheet, setActionSheet] = useState({ open: false, dateKey: null });
-
-  useEffect(() => { localStorage.setItem(FOODS_KEY, JSON.stringify(foods)); }, [foods]);
-  useEffect(() => { localStorage.setItem(RECORDS_KEY, JSON.stringify(records)); }, [records]);
-  useEffect(() => { localStorage.setItem(TARGET_KEY, String(target)); }, [target]);
-  useEffect(() => { localStorage.setItem('fasting-mode', String(fastModeIndex)); }, [fastModeIndex]);
-  useEffect(() => { localStorage.setItem('fasting-records', JSON.stringify(fastRecords)); }, [fastRecords]);
-  useEffect(() => { localStorage.setItem('health-mode', appMode); }, [appMode]);
-
-  function showToast(msg) {
-    setToast(msg);
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(''), 1800);
-  }
-
-  function openPicker(field, dk) {
-    setPicker({ open: true, field, dateKey: dk });
-  }
-  function closePicker() { setPicker({ open: false, field: null, dateKey: null }); }
-  function handlePickerConfirm(val) {
-    const { field, dateKey: dk } = picker;
-    closePicker();
-    setFastRecords(prev => {
-      const updated = { ...prev };
-      if (!updated[dk]) updated[dk] = {};
-      updated[dk] = { ...updated[dk], [field]: val };
-      return updated;
-    });
-  }
-
-  function openActionSheetFn(dk) { setActionSheet({ open: true, dateKey: dk }); }
-  function closeActionSheet() { setActionSheet({ open: false, dateKey: null }); }
-  function handleEditField(field) {
-    const dk = actionSheet.dateKey;
-    closeActionSheet();
-    openPicker(field, dk);
-  }
-  function handleDeleteRecord() {
-    const dk = actionSheet.dateKey;
-    closeActionSheet();
-    setFastRecords(prev => {
-      const updated = { ...prev };
-      delete updated[dk];
-      return updated;
-    });
-  }
-
-  function handleExportJSON() {
-    const data = JSON.stringify({ foods, records, target, fastModeIndex, fastRecords }, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `profast-${todayKey()}.json`; a.click();
-    URL.revokeObjectURL(url); showToast('已导出');
-  }
-  function handleImportJSON(e) {
-    const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const obj = JSON.parse(reader.result);
-        if (obj.foods) {
-          setFoods(prev => {
-            const currentIds = new Set(prev.map(f => f.id));
-            const extras = obj.foods.filter(f => !currentIds.has(f.id));
-            return extras.length ? [...prev, ...extras] : prev;
+      if (obj.records) {
+        for (const [dk, day] of Object.entries(obj.records)) {
+          if (!day || !Array.isArray(day.entries)) continue;
+          if (!records[dk]) records[dk] = { entries: [] };
+          const have = new Set(records[dk].entries.map(en => en.id));
+          day.entries.forEach(en => {
+            if (!have.has(en.id)) { records[dk].entries.push(en); addedEntries++; }
           });
+          records[dk].entries.sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
         }
-        if (obj.records) setRecords(obj.records);
-        if (obj.target > 0) setTarget(obj.target);
-        if (obj.fastRecords) setFastRecords(obj.fastRecords);
-        if (obj.fastModeIndex != null) setFastModeIndex(obj.fastModeIndex);
-        showToast('已导入');
-      } catch { showToast('导入失败'); }
-    };
-    reader.readAsText(file); e.target.value = '';
-  }
-
-  const pickerInitialTime = picker.open ? ((fastRecords[picker.dateKey] || {})[picker.field] || nowHHMM()) : '';
-  const pickerTitle = picker.field === 'start' ? '开始进食时间' : '结束进食时间';
-
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
-
-  return (
-    <>
-      <header>
-        <h1>ProFast</h1>
-        <p>{dateStr}</p>
-        <div className="seg-ctrl" style={{ margin: '10px 0 0' }}>
-          <button className={`seg-btn${appMode === 'protein' ? ' active' : ''}`} onClick={() => setAppMode('protein')}>蛋白质</button>
-          <button className={`seg-btn${appMode === 'fasting' ? ' active' : ''}`} onClick={() => setAppMode('fasting')}>断食</button>
-        </div>
-      </header>
-
-      <main>
-        {appMode === 'protein' && (
-          <>
-            <RecordPanel foods={foods} setFoods={setFoods} records={records} setRecords={setRecords} target={target} setTarget={setTarget} showToast={showToast} />
-            <TrendPanel records={records} target={target} />
-            <div className="card-label" style={{ marginTop: '8px' }}>数据管理</div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn btn-outline" style={{ flex: 1 }} onClick={handleExportJSON}>导出 JSON</button>
-              <label className="btn btn-outline" style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }}>
-                导入 JSON
-                <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportJSON} />
-              </label>
-            </div>
-          </>
-        )}
-        {appMode === 'fasting' && (
-          <>
-            <FastRecordPanel modeIndex={fastModeIndex} setModeIndex={setFastModeIndex}
-              fastRecords={fastRecords} setFastRecords={setFastRecords} openPicker={openPicker} showToast={showToast} />
-            <FastChartPanel modeIndex={fastModeIndex} fastRecords={fastRecords} />
-            <FastSettingsPanel fastRecords={fastRecords} setFastRecords={setFastRecords}
-              modeIndex={fastModeIndex} openActionSheet={openActionSheetFn} onExport={handleExportJSON} onImport={handleImportJSON} />
-          </>
-        )}
-      </main>
-
-      <Toast msg={toast} />
-      <TimePickerModal isOpen={picker.open} title={pickerTitle} initialTime={pickerInitialTime}
-        onConfirm={handlePickerConfirm} onClose={closePicker} />
-      <ActionSheet isOpen={actionSheet.open} dateKey={actionSheet.dateKey}
-        record={actionSheet.dateKey ? fastRecords[actionSheet.dateKey] : null}
-        onEditField={handleEditField} onDelete={handleDeleteRecord} onClose={closeActionSheet} />
-    </>
-  );
+        saveRecords();
+      }
+      if (obj.fastRecords) {
+        for (const [dk, r] of Object.entries(obj.fastRecords)) {
+          if (!fastRecords[dk]) { fastRecords[dk] = r; addedFastDays++; }
+          else fastRecords[dk] = { ...r, ...fastRecords[dk] };  // 本机字段优先，备份补缺
+        }
+        saveFastRecords();
+      }
+      showToast(`已合并：${addedEntries} 条摄入 / ${addedFastDays} 天断食`);
+      renderCurrent();
+    } catch { showToast('导入失败'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+/* ═══════════════════ Mode Switch & Init ═══════════════════ */
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js');
+function setAppMode(m) {
+  appMode = m;
+  localStorage.setItem('health-mode', m);
+  document.getElementById('seg-protein').classList.toggle('active', m === 'protein');
+  document.getElementById('seg-fasting').classList.toggle('active', m === 'fasting');
+  document.getElementById('protein-panel').classList.toggle('active', m === 'protein');
+  document.getElementById('fasting-panel').classList.toggle('active', m === 'fasting');
+  renderCurrent();
 }
+
+function renderCurrent() {
+  if (appMode === 'protein') renderProtein();
+  else renderFasting();
+}
+
+function init() {
+  const d = new Date();
+  document.getElementById('today-label').textContent =
+    `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+  buildPickerCols();
+  setAppMode(appMode);
+  if ('serviceWorker' in navigator)
+    navigator.serviceWorker.register('service-worker.js');
+}
+
+init();
 </script>
 </body>
 </html>

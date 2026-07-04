@@ -545,6 +545,12 @@ function saveRecords(records) {
   localStorage.setItem('expense_records', JSON.stringify(records));
 }
 
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ── CSV Import ───────────────────────────────────────────────
 
 function importCSV() {
@@ -708,12 +714,11 @@ function changeMonth(delta) {
 
 function getWeekRange() {
   const now = new Date();
-  const day = now.getDay() || 7;
-  const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
-  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const sun = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+  const sat = new Date(sun); sat.setDate(sun.getDate() + 6);
   const fmt = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   const short = d => (d.getMonth()+1) + '/' + d.getDate();
-  return { start: fmt(mon), end: fmt(sun), label: short(mon) + ' - ' + short(sun) };
+  return { start: fmt(sun), end: fmt(sat), label: short(sun) + ' - ' + short(sat) };
 }
 
 function getFoodBudget() {
@@ -845,7 +850,7 @@ function renderHistory() {
       <div style="padding:8px 16px;font-size:12px;color:var(--label3);border-bottom:1px solid var(--sep)">${all.length} 笔记录</div>
       ${Object.keys(byLargeCat).length ? `<div class="cat-breakdown">
         ${Object.entries(byLargeCat).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>
-          `<div class="cat-breakdown-row"><span>${cat}</span><span class="amt">¥${amt.toFixed(2)}</span></div>`
+          `<div class="cat-breakdown-row"><span>${esc(cat)}</span><span class="amt">¥${amt.toFixed(2)}</span></div>`
         ).join('')}
       </div>` : ''}`;
   }
@@ -861,8 +866,8 @@ function renderHistory() {
   recordsCard.innerHTML = displayRecords.map(r => `
     <div class="record-item${r.ignored ? ' ignored' : ''}">
       <div class="record-left">
-        <div class="record-cat">${r.largeCat} · ${r.smallCat}${r.pending ? '<span class="record-badge pending">待确认</span>' : ''}${r.ignored ? '<span class="record-badge ignored">已忽略</span>' : ''}</div>
-        <div class="record-meta">${r.dateStr}${r.note ? ' · ' + r.note : ''}</div>
+        <div class="record-cat">${esc(r.largeCat)} · ${esc(r.smallCat)}${r.pending ? '<span class="record-badge pending">待确认</span>' : ''}${r.ignored ? '<span class="record-badge ignored">已忽略</span>' : ''}</div>
+        <div class="record-meta">${esc(r.dateStr)}${r.note ? ' · ' + esc(r.note) : ''}</div>
       </div>
       <div class="record-right">
         <div class="record-amt${r.type==='收入'?' income':''}">${r.type==='收入'?'+':'-'}¥${r.amount.toFixed(2)}</div>
@@ -912,7 +917,7 @@ function buildCSV(records) {
 function triggerDownload(csv, filename) {
   const file = new File(['﻿' + csv], filename, {type: 'text/csv;charset=utf-8'});
   if (navigator.canShare && navigator.canShare({files: [file]})) {
-    navigator.share({files: [file], title: filename}).catch(() => fallbackDownload(csv, filename));
+    navigator.share({files: [file], title: filename}).catch(err => { if (!err || err.name !== 'AbortError') fallbackDownload(csv, filename); });
   } else {
     fallbackDownload(csv, filename);
   }
@@ -1045,7 +1050,7 @@ function renameTripModal(tripId) {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `<div class="modal-box">
     <h3>修改行程名称</h3>
-    <input type="text" id="rename-trip-input" value="${trip.name}" maxlength="20">
+    <input type="text" id="rename-trip-input" value="${esc(trip.name)}" maxlength="20">
     <div class="modal-btns">
       <button class="modal-cancel" onclick="this.closest('.modal-overlay').remove()">取消</button>
       <button class="modal-confirm" onclick="confirmRenameTrip(${tripId})">确定</button>
@@ -1146,7 +1151,7 @@ function renderTripList() {
       const total = getTripTotal(t);
       return `<div class="trip-list-item" onclick="viewingTripId=${t.id};renderTravel()">
         <div>
-          <div class="trip-name">${t.name}</div>
+          <div class="trip-name">${esc(t.name)}</div>
           <div class="trip-info">${getTripDateRange(t)} · ${t.records.length} 笔</div>
         </div>
         <div class="trip-amt">¥${total.toFixed(2)}</div>
@@ -1169,7 +1174,7 @@ function renderTripRecorder(trip) {
   let html = `
     <div class="card">
       <div class="trip-header">
-        <h2>${trip.name} <button class="record-edit-btn" onclick="renameTripModal(${trip.id})">✏️</button></h2>
+        <h2>${esc(trip.name)} <button class="record-edit-btn" onclick="renameTripModal(${trip.id})">✏️</button></h2>
         <div class="trip-total">¥${total.toFixed(2)}</div>
         <div class="trip-meta">${trip.records.length} 笔记录 · ${getTripDateRange(trip)}</div>
       </div>
@@ -1221,8 +1226,8 @@ function renderTripRecorder(trip) {
       const cat = TRAVEL_CATS.find(c => c.name === r.category);
       return `<div class="record-item">
         <div class="record-left">
-          <div class="record-cat">${cat ? cat.icon : ''} ${r.category}${r.pending ? '<span class="record-badge pending">待确认</span>' : ''}</div>
-          <div class="record-meta">${r.date}${r.note ? ' · ' + r.note : ''}</div>
+          <div class="record-cat">${cat ? cat.icon : ''} ${esc(r.category)}${r.pending ? '<span class="record-badge pending">待确认</span>' : ''}</div>
+          <div class="record-meta">${esc(r.date)}${r.note ? ' · ' + esc(r.note) : ''}</div>
         </div>
         <div class="record-right">
           <div class="record-amt">-¥${r.amount.toFixed(2)}</div>
@@ -1254,7 +1259,7 @@ function renderTripSummary(tripId) {
   let html = `
     <div class="card">
       <div class="trip-summary-total">
-        <div class="label">${trip.name}</div>
+        <div class="label">${esc(trip.name)}</div>
         <div class="amount">¥${total.toFixed(2)}</div>
       </div>
       <div style="padding:8px 16px;font-size:12px;color:var(--label3);text-align:center;border-bottom:1px solid var(--sep)">
@@ -1263,7 +1268,7 @@ function renderTripSummary(tripId) {
       ${Object.keys(byCat).length ? `<div class="cat-breakdown">
         ${Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([cat,amt]) => {
           const c = TRAVEL_CATS.find(tc => tc.name === cat);
-          return `<div class="cat-breakdown-row"><span>${c ? c.icon : ''} ${cat}</span><span class="amt">¥${amt.toFixed(2)}</span></div>`;
+          return `<div class="cat-breakdown-row"><span>${c ? c.icon : ''} ${esc(cat)}</span><span class="amt">¥${amt.toFixed(2)}</span></div>`;
         }).join('')}
       </div>` : ''}
     </div>

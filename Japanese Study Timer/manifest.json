@@ -4,8 +4,8 @@
   "display": "standalone",
   "background_color": "#fafbff",
   "theme_color": "#4853a7",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "/master/Japanese%20Study%20Timer/",
+  "scope": "/master/Japanese%20Study%20Timer/",
   "icons": [
     {
       "src": "apple-touch-icon.png",

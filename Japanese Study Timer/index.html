@@ -1764,6 +1764,26 @@ function clearAllData() {
 }
 
 // ── CSV Export/Import ────────────────────────────────────────
+function shareOrDownload(content, filename, mime) {
+  // 优先走 iOS 分享面板（一步直达），不支持或分享失败时退回 <a download>；用户主动取消不触发下载
+  const file = new File([content], filename, { type: mime });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: filename })
+      .catch(err => { if (!err || err.name !== 'AbortError') fallbackDownload(content, filename, mime); });
+  } else {
+    fallbackDownload(content, filename, mime);
+  }
+}
+
+function fallbackDownload(content, filename, mime) {
+  const url = URL.createObjectURL(new Blob([content], { type: mime }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function exportCSV() {
   const data = loadData();
   const rows = ['date,start_time,duration_minutes,topic'];
@@ -1771,15 +1791,7 @@ function exportCSV() {
     rows.push(`${s.date},${s.startTime || ''},${Math.round(s.duration / 60)},"${(s.topic||'').replace(/"/g,'""')}"`);
   }
   const csv = rows.join('\n');
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `japanese_study_${todayStr()}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  shareOrDownload('﻿' + csv, `japanese_study_${todayStr()}.csv`, 'text/csv;charset=utf-8;');
 }
 
 function importCSV(event) {
@@ -1832,17 +1844,31 @@ function updateLayoutVars() {
   if (tabbar) document.documentElement.style.setProperty('--tabbar-h', tabbar.offsetHeight + 'px');
 }
 
-// Lock app height on first load; ignore keyboard resize
+// Lock app height; refresh whenever the viewport really changes (browser chrome
+// collapse/expand, rotation, relaunch). Body has transform, so the fixed tab bar
+// anchors to body's bottom — a stale --app-h makes it float up or clip off-screen.
+function updateAppHeight() {
+  // 键盘弹起期间跳过刷新，维持"键盘不挤压布局"的锁定设计
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
+  document.body.style.setProperty('--app-h', document.documentElement.clientHeight + 'px');
+}
+
 (function() {
-  const h = document.documentElement.clientHeight;
-  document.body.style.setProperty('--app-h', h + 'px');
+  updateAppHeight();
   // Prevent iOS from scrolling the fixed body when input is focused
   document.addEventListener('focusin', function(e) {
     if (e.target.tagName === 'INPUT') {
       setTimeout(function() { window.scrollTo(0, 0); }, 50);
     }
   });
+  // 键盘收起后校正一次高度
+  document.addEventListener('focusout', function() {
+    setTimeout(updateAppHeight, 100);
+  });
   window.addEventListener('scroll', function() { window.scrollTo(0, 0); });
+  window.addEventListener('resize', function() { updateAppHeight(); updateLayoutVars(); });
+  window.addEventListener('pageshow', updateAppHeight);
 })();
 
 function renderAll() {
@@ -1853,7 +1879,7 @@ function renderAll() {
 updateLayoutVars();
 
 window.addEventListener('orientationchange', () => {
-  setTimeout(updateLayoutVars, 300);
+  setTimeout(() => { updateAppHeight(); updateLayoutVars(); }, 300);
 });
 renderAll();
 

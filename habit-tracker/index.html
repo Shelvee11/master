@@ -50,7 +50,7 @@
       padding-top: calc(env(safe-area-inset-top) + 14px);
       position: sticky; top: 0; z-index: 10;
     }
-    header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; color: var(--label); }
+    header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent); }
     header p  { font-size: 12px; color: var(--label3); margin-top: 2px; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
 
     main {
@@ -1145,17 +1145,31 @@ function closeDeleteSheet() {
 }
 
 // ── Export / Import ──
-function exportJSON() {
-  const data = getData();
-  if (!data.habits.length) { showToast('暂无数据'); return; }
-  const json = JSON.stringify(data, null, 2);
-  const filename = `habitbit-${todayKey()}.json`;
-  const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }));
+function shareOrDownload(content, filename, mime) {
+  // 优先走 iOS 分享面板（一步直达），不支持或分享失败时退回 <a download>；用户主动取消不触发下载
+  const file = new File([content], filename, { type: mime });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: filename })
+      .catch(err => { if (!err || err.name !== 'AbortError') fallbackDownload(content, filename, mime); });
+  } else {
+    fallbackDownload(content, filename, mime);
+  }
+}
+
+function fallbackDownload(content, filename, mime) {
+  const url = URL.createObjectURL(new Blob([content], { type: mime }));
   const a = Object.assign(document.createElement('a'), { href: url, download: filename });
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function exportJSON() {
+  const data = getData();
+  if (!data.habits.length) { showToast('暂无数据'); return; }
+  const json = JSON.stringify(data, null, 2);
+  shareOrDownload(json, `habitbit-${todayKey()}.json`, 'application/json;charset=utf-8');
 }
 
 function importJSON(input) {

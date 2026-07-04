@@ -1,4 +1,4 @@
-const CACHE = 'jp-study-v4';
+const CACHE = 'jp-study-v5';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -15,8 +15,13 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// network-first：在线永远拿最新版，离线回退到最近一次成功加载的缓存
 self.addEventListener('fetch', e => {
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+    fetch(e.request).then(r => {
+      const clone = r.clone();
+      caches.open(CACHE).then(c => c.put(e.request, clone));
+      return r;
+    }).catch(() => caches.match(e.request))
   );
 });
