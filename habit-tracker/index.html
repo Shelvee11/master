@@ -1141,14 +1141,25 @@ function importJSON(input) {
       const incoming = JSON.parse(e.target.result);
       if (!incoming.habits || !incoming.checkins) { showToast('无效的数据文件'); return; }
       const data = getData();
-      const existingIds = new Set(data.habits.map(h => h.id));
+      // 同名同类型的习惯视为同一个（历史导出里的 id 可能不同），打卡记录重定向到现有 id
+      const idMap = {};
       incoming.habits.forEach(h => {
-        if (!existingIds.has(h.id)) data.habits.push(h);
+        const match = data.habits.find(x => x.id === h.id || (x.name === h.name && x.type === h.type));
+        if (match) {
+          idMap[h.id] = match.id;
+        } else {
+          data.habits.push(h);
+          idMap[h.id] = h.id;
+        }
       });
-      const existingCheckins = new Set(data.checkins.map(c => c.habitId + '|' + c.date + '|' + (c.time || '')));
+      const ckKey = c => c.habitId + '|' + c.date + '|' + (c.time || '') + '|' + (c.value ?? '');
+      const existingCheckins = new Set(data.checkins.map(ckKey));
       incoming.checkins.forEach(c => {
-        const key = c.habitId + '|' + c.date + '|' + (c.time || '');
-        if (!existingCheckins.has(key)) data.checkins.push(c);
+        const mapped = { ...c, habitId: idMap[c.habitId] || c.habitId };
+        if (!existingCheckins.has(ckKey(mapped))) {
+          data.checkins.push(mapped);
+          existingCheckins.add(ckKey(mapped));
+        }
       });
       saveData(data);
       showToast('导入成功');
@@ -1158,6 +1169,35 @@ function importJSON(input) {
     }
   };
   reader.readAsText(file);
+}
+
+// 修复历史导入产生的重复习惯：同名同类型只保留第一个，打卡记录重定向后去重
+function dedupeHabits() {
+  const data = getData();
+  const keep = {}, idMap = {};
+  const merged = [];
+  data.habits.forEach(h => {
+    const key = h.name + '|' + h.type;
+    if (keep[key]) {
+      idMap[h.id] = keep[key].id;
+      if (!h.archived) keep[key].archived = false;
+    } else {
+      keep[key] = h;
+      idMap[h.id] = h.id;
+      merged.push(h);
+    }
+  });
+  if (merged.length === data.habits.length) return;
+  data.habits = merged;
+  const seen = new Set();
+  data.checkins = data.checkins.filter(c => {
+    c.habitId = idMap[c.habitId] || c.habitId;
+    const key = c.habitId + '|' + c.date + '|' + (c.time || '') + '|' + (c.value ?? '');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  saveData(data);
 }
 
 // ── Toast ──
@@ -1191,6 +1231,7 @@ function init() {
   document.getElementById('today-label').textContent =
     `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
   seedDefaults();
+  dedupeHabits();
   // One-time migration: add 俯卧撑 if missing, ensure order: 深蹲, 俯卧撑, 跑步
   (function() {
     const data = getData();
