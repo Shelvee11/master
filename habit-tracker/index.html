@@ -129,12 +129,6 @@
       font-size: 14px; color: var(--label3);
     }
 
-    /* ── Streak ── */
-    .streak-val {
-      font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
-      letter-spacing: -0.3px;
-    }
-
     /* ── Weekly Grid ── */
     .week-nav {
       display: flex; align-items: center; justify-content: space-between;
@@ -466,9 +460,6 @@
   <p class="card-label">今日打卡 <span style="font-size:11px;color:var(--label3);font-weight:400">长按可删除</span></p>
   <div class="card" id="today-habits"></div>
 
-  <p class="card-label" style="margin-top:4px">连续打卡</p>
-  <div class="card" id="streak-card"></div>
-
   <p class="card-label" style="margin-top:4px">周报</p>
   <div class="card">
     <div class="week-nav">
@@ -624,7 +615,6 @@ function renderToday() {
     document.getElementById('today-habits').innerHTML =
       '<div class="empty-msg">还没有习惯</div>' +
       '<div class="add-habit-card" onclick="openAddHabit()">+ 添加习惯</div>';
-    document.getElementById('streak-card').innerHTML = '<div class="empty-msg">—</div>';
     return;
   }
 
@@ -636,7 +626,6 @@ function renderToday() {
   }).join('') + '<div class="add-habit-card" onclick="openAddHabit()">+ 添加习惯</div>';
 
   document.getElementById('today-habits').innerHTML = html;
-  renderStreaks(active, data);
 }
 
 function renderCheckCard(h, data, today) {
@@ -755,36 +744,6 @@ function confirmDelCheckin() {
 function closeDelCheckinSheet() {
   document.getElementById('del-checkin-sheet').classList.remove('open');
   delCheckinInfo = null;
-}
-
-// ── Streaks ──
-function renderStreaks(active, data) {
-  const html = active.map(h => {
-    const streak = calcStreak(h, data.checkins);
-    return `<div class="habit-card">
-      <span class="habit-emoji">${h.emoji}</span>
-      <div class="habit-info"><span class="habit-name">${esc(h.name)}</span></div>
-      <span class="streak-val" style="color:${streak > 0 ? 'var(--green)' : 'var(--label3)'}">${streak} 天</span>
-    </div>`;
-  }).join('');
-  document.getElementById('streak-card').innerHTML = html;
-}
-
-function calcStreak(habit, checkins) {
-  let streak = 0;
-  const d = new Date();
-  const todayChecked = checkins.some(c => c.habitId === habit.id && c.date === todayKey());
-  if (!todayChecked) d.setDate(d.getDate() - 1);
-  while (true) {
-    const key = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-    if (checkins.some(c => c.habitId === habit.id && c.date === key)) {
-      streak++;
-      d.setDate(d.getDate() - 1);
-    } else {
-      break;
-    }
-  }
-  return streak;
 }
 
 // ── Weekly Panel ──
