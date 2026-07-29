@@ -205,8 +205,16 @@ main {
 .cat-breakdown-row {
   display: flex; justify-content: space-between;
   padding: 5px 8px; background: var(--fill); border-radius: 8px; font-size: 13px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  border: 1px solid transparent; transition: background .15s, border-color .15s;
 }
+.cat-breakdown-row:active { opacity: .6; }
+.cat-breakdown-row.active { background: rgba(255,149,0,.14); border-color: var(--orange); }
 .cat-breakdown-row .amt { color: var(--orange); font-weight: 600; }
+.cat-filter-clear {
+  margin-left: 8px; font-size: 12px; font-weight: 400; color: var(--orange);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
 
 /* Record list */
 .record-item {
@@ -502,7 +510,7 @@ main {
       </div>
     </div>
 
-    <p class="card-label">记录</p>
+    <p class="card-label" id="records-label">记录</p>
     <div class="card" id="records-card"></div>
 
   </div>
@@ -534,6 +542,7 @@ let selectedSub = null;
 let editingId   = null;
 let viewMonth   = new Date().toISOString().slice(0,7);
 let activeFilter = 'all';
+let catFilter = null;   // 明细页：点击类别后只看该大类的记录
 
 // ── Storage ──────────────────────────────────────────────────
 
@@ -782,8 +791,20 @@ function renderWeeklyFood(allRecords) {
   </div>`;
 }
 
+function toggleCatFilter(cat) {
+  catFilter = (catFilter === cat) ? null : cat;
+  renderHistory();
+  document.getElementById('records-label').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function clearCatFilter() {
+  catFilter = null;
+  renderHistory();
+}
+
 function setFilter(f) {
   activeFilter = f;
+  catFilter = null;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.filter-btn[onclick="setFilter('${f}')"]`).classList.add('active');
   renderHistory();
@@ -811,6 +832,12 @@ function renderHistory() {
     displayRecords = allRecords.filter(r => r.ignored).sort((a,b) => b.id - a.id);
   } else {
     displayRecords = allRecords.filter(r => r.date.startsWith(viewMonth)).sort((a,b) => b.id - a.id);
+  }
+
+  if (catFilter && activeFilter === 'all') {
+    displayRecords = displayRecords.filter(r => r.largeCat === catFilter && r.type !== '收入' && !r.ignored);
+  } else if (catFilter) {
+    catFilter = null;
   }
 
   const all = allRecords.filter(r => r.date.startsWith(viewMonth)).sort((a,b) => b.id - a.id);
@@ -850,16 +877,25 @@ function renderHistory() {
       <div style="padding:8px 16px;font-size:12px;color:var(--label3);border-bottom:1px solid var(--sep)">${all.length} 笔记录</div>
       ${Object.keys(byLargeCat).length ? `<div class="cat-breakdown">
         ${Object.entries(byLargeCat).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>
-          `<div class="cat-breakdown-row"><span>${esc(cat)}</span><span class="amt">¥${amt.toFixed(2)}</span></div>`
+          `<div class="cat-breakdown-row${catFilter === cat ? ' active' : ''}" data-cat="${esc(cat)}" onclick="toggleCatFilter(this.dataset.cat)"><span>${esc(cat)}</span><span class="amt">¥${amt.toFixed(2)}</span></div>`
         ).join('')}
       </div>` : ''}`;
   }
 
   renderWeeklyFood(allRecords);
 
+  const recordsLabel = document.getElementById('records-label');
+  if (catFilter) {
+    const sum = displayRecords.reduce((s,r) => s + r.amount, 0);
+    recordsLabel.innerHTML = `记录 · ${esc(catFilter)}（${displayRecords.length} 笔 ¥${sum.toFixed(2)}）<span class="cat-filter-clear" onclick="clearCatFilter()">✕ 显示全部</span>`;
+  } else {
+    recordsLabel.textContent = '记录';
+  }
+
   const recordsCard = document.getElementById('records-card');
   if (!displayRecords.length) {
-    const emptyMsg = activeFilter === 'pending' ? '没有待确认记录' : activeFilter === 'ignored' ? '没有已忽略记录' : '暂无记录';
+    const emptyMsg = catFilter ? `本月没有「${esc(catFilter)}」的记录` :
+      activeFilter === 'pending' ? '没有待确认记录' : activeFilter === 'ignored' ? '没有已忽略记录' : '暂无记录';
     recordsCard.innerHTML = `<div class="empty-msg">${emptyMsg}</div>`;
     return;
   }
@@ -954,6 +990,7 @@ function switchTab(tab) {
   } else if (tab === 'history') {
     if (editingId) resetForm();
     activeFilter = 'all';
+    catFilter = null;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('.filter-btn[onclick="setFilter(\'all\')"]').classList.add('active');
     document.getElementById('history-panel').classList.add('active');
