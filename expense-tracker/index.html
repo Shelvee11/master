@@ -576,14 +576,43 @@ function importCSV() {
   input.click();
 }
 
+// 备份里的设置：本地没有就恢复，本地已有就先问过再覆盖
+function restoreSettings(settings) {
+  let changed = false;
+  for (const cols of settings) {
+    if ((cols[1] || '').trim() !== '每周饮食预算') continue;
+    const n = parseFloat(cols[2]);
+    if (isNaN(n) || n <= 0) continue;
+    const stored = parseFloat(localStorage.getItem('weekly_food_budget'));
+    if (!isNaN(stored) && stored > 0) {
+      if (stored === n) continue;
+      if (!confirm(`备份里的每周饮食预算是 ¥${n}，当前是 ¥${stored}。要改用备份里的吗？`)) continue;
+    }
+    localStorage.setItem('weekly_food_budget', n);
+    changed = true;
+  }
+  return changed;
+}
+
 function parseAndImportCSV(text) {
   const lines = text.replace(/^﻿/, '').trim().split('\n');
   if (lines.length < 2) { alert('CSV 文件为空'); return; }
+
+  // 备份文件开头可能有 #设置 行（如每周饮食预算），先吃掉再找表头
+  let headerIdx = 0;
+  const settings = [];
+  while (headerIdx < lines.length && lines[headerIdx].trim().startsWith('#')) {
+    settings.push(lines[headerIdx].split(','));
+    headerIdx++;
+  }
+  const settingsChanged = restoreSettings(settings);
+  if (settingsChanged) renderHistory();
+
   const incoming = [];
-  const header = lines[0].split(',');
+  const header = lines[headerIdx].split(',');
   const ignoredIdx = header.indexOf('忽略');
   const pendingIdx = header.indexOf('待确认');
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = headerIdx + 1; i < lines.length; i++) {
     const cols = lines[i].split(',');
     if (cols.length < 5) continue;
     const [dateStr, type, largeCat, smallCat, amount] = cols;
@@ -947,7 +976,8 @@ function buildCSV(records) {
   const rows = records.sort((a,b)=>a.id-b.id).map(r =>
     `${r.dateStr},${r.type||'支出'},${r.largeCat},${r.smallCat},${r.amount},${(r.note||'').replace(/,/g,'，')},${r.ignored?'1':''},${r.pending?'1':''}`
   );
-  return '日期,类型,大类,小类,金额,备注,忽略,待确认\n' + rows.join('\n') + '\n';
+  return `#设置,每周饮食预算,${getFoodBudget()}\n`
+    + '日期,类型,大类,小类,金额,备注,忽略,待确认\n' + rows.join('\n') + '\n';
 }
 
 function triggerDownload(csv, filename) {
