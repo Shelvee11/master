@@ -843,24 +843,25 @@ function renderHistory() {
   document.getElementById('month-label').textContent = viewMonth;
 
   const allRecords = getRecords();
-  const pendingCount = allRecords.filter(r => r.pending).length;
-  const ignoredCount = allRecords.filter(r => r.ignored).length;
+  const monthRecords = allRecords.filter(r => r.date.startsWith(viewMonth));
+  const pendingCount = monthRecords.filter(r => r.pending).length;
+  const ignoredCount = monthRecords.filter(r => r.ignored).length;
 
   const filterCard = document.getElementById('filter-card');
-  filterCard.style.display = (pendingCount > 0 || ignoredCount > 0) ? '' : 'none';
+  filterCard.style.display = (pendingCount > 0 || ignoredCount > 0 || activeFilter !== 'all') ? '' : 'none';
   document.getElementById('pending-filter-btn').textContent = `待确认(${pendingCount})`;
-  document.getElementById('pending-filter-btn').style.display = pendingCount > 0 ? '' : 'none';
+  document.getElementById('pending-filter-btn').style.display = (pendingCount > 0 || activeFilter === 'pending') ? '' : 'none';
   document.getElementById('ignored-filter-btn').textContent = `已忽略(${ignoredCount})`;
-  document.getElementById('ignored-filter-btn').style.display = ignoredCount > 0 ? '' : 'none';
-  document.getElementById('month-nav-card').style.display = (activeFilter === 'pending' || activeFilter === 'ignored') ? 'none' : '';
+  document.getElementById('ignored-filter-btn').style.display = (ignoredCount > 0 || activeFilter === 'ignored') ? '' : 'none';
+  document.getElementById('month-nav-card').style.display = '';
 
   let displayRecords;
   if (activeFilter === 'pending') {
-    displayRecords = allRecords.filter(r => r.pending).sort((a,b) => b.id - a.id);
+    displayRecords = monthRecords.filter(r => r.pending).sort((a,b) => b.id - a.id);
   } else if (activeFilter === 'ignored') {
-    displayRecords = allRecords.filter(r => r.ignored).sort((a,b) => b.id - a.id);
+    displayRecords = monthRecords.filter(r => r.ignored).sort((a,b) => b.id - a.id);
   } else {
-    displayRecords = allRecords.filter(r => r.date.startsWith(viewMonth)).sort((a,b) => b.id - a.id);
+    displayRecords = monthRecords.slice().sort((a,b) => b.id - a.id);
   }
 
   if (catFilter && activeFilter === 'all') {
@@ -869,7 +870,7 @@ function renderHistory() {
     catFilter = null;
   }
 
-  const all = allRecords.filter(r => r.date.startsWith(viewMonth)).sort((a,b) => b.id - a.id);
+  const all = monthRecords.slice().sort((a,b) => b.id - a.id);
   const incRecs = all.filter(r => r.type === '收入' && !r.ignored);
   const expRecs = all.filter(r => r.type !== '收入' && !r.ignored);
   const totalInc = incRecs.reduce((s,r) => s+r.amount, 0);
@@ -924,7 +925,7 @@ function renderHistory() {
   const recordsCard = document.getElementById('records-card');
   if (!displayRecords.length) {
     const emptyMsg = catFilter ? `本月没有「${esc(catFilter)}」的记录` :
-      activeFilter === 'pending' ? '没有待确认记录' : activeFilter === 'ignored' ? '没有已忽略记录' : '暂无记录';
+      activeFilter === 'pending' ? '本月没有待确认记录' : activeFilter === 'ignored' ? '本月没有已忽略记录' : '暂无记录';
     recordsCard.innerHTML = `<div class="empty-msg">${emptyMsg}</div>`;
     return;
   }
