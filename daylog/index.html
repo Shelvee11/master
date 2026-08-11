@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="日录">
+  <meta name="apple-mobile-web-app-title" content="Aside">
   <meta name="theme-color" content="#efeeea">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-512.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <title>日录 — 对话式记录</title>
+  <title>Aside — 对话式记录</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -73,6 +73,18 @@
       display: flex; align-items: center; justify-content: center;
     }
     .icon-btn:active { opacity: 0.6; }
+    .head-btns { display: flex; gap: 8px; flex: none; }
+
+    /* 多选模式的顶栏（仿「信息」：左全选 / 中计数 / 右取消） */
+    .selbar { max-width: 430px; margin: 0 auto; display: none; align-items: center; justify-content: space-between; gap: 12px; min-height: 41px; }
+    body.select .selbar { display: flex; }
+    body.select .head-row { display: none; }
+    .selbar-text {
+      border: none; background: none; padding: 2px 0; cursor: pointer;
+      font-family: inherit; font-size: 15px; font-weight: 700; color: var(--accent);
+    }
+    .selbar-text:active { opacity: 0.5; }
+    .selbar-count { font-size: 15px; font-weight: 700; color: var(--label); }
 
     /* ── Filter chips ── */
     .filters {
@@ -106,8 +118,24 @@
     }
     .daysep:first-child { margin-top: 0; }
 
+    /* 一行 = 左侧勾选圈（多选时才滑出）+ 记录本体 */
+    .srow { display: flex; align-items: center; }
+    .selcirc {
+      flex: none; width: 0; opacity: 0; margin-right: 0; border: none; padding: 0;
+      background: none; cursor: pointer; line-height: 0; color: var(--label3);
+      transition: width 0.22s cubic-bezier(0.32,0.72,0,1), margin-right 0.22s, opacity 0.18s;
+      overflow: hidden;
+    }
+    body.select .selcirc { width: 24px; margin-right: 12px; opacity: 1; }
+    .selcirc .on  { display: none; }
+    .selcirc.checked .off { display: none; }
+    .selcirc.checked .on { display: block; color: var(--accent); }
+    body.select .srow { cursor: pointer; }
+    body.select .bubble, body.select .imgs img, body.select .tagchip { cursor: pointer; pointer-events: none; }
+    body.select .srow.checked .bubble { outline: 2px solid var(--accent); outline-offset: 2px; }
+
     /* 一条记录 = 气泡 + 气泡外下方的「标签 · 时间」 */
-    .brow { display: flex; flex-direction: column; align-items: flex-start; max-width: 100%; }
+    .brow { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; max-width: 100%; }
     .brow.me { align-items: flex-end; }
     .bubble {
       max-width: 84%; padding: 12px 15px;
@@ -137,6 +165,19 @@
       padding-bottom: calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 12px);
     }
     .composer-inner { max-width: 430px; margin: 0 auto; display: flex; align-items: flex-end; gap: 10px; }
+    /* 多选时输入条换成删除条 */
+    body.select .composer-inner, body.select .attach-strip { display: none; }
+    .selactions { max-width: 430px; margin: 0 auto; display: none; align-items: center; justify-content: space-between; gap: 12px; }
+    body.select .selactions { display: flex; }
+    .del-btn {
+      border: none; border-radius: 999px; padding: 11px 20px; cursor: pointer;
+      font-family: inherit; font-size: 15px; font-weight: 700;
+      background: var(--red); color: #fff;
+      display: flex; align-items: center; gap: 7px;
+    }
+    .del-btn:disabled { background: var(--fill2); color: var(--label3); }
+    .del-btn:not(:disabled):active { opacity: 0.75; }
+    .sel-hint { font-size: 13px; color: var(--label3); }
     #input {
       flex: 1; resize: none; border: none; background: var(--bg2);
       border-radius: 22px; padding: 12px 16px; font-size: 15.5px; line-height: 1.45;
@@ -347,6 +388,22 @@
     }
     .lightbox.open { opacity: 1; pointer-events: auto; }
     .lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
+    .lightbox-bar {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      padding: 16px 20px calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 20px);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .lb-btn {
+      border: none; background: rgba(255,255,255,0.16); color: #fff; cursor: pointer;
+      border-radius: 999px; padding: 10px 18px; font-family: inherit; font-size: 15px; font-weight: 600;
+      display: flex; align-items: center; gap: 7px;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    }
+    .lb-btn.danger { color: #ff6b5c; }
+    .lb-btn:active { opacity: 0.6; }
+
+    .imgman { display: flex; flex-wrap: wrap; gap: 12px; padding: 14px 16px; justify-content: center; }
+    .imgman .attach-x { border-color: var(--bg2); }
 
     .kw-list { display: flex; flex-wrap: wrap; gap: 8px; }
     .kw-chip {
@@ -364,15 +421,32 @@
   <header>
     <div class="head-row">
       <div>
-        <h1>日录</h1>
+        <h1>Aside</h1>
         <p id="subtitle">—</p>
       </div>
+      <div class="head-btns">
+      <button class="icon-btn" onclick="enterSelect()" aria-label="选择记录">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 7 5.2 9.2 9.4 5"></polyline>
+          <polyline points="3 17 5.2 19.2 9.4 15"></polyline>
+          <line x1="13" y1="7" x2="21" y2="7"></line>
+          <line x1="13" y1="17" x2="21" y2="17"></line>
+        </svg>
+      </button>
       <button class="icon-btn" onclick="openSettings()" aria-label="设置">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"></circle>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
         </svg>
       </button>
+      </div>
+    </div>
+
+    <!-- 多选顶栏 -->
+    <div class="selbar">
+      <button class="selbar-text" id="sel-all" onclick="toggleSelectAll()">全选</button>
+      <span class="selbar-count" id="sel-count">未选择记录</span>
+      <button class="selbar-text" onclick="exitSelect()">取消</button>
     </div>
   </header>
 
@@ -399,6 +473,19 @@
           <line x1="12" y1="19" x2="12" y2="5"></line>
           <polyline points="5 12 12 5 19 12"></polyline>
         </svg>
+      </button>
+    </div>
+
+    <!-- 多选时的删除条 -->
+    <div class="selactions">
+      <span class="sel-hint" id="sel-hint">点一下选中，可跨天多选</span>
+      <button class="del-btn" id="del-btn" onclick="confirmDeleteSelected()" disabled>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 21 6"></polyline>
+          <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"></path>
+          <path d="M5.5 6l1 13A2 2 0 0 0 8.5 21h7a2 2 0 0 0 2-1.9l1-13.1"></path>
+        </svg>
+        <span id="del-btn-text">删除</span>
       </button>
     </div>
   </div>
@@ -431,7 +518,20 @@
   <div id="form-body"></div>
 </div>
 
-<div class="lightbox" id="lightbox" onclick="closeLightbox()"><img id="lightbox-img" alt=""></div>
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <img id="lightbox-img" alt="">
+  <div class="lightbox-bar" onclick="event.stopPropagation()">
+    <button class="lb-btn" onclick="closeLightbox()">关闭</button>
+    <button class="lb-btn danger" onclick="deleteCurrentImage()">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 21 6"></polyline>
+        <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"></path>
+        <path d="M5.5 6l1 13A2 2 0 0 0 8.5 21h7a2 2 0 0 0 2-1.9l1-13.1"></path>
+      </svg>
+      删除这张
+    </button>
+  </div>
+</div>
 
 <input type="file" id="import-file" accept="application/json,.json" class="hidden" onchange="importJSON(event)">
 <input type="file" id="pick-file" accept="image/*" multiple class="hidden" onchange="onPickFiles(event)">
@@ -666,6 +766,8 @@ function renderFilters() {
 
 function setFilter(id) {
   activeFilter = id;
+  // 切筛选时清空勾选，免得删掉屏幕上看不见的记录
+  if (selectMode) { selected.clear(); renderSelBar(); }
   renderFilters();
   renderHeader();
   renderStream();
@@ -691,22 +793,29 @@ function renderStream() {
     }
     const t = tagById(e.tagId);
     const imgs = e.imgs || [];
+    const on = selected.has(e.id);
     const imgHtml = imgs.length
       ? `<div class="imgs n${imgs.length}" onpointerdown="event.stopPropagation()" onpointerup="event.stopPropagation()">
-           ${imgs.map(id => `<img data-img="${id}" alt="" onclick="event.stopPropagation(); openLightbox('${id}')">`).join('')}
+           ${imgs.map(id => `<img data-img="${id}" alt="" onclick="event.stopPropagation(); openLightbox('${e.id}','${id}')">`).join('')}
          </div>`
       : '';
     html += `
-      <div class="brow ${e.date === today ? 'me' : ''}" data-id="${e.id}">
-        <div class="bubble"
-             onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
-          ${imgHtml}
-          ${e.text ? `<div class="btext">${esc(e.text)}</div>` : ''}
-        </div>
-        <div class="bmeta">
-          <span class="tagchip" onclick="openTagPicker('${e.id}')">${esc(t.emoji)} ${esc(t.name)}</span>
-          <span>·</span>
-          <span class="btime">${esc(e.time)}</span>
+      <div class="srow ${on ? 'checked' : ''}" data-id="${e.id}" onclick="rowClick(event, '${e.id}')">
+        <button class="selcirc ${on ? 'checked' : ''}" tabindex="-1" aria-label="选择">
+          <svg class="off" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9.5"></circle></svg>
+          <svg class="on" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle><polyline points="7.6 12.3 10.7 15.3 16.4 9.2" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
+        </button>
+        <div class="brow ${e.date === today ? 'me' : ''}">
+          <div class="bubble"
+               onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
+            ${imgHtml}
+            ${e.text ? `<div class="btext">${esc(e.text)}</div>` : ''}
+          </div>
+          <div class="bmeta">
+            <span class="tagchip" onclick="event.stopPropagation(); openTagPicker('${e.id}')">${esc(t.emoji)} ${esc(t.name)}</span>
+            <span>·</span>
+            <span class="btime">${esc(e.time)}</span>
+          </div>
         </div>
       </div>`;
   });
@@ -722,16 +831,71 @@ function hydrateImages() {
   });
 }
 
-function openLightbox(id) {
-  imgURL(id).then(url => {
+let lightboxCtx = null;   // { entryId, imgId }：删除这张时要知道它挂在哪条记录上
+function openLightbox(entryId, imgId) {
+  if (selectMode) return;
+  imgURL(imgId).then(url => {
     if (!url) return;
+    lightboxCtx = { entryId, imgId };
     document.getElementById('lightbox-img').src = url;
     document.getElementById('lightbox').classList.add('open');
   });
 }
-function closeLightbox() {
+function closeLightbox(e) {
+  if (e && e.target.closest('.lightbox-bar')) return;
   document.getElementById('lightbox').classList.remove('open');
   document.getElementById('lightbox-img').src = '';
+  lightboxCtx = null;
+}
+
+function deleteCurrentImage() {
+  if (!lightboxCtx) return;
+  const { entryId, imgId } = lightboxCtx;
+  closeLightbox();
+  removeImageFromEntry(entryId, imgId);
+}
+
+// 返回 true 表示这条记录被整条收掉了（图删光且没有文字）
+function removeImageFromEntry(entryId, imgId) {
+  const e = entryById(entryId);
+  if (!e) return false;
+  e.imgs = (e.imgs || []).filter(x => x !== imgId);
+  imgCache.delete(imgId);
+  delImage(imgId).catch(() => {});
+  const emptied = !e.text && !e.imgs.length;
+  if (emptied) purgeEntries([entryId]); else saveEntries();
+  renderAll();
+  showToast(emptied ? '图片和这条记录都删了' : '已删除这张图');
+  return emptied;
+}
+
+// 一条记录里多张图时，逐张删太慢，给个管理面板
+function openImageManager(id) {
+  const e = entryById(id);
+  if (!e || !(e.imgs || []).length) return;
+  openAction(`
+    <div class="action-group">
+      <div class="action-title">点 ✕ 删掉不要的图</div>
+      <div class="imgman" id="imgman">${e.imgs.map(imgId => `
+        <div class="attach-thumb">
+          <img data-mimg="${imgId}" alt="">
+          <button class="attach-x" onclick="deleteEntryImage('${id}','${imgId}')" aria-label="删除这张">✕</button>
+        </div>`).join('')}</div>
+    </div>
+    <div class="action-group">
+      <button class="action-btn strong" onclick="forceCloseAction()">完成</button>
+    </div>`);
+  document.querySelectorAll('#imgman img[data-mimg]').forEach(async el => {
+    const url = await imgURL(el.dataset.mimg);
+    if (url) el.src = url;
+  });
+}
+
+function deleteEntryImage(entryId, imgId) {
+  const emptied = removeImageFromEntry(entryId, imgId);
+  const e = entryById(entryId);
+  if (emptied || !e || !(e.imgs || []).length) forceCloseAction();
+  else openImageManager(entryId);       // 还有剩的就原地刷新面板
 }
 
 function scrollToBottom(smooth) {
@@ -739,7 +903,13 @@ function scrollToBottom(smooth) {
   w.scrollTo({ top: w.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
 }
 
-function renderAll() { renderHeader(); renderFilters(); renderStream(); }
+function renderAll() {
+  renderHeader(); renderFilters(); renderStream();
+  if (selectMode) {
+    selected.forEach(id => { if (!entryById(id)) selected.delete(id); });   // 删掉的别留在选区里
+    if (!entries.length) exitSelect(); else renderSelBar();
+  }
+}
 
 /* ═══════════════════ Compose ═══════════════════ */
 
@@ -894,9 +1064,11 @@ function forceCloseAction() { document.getElementById('action-overlay').classLis
 /* 长按气泡 → 操作；轻点气泡 → 也开操作（气泡本身没有别的动作） */
 let longPressTimer = null;
 function bubbleDown(id) {
+  if (selectMode) return;
   longPressTimer = setTimeout(() => { longPressTimer = 'fired'; openEntryAction(id); }, 500);
 }
 function bubbleUp(id) {
+  if (selectMode) return;
   if (longPressTimer === 'fired') { longPressTimer = null; return; }
   clearTimeout(longPressTimer);
   longPressTimer = null;
@@ -907,12 +1079,17 @@ function bubbleCancel() { clearTimeout(longPressTimer); longPressTimer = null; }
 function openEntryAction(id) {
   const e = entryById(id);
   if (!e) return;
-  const preview = e.text.length > 28 ? e.text.slice(0, 28) + '…' : e.text;
+  const nImg = (e.imgs || []).length;
+  const preview = e.text
+    ? (e.text.length > 28 ? e.text.slice(0, 28) + '…' : e.text)
+    : `${nImg} 张图片`;
   openAction(`
     <div class="action-group">
       <div class="action-title">${esc(e.date)} ${esc(e.time)}<br>${esc(preview)}</div>
       <button class="action-btn" onclick="forceCloseAction(); openEditText('${id}')">编辑文本</button>
       <button class="action-btn" onclick="forceCloseAction(); openTagPicker('${id}')">改标签</button>
+      ${nImg ? `<button class="action-btn" onclick="forceCloseAction(); openImageManager('${id}')">管理图片（${nImg} 张）</button>` : ''}
+      <button class="action-btn" onclick="forceCloseAction(); enterSelect('${id}')">选择多条…</button>
       <button class="action-btn danger" onclick="deleteEntry('${id}')">删除这条</button>
     </div>
     <div class="action-group">
@@ -920,14 +1097,105 @@ function openEntryAction(id) {
     </div>`);
 }
 
-function deleteEntry(id) {
-  const e = entryById(id);
-  (e && e.imgs || []).forEach(imgId => { imgCache.delete(imgId); delImage(imgId).catch(() => {}); });
-  entries = entries.filter(x => x.id !== id);
+// 删记录的唯一出口：顺手把它挂的图从 IDB 清掉，别留孤儿
+function purgeEntries(ids) {
+  const set = new Set(ids);
+  entries.forEach(e => {
+    if (!set.has(e.id)) return;
+    (e.imgs || []).forEach(imgId => { imgCache.delete(imgId); delImage(imgId).catch(() => {}); });
+  });
+  entries = entries.filter(e => !set.has(e.id));
   saveEntries();
+}
+
+function deleteEntry(id) {
+  purgeEntries([id]);
   forceCloseAction();
   renderAll();
   showToast('已删除');
+}
+
+/* ═══════════════════ 多选删除（仿「信息」的批量删除） ═══════════════════ */
+
+let selectMode = false;
+const selected = new Set();
+
+function enterSelect(preselectId) {
+  if (!entries.length) { showToast('还没有记录'); return; }
+  selectMode = true;
+  selected.clear();
+  if (preselectId) selected.add(preselectId);
+  document.body.classList.add('select');
+  document.getElementById('input').blur();
+  renderStream();
+  renderSelBar();
+}
+
+function exitSelect() {
+  selectMode = false;
+  selected.clear();
+  document.body.classList.remove('select');
+  renderStream();
+  renderSelBar();
+}
+
+function rowClick(ev, id) {
+  if (!selectMode) return;              // 平时点气泡走 bubbleUp，这里不插手
+  ev.stopPropagation();
+  toggleSelect(id);
+}
+
+function toggleSelect(id) {
+  if (selected.has(id)) selected.delete(id); else selected.add(id);
+  const row = document.querySelector(`.srow[data-id="${id}"]`);
+  if (row) {
+    row.classList.toggle('checked', selected.has(id));
+    row.querySelector('.selcirc').classList.toggle('checked', selected.has(id));
+  }
+  renderSelBar();
+}
+
+function toggleSelectAll() {
+  const ids = visibleEntries().map(e => e.id);      // 只针对当前筛选下看得见的
+  const allOn = ids.length && ids.every(id => selected.has(id));
+  selected.clear();
+  if (!allOn) ids.forEach(id => selected.add(id));
+  renderStream();
+  renderSelBar();
+}
+
+function renderSelBar() {
+  const n = selected.size;
+  const ids = visibleEntries().map(e => e.id);
+  document.getElementById('sel-count').textContent = n ? `已选 ${n} 条` : '未选择记录';
+  document.getElementById('sel-all').textContent =
+    ids.length && ids.every(id => selected.has(id)) ? '取消全选' : '全选';
+  document.getElementById('del-btn').disabled = !n;
+  document.getElementById('del-btn-text').textContent = n ? `删除 ${n} 条` : '删除';
+  document.getElementById('sel-hint').textContent = n ? '' : '点一下选中，可跨天多选';
+}
+
+function confirmDeleteSelected() {
+  const n = selected.size;
+  if (!n) return;
+  const withImgs = [...selected].reduce((s, id) => s + ((entryById(id) || {}).imgs || []).length, 0);
+  openAction(`
+    <div class="action-group">
+      <div class="action-title">删除后无法恢复${withImgs ? `，其中 ${withImgs} 张配图也会一起删掉` : ''}</div>
+      <button class="action-btn danger" onclick="deleteSelected()">删除 ${n} 条记录</button>
+    </div>
+    <div class="action-group">
+      <button class="action-btn strong" onclick="forceCloseAction()">取消</button>
+    </div>`);
+}
+
+function deleteSelected() {
+  const n = selected.size;
+  purgeEntries([...selected]);
+  forceCloseAction();
+  exitSelect();
+  renderAll();
+  showToast(`已删除 ${n} 条`);
 }
 
 function openTagPicker(id) {
@@ -1222,8 +1490,8 @@ function buildMarkdown(month) {
     .sort((a, b) => a.ts - b.ts);
 
   const title = month
-    ? `# 日录导出 · ${Number(month.slice(0, 4))}年${Number(month.slice(5, 7))}月`
-    : `# 日录导出 · 全部记录`;
+    ? `# Aside 导出 · ${Number(month.slice(0, 4))}年${Number(month.slice(5, 7))}月`
+    : `# Aside 导出 · 全部记录`;
 
   const counts = {};
   list.forEach(e => { counts[e.tagId] = (counts[e.tagId] || 0) + 1; });
@@ -1248,7 +1516,7 @@ function buildMarkdown(month) {
   return blocks.join('\n\n') + '\n';
 }
 
-function mdFilename(month) { return month ? `daylog-${month}.md` : 'daylog-all.md'; }
+function mdFilename(month) { return month ? `aside-${month}.md` : 'aside-all.md'; }
 
 function exportMarkdown(month) {
   const list = entries.filter(e => !month || e.date.startsWith(month));
@@ -1259,7 +1527,7 @@ function exportMarkdown(month) {
 }
 
 async function exportJSON() {
-  const filename = `daylog-backup-${todayKey()}.json`;
+  const filename = `aside-backup-${todayKey()}.json`;
   showToast('正在打包…');
   const images = await allImages().catch(() => []);   // 图片只有 JSON 备份能带走
   shareOrDownload(JSON.stringify({ version: 2, entries, tags, images }, null, 2), filename, 'application/json');
