@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="日录">
+  <meta name="theme-color" content="#efeeea">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-512.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>日录 — 对话式记录</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    /* 配色参照 mynd：暖灰底 + 纯白气泡 + 墨绿高亮，无描边、大圆角 */
+    :root {
+      --accent:  #3d4f45;   /* 墨绿：今天的气泡、选中态、强调文字 */
+      --accent2: #55685c;
+      --accent-fg: #ffffff;
+      --red:     #b4483c;
+      --label:   #1a1a18;
+      --label2:  #6b6b64;
+      --label3:  #a3a29b;
+      --fill:    #e7e6e1;
+      --fill2:   #dedcd6;
+      --bg:      #efeeea;   /* 暖灰页面底 */
+      --bg2:     #ffffff;   /* 气泡 / 卡片 */
+      --sep:     #e2e0da;
+      --radius:  18px;
+      --bubble-r: 20px;
+      --app-h:   100dvh;
+      --vv-top:  0px;
+      --kb:      0px;
+    }
+
+    html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--label);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 整个 App 装在一个固定高度的 flex 列里：header / chips / 滚动流 / 输入条
+       高度取 visualViewport，键盘弹起时输入条自动跟着抬起（见底部 syncViewport） */
+    .app {
+      position: fixed; left: 0; right: 0;
+      top: var(--vv-top); height: var(--app-h);
+      display: flex; flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      flex: none;
+      background: rgba(239,238,234,0.92);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      padding: 14px 20px 12px;
+      padding-top: calc(env(safe-area-inset-top) + 14px);
+    }
+    .head-row { max-width: 430px; margin: 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    header h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.6px; color: var(--label); }
+    header p  { font-size: 12px; color: var(--label3); margin-top: 3px; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+    .icon-btn {
+      flex: none; border: none; cursor: pointer; line-height: 0;
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--bg2); color: var(--label);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:active { opacity: 0.6; }
+
+    /* ── Filter chips ── */
+    .filters {
+      flex: none; background: rgba(239,238,234,0.92);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .filters::-webkit-scrollbar { display: none; }
+    .filters-inner { display: flex; gap: 8px; padding: 4px 16px 12px; width: max-content; min-width: 100%; }
+    .fchip {
+      flex: none; border: none; background: var(--bg2);
+      color: var(--label2); border-radius: 999px; padding: 7px 14px;
+      font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+      white-space: nowrap;
+    }
+    .fchip.active { background: var(--accent); color: var(--accent-fg); }
+    .fchip:active { opacity: 0.75; }
+
+    /* ── Stream ── */
+    .stream-wrap { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .stream {
+      max-width: 430px; margin: 0 auto;
+      padding: 12px 16px 24px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .daysep {
+      align-self: center; margin: 10px 0 2px;
+      color: var(--label3);
+      font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+    }
+    .daysep:first-child { margin-top: 0; }
+
+    /* 一条记录 = 气泡 + 气泡外下方的「标签 · 时间」 */
+    .brow { display: flex; flex-direction: column; align-items: flex-start; max-width: 100%; }
+    .brow.me { align-items: flex-end; }
+    .bubble {
+      max-width: 84%; padding: 12px 15px;
+      background: var(--bg2); color: var(--label);
+      border-radius: var(--bubble-r);
+      cursor: pointer;
+    }
+    .brow.me .bubble { background: var(--accent); color: var(--accent-fg); }
+    .bubble:active { opacity: 0.8; }
+    .btext { font-size: 15.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+    .bmeta {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 6px 0; font-size: 12px; color: var(--label3);
+      font-variant-numeric: tabular-nums;
+    }
+    .tagchip { color: var(--label2); font-weight: 600; white-space: nowrap; }
+    .tagchip:active { opacity: 0.5; }
+    .empty { text-align: center; color: var(--label3); font-size: 14px; line-height: 1.7; padding: 60px 20px; }
+
+    /* ── Composer ── */
+    .composer {
+      flex: none;
+      background: rgba(239,238,234,0.92);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      padding: 8px 16px 12px;
+      padding-bottom: calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 12px);
+    }
+    .composer-inner { max-width: 430px; margin: 0 auto; display: flex; align-items: flex-end; gap: 10px; }
+    #input {
+      flex: 1; resize: none; border: none; background: var(--bg2);
+      border-radius: 22px; padding: 12px 16px; font-size: 15.5px; line-height: 1.45;
+      font-family: inherit; color: var(--label); outline: none;
+      max-height: 120px;
+    }
+    #input::placeholder { color: var(--label3); }
+    .send-btn {
+      flex: none; width: 44px; height: 44px; border-radius: 50%; border: none;
+      background: var(--accent); color: var(--accent-fg); cursor: pointer; line-height: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s, transform 0.15s;
+    }
+    .send-btn:disabled { background: var(--bg2); color: var(--label3); }
+    .send-btn:active:not(:disabled) { transform: scale(0.92); }
+    .card-sub { font-size: 12px; color: var(--label3); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; top: calc(env(safe-area-inset-top) + 60px);
+      left: 50%; transform: translateX(-50%) translateY(-20px);
+      background: var(--label); color: #fff; padding: 9px 14px 9px 18px;
+      border-radius: 20px; font-size: 14px; font-weight: 600;
+      opacity: 0; transition: all 0.25s cubic-bezier(0.32,0.72,0,1); z-index: 400;
+      pointer-events: none; white-space: nowrap;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+    .toast-action {
+      border: none; background: rgba(255,255,255,0.18); color: #fff;
+      font-family: inherit; font-size: 13px; font-weight: 700;
+      padding: 5px 11px; border-radius: 999px; cursor: pointer;
+    }
+    .toast-action:active { opacity: 0.6; }
+
+    /* ── Bottom sheet ── */
+    .overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.3);
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .overlay.open { opacity: 1; pointer-events: auto; }
+    .sheet {
+      position: fixed; left: 0; right: 0; bottom: var(--kb); z-index: 201;
+      background: var(--bg2);
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 18px 20px calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 20px);
+      transform: translateY(110%); transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+      max-height: 84%; overflow-y: auto;
+    }
+    .sheet.open { transform: translateY(0); }
+    .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .sheet-title { font-size: 17px; font-weight: 700; }
+    .sheet-done {
+      border: none; background: none; color: var(--accent);
+      font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; padding: 2px 0;
+    }
+    .sheet-done:active { opacity: 0.5; }
+
+    /* ── Action sheet ── */
+    .action-overlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(0,0,0,0.25);
+      display: flex; align-items: flex-end;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .action-overlay.open { opacity: 1; pointer-events: auto; }
+    .action-sheet {
+      width: 100%; padding: 0 12px calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 12px);
+      transform: translateY(110%); transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+      max-height: 90%; overflow-y: auto;
+    }
+    .action-overlay.open .action-sheet { transform: translateY(0); }
+    .action-group {
+      background: var(--bg2); border-radius: var(--radius);
+      overflow: hidden; margin-bottom: 10px;
+    }
+    .action-title {
+      padding: 12px 16px 10px; font-size: 13px; color: var(--label2);
+      text-align: center; border-bottom: 1px solid var(--sep); line-height: 1.5;
+    }
+    .action-btn {
+      width: 100%; padding: 15px; border: none; background: var(--bg2);
+      font-size: 16px; font-family: inherit; color: var(--label); cursor: pointer;
+      border-bottom: 1px solid var(--sep); display: flex; align-items: center; gap: 10px;
+      justify-content: center;
+    }
+    .action-btn:last-child { border-bottom: none; }
+    .action-btn:active { background: var(--fill); }
+    .action-btn.danger { color: var(--red); }
+    .action-btn.strong { font-weight: 700; }
+    .action-check { color: var(--accent); font-weight: 800; }
+
+    /* ── Cards (settings) ── */
+    .card-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--label3); margin: 18px 2px 8px;
+    }
+    .card-label:first-of-type { margin-top: 0; }
+    .card {
+      background: var(--bg2); border-radius: var(--radius); overflow: hidden;
+    }
+    .row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 13px 14px; border-bottom: 1px solid var(--sep);
+    }
+    .row:last-child { border-bottom: none; }
+    .row-btn { width: 100%; border: none; background: var(--bg2); font-family: inherit;
+      font-size: 15px; color: var(--accent); cursor: pointer; text-align: left; font-weight: 600; }
+    .row-btn:active { background: var(--fill); }
+    .row-btn.danger { color: var(--red); }
+    .row-emoji { font-size: 20px; width: 26px; text-align: center; flex: none; }
+    .row-info { flex: 1; min-width: 0; }
+    .row-name { font-size: 15px; font-weight: 600; }
+    .row-sub { font-size: 12px; color: var(--label3); margin-top: 2px; }
+    .row-mini {
+      flex: none; border: none; background: var(--fill);
+      width: 30px; height: 30px; border-radius: 8px; color: var(--label2);
+      font-size: 15px; font-family: inherit; cursor: pointer; line-height: 1;
+    }
+    .row-mini:disabled { color: var(--label3); opacity: 0.4; }
+    .row-mini:active:not(:disabled) { background: var(--fill); }
+
+    /* month nav */
+    .month-nav { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; }
+    .month-label { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .nav-btn {
+      width: 30px; height: 30px; border-radius: 50%; border: none;
+      background: var(--fill); color: var(--label2); font-size: 14px; cursor: pointer;
+      font-family: inherit; line-height: 1;
+    }
+    .nav-btn:disabled { color: var(--label3); opacity: 0.4; }
+    .nav-btn:active:not(:disabled) { background: var(--fill); }
+
+    /* forms */
+    .form-group { margin-bottom: 14px; }
+    .form-label { font-size: 12px; font-weight: 600; color: var(--label2); margin-bottom: 6px; display: block; }
+    .form-input, .form-area {
+      width: 100%; padding: 10px 12px; border: 1.5px solid var(--sep);
+      border-radius: 10px; font-size: 15px; font-family: inherit; color: var(--label);
+      outline: none; transition: border-color 0.15s; background: var(--bg2);
+    }
+    .form-area { resize: vertical; min-height: 88px; line-height: 1.5; }
+    .form-input:focus, .form-area:focus { border-color: var(--accent); }
+    .form-row { display: flex; gap: 10px; }
+    .form-hint { font-size: 11px; color: var(--label3); margin-top: 5px; line-height: 1.5; }
+    .btn-primary {
+      width: 100%; padding: 13px; border: none; border-radius: 12px;
+      background: var(--accent); color: #fff; font-size: 15px; font-weight: 700;
+      font-family: inherit; cursor: pointer; margin-top: 4px;
+    }
+    .btn-primary:active { opacity: 0.8; }
+    .filename {
+      margin-top: 10px; padding: 8px 12px; border-radius: 10px;
+      background: var(--fill); color: var(--label2);
+      font-size: 12.5px; text-align: center; word-break: break-all;
+      font-variant-numeric: tabular-nums;
+    }
+    /* 「高级」折叠区：JSON 备份/恢复/清空都藏在这后面 */
+    .adv { margin-top: 18px; }
+    .adv > summary {
+      list-style: none; cursor: pointer;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--label3); padding: 4px 2px 8px;
+    }
+    .adv > summary::-webkit-details-marker { display: none; }
+    .adv > summary::before { content: '▸ '; }
+    .adv[open] > summary::before { content: '▾ '; }
+    .adv > summary:active { opacity: 0.5; }
+    .kw-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .kw-chip {
+      border: 1px solid var(--sep); background: var(--bg2); color: var(--label2);
+      border-radius: 999px; padding: 7px 13px; font-size: 14px;
+      font-family: inherit; cursor: pointer;
+    }
+    .kw-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="head-row">
+      <div>
+        <h1>日录</h1>
+        <p id="subtitle">—</p>
+      </div>
+      <button class="icon-btn" onclick="openSettings()" aria-label="设置">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="filters"><div class="filters-inner" id="filters"></div></div>
+
+  <div class="stream-wrap" id="stream-wrap">
+    <div class="stream" id="stream"></div>
+  </div>
+
+  <div class="composer">
+    <div class="composer-inner">
+      <textarea id="input" rows="1" placeholder="记点什么…" oninput="onInput()"></textarea>
+      <button class="send-btn" id="send-btn" onclick="addEntry()" disabled aria-label="记录">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="19" x2="12" y2="5"></line>
+          <polyline points="5 12 12 5 19 12"></polyline>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-text"></span></div>
+
+<!-- 记录操作 / 选标签：action sheet -->
+<div class="action-overlay" id="action-overlay" onclick="closeAction(event)">
+  <div class="action-sheet" id="action-sheet"></div>
+</div>
+
+<!-- 设置 -->
+<div class="overlay" id="settings-overlay" onclick="closeSettings()"></div>
+<div class="sheet" id="settings-sheet">
+  <div class="sheet-head">
+    <div class="sheet-title">设置</div>
+    <button class="sheet-done" onclick="closeSettings()">完成</button>
+  </div>
+  <div id="settings-body"></div>
+</div>
+
+<!-- 编辑文本 / 标签编辑 / 学关键词：通用表单 sheet -->
+<div class="overlay" id="form-overlay" onclick="closeForm()"></div>
+<div class="sheet" id="form-sheet">
+  <div class="sheet-head">
+    <div class="sheet-title" id="form-title">编辑</div>
+    <button class="sheet-done" onclick="closeForm()">取消</button>
+  </div>
+  <div id="form-body"></div>
+</div>
+
+<input type="file" id="import-file" accept="application/json,.json" class="hidden" onchange="importJSON(event)">
+
+<script>
+/* ═══════════════════ Constants & Utils ═══════════════════ */
+
+const ENTRIES_KEY = 'daylog-entries';
+const TAGS_KEY    = 'daylog-tags';
+
+const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function dateKey(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function todayKey() { return dateKey(new Date()); }
+function nowTime(d) { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function loadJSON(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch { return fallback; }
+}
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function cnDate(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  return `${m}月${d}日 周${DAY_LABELS[new Date(y, m - 1, d).getDay()]}`;
+}
+function cnFullDate(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  return `${y}年${m}月${d}日`;
+}
+
+/* ═══════════════════ Seed tags ═══════════════════ */
+
+const SEED_TAGS = [
+  {
+    id: 'diet', name: '饮食', emoji: '🍚',
+    pattern: '',
+    keywords: ['吃', '喝', '早饭', '早餐', '午饭', '午餐', '晚饭', '晚餐', '夜宵', '加餐', '零食', '外卖', '食堂', '下馆子',
+      '米饭', '面条', '面包', '馒头', '粥', '饺子', '沙拉', '西兰花', '青菜', '蔬菜', '水果', '苹果', '香蕉',
+      '鸡蛋', '鸡胸', '牛肉', '猪肉', '鱼', '虾', '豆腐', '牛奶', '酸奶', '咖啡', '奶茶', '可乐', '啤酒', '喝水',
+      '蛋白粉', '维生素', '卡路里', '热量', '糖', '油腻', '重口', '清淡', '撑', '吃饱', '很饱', '饿', '嘴馋',
+      '消化', '胃', '肚子', '反酸', '胀气', '拉肚子']
+  },
+  {
+    id: 'sport', name: '运动', emoji: '🏃',
+    pattern: '',
+    keywords: ['跑步', '跑了', '慢跑', '快走', '走路', '步数', '健身', '举铁', '力量训练', '有氧', '无氧',
+      '深蹲', '硬拉', '卧推', '引体', '俯卧撑', '平板支撑', '划船机', '椭圆机', '跑步机', '哑铃', '杠铃',
+      '瑜伽', '普拉提', '拉伸', '游泳', '骑车', '骑行', '爬山', '徒步', '打球', '篮球', '羽毛球', '网球',
+      '公里', '配速', '心率', '组数', '训练', '锻炼', '出汗', '酸痛', '肌肉', '腿酸', '腰酸', '累瘫', '热身']
+  },
+  {
+    id: 'todo', name: '待办', emoji: '✅',
+    pattern: '',
+    keywords: ['要买', '记得', '别忘', '待办', 'todo', '预约', '挂号', '下单', '续费', '缴费', '还书', '提醒',
+      '明天要', '得去', '需要去', '安排一下', '回头', '有空', '截止', 'deadline', '交表', '报名']
+  },
+  {
+    // 形态规则优先级高于所有关键词打分，所以摘抄排在后面也照样先命中引号句
+    id: 'quote', name: '摘抄', emoji: '📖',
+    pattern: '[“”「」『』《》]|^\\s*>|——\\s*\\S',
+    keywords: ['书里', '读到', '看到一句', '这句话', '作者', '原文', '引用', '金句', '摘抄', '书中', '写道', '说过']
+  },
+  { id: 'other', name: '其他', emoji: '📝', pattern: '', keywords: [], fallback: true }
+];
+
+/* ═══════════════════ State ═══════════════════ */
+
+let entries = loadJSON(ENTRIES_KEY, null);
+let tags    = loadJSON(TAGS_KEY, null);
+let activeFilter = 'all';
+
+if (!tags || !tags.length) { tags = JSON.parse(JSON.stringify(SEED_TAGS)); }
+if (!entries) { entries = []; }
+if (!tags.some(t => t.fallback)) { tags[tags.length - 1].fallback = true; }
+
+// 一次性迁移：把已存在的种子标签重排成指定顺序（只动顺序，不碰 name/emoji/keywords/pattern）
+const MIG_KEY = 'daylog-migration';
+if (Number(localStorage.getItem(MIG_KEY) || 0) < 1) {
+  const order = ['diet', 'sport', 'todo', 'quote', 'other'];
+  tags = tags
+    .map((t, i) => ({ t, i, k: order.indexOf(t.id) }))
+    .sort((a, b) => {
+      if (a.k < 0 && b.k < 0) return a.i - b.i;   // 自定义标签之间保持原相对顺序
+      if (a.k < 0) return -1;                     // 自定义标签排在种子标签之前
+      if (b.k < 0) return 1;
+      return a.k - b.k;
+    })
+    .map(x => x.t);
+  localStorage.setItem(MIG_KEY, '1');
+}
+
+function saveEntries() { localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); }
+function saveTags()    { localStorage.setItem(TAGS_KEY, JSON.stringify(tags)); }
+
+function tagById(id) { return tags.find(t => t.id === id) || fallbackTag(); }
+function fallbackTag() { return tags.find(t => t.fallback) || tags[tags.length - 1]; }
+function entryById(id) { return entries.find(e => e.id === id); }
+
+/* ═══════════════════ Auto tagging ═══════════════════ */
+
+function suggestTag(text) {
+  // 第一优先：形态规则（摘抄用引号/引用符/出处标记触发）
+  for (const tag of tags) {
+    if (!tag.pattern) continue;
+    try { if (new RegExp(tag.pattern, 'm').test(text)) return tag; }
+    catch { /* 规则写错就跳过，不影响记录 */ }
+  }
+  // 第二优先：关键词打分，长词权重更高（「深蹲」> 「动」）
+  const t = text.toLowerCase();
+  let best = null, bestScore = 0;
+  for (const tag of tags) {
+    let score = 0;
+    for (const kw of tag.keywords) {
+      if (kw && t.includes(String(kw).toLowerCase())) score += kw.length;
+    }
+    if (score > bestScore) { bestScore = score; best = tag; }
+  }
+  return best || fallbackTag();
+}
+
+// 从文本里抽 2~3 字的中文候选词：没有分词库，就用 n-gram + 虚词过滤，宁可少给也不刷屏
+const STOP_CHARS = new Set('的是了在有我你他她它这那都很就也还又和与把被给对从到过来去做让说着得地以及或但而没能会要不太么呢吧啊今天'.split(''));
+function candidateWords(text) {
+  const known = new Set();
+  tags.forEach(t => t.keywords.forEach(k => known.add(String(k).toLowerCase())));
+  const runs = text.match(/[一-龥]{2,}/g) || [];
+  const out = [];
+  const seen = new Set();
+  for (const len of [3, 2]) {
+    for (const run of runs) {
+      for (let i = 0; i + len <= run.length; i++) {
+        const w = run.slice(i, i + len);
+        if (seen.has(w) || known.has(w)) continue;
+        if ([...w].some(c => STOP_CHARS.has(c))) continue;
+        seen.add(w);
+        out.push(w);
+      }
+    }
+  }
+  return out.slice(0, 20);
+}
+
+/* ═══════════════════ Render ═══════════════════ */
+
+function visibleEntries() {
+  const list = activeFilter === 'all' ? entries : entries.filter(e => e.tagId === activeFilter);
+  return list.slice().sort((a, b) => a.ts - b.ts);
+}
+
+function renderHeader() {
+  const n = entries.length;
+  const suffix = activeFilter === 'all' ? `共 ${n} 条` : `${tagById(activeFilter).name} ${visibleEntries().length} 条 / 共 ${n} 条`;
+  document.getElementById('subtitle').textContent = `${cnFullDate(todayKey())} · ${suffix}`;
+}
+
+function renderFilters() {
+  const counts = {};
+  entries.forEach(e => { counts[e.tagId] = (counts[e.tagId] || 0) + 1; });
+  let html = `<button class="fchip ${activeFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">全部 ${entries.length}</button>`;
+  tags.forEach(t => {
+    html += `<button class="fchip ${activeFilter === t.id ? 'active' : ''}" onclick="setFilter('${t.id}')">${esc(t.emoji)} ${esc(t.name)} ${counts[t.id] || 0}</button>`;
+  });
+  document.getElementById('filters').innerHTML = html;
+}
+
+function setFilter(id) {
+  activeFilter = id;
+  renderFilters();
+  renderHeader();
+  renderStream();
+  scrollToBottom(false);
+}
+
+function renderStream() {
+  const list = visibleEntries();
+  const el = document.getElementById('stream');
+  if (!list.length) {
+    el.innerHTML = entries.length
+      ? `<div class="empty">这个标签下还没有记录</div>`
+      : `<div class="empty">记点什么吧<br>吃了什么、动了多久、身体什么感觉</div>`;
+    return;
+  }
+  const today = todayKey();
+  let html = '';
+  let lastDate = null;
+  list.forEach(e => {
+    if (e.date !== lastDate) {
+      lastDate = e.date;
+      html += `<div class="daysep">${e.date === today ? '今天' : esc(cnDate(e.date))}</div>`;
+    }
+    const t = tagById(e.tagId);
+    html += `
+      <div class="brow ${e.date === today ? 'me' : ''}" data-id="${e.id}">
+        <div class="bubble"
+             onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
+          <div class="btext">${esc(e.text)}</div>
+        </div>
+        <div class="bmeta">
+          <span class="tagchip" onclick="openTagPicker('${e.id}')">${esc(t.emoji)} ${esc(t.name)}</span>
+          <span>·</span>
+          <span class="btime">${esc(e.time)}</span>
+        </div>
+      </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function scrollToBottom(smooth) {
+  const w = document.getElementById('stream-wrap');
+  w.scrollTo({ top: w.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+}
+
+function renderAll() { renderHeader(); renderFilters(); renderStream(); }
+
+/* ═══════════════════ Compose ═══════════════════ */
+
+function onInput() {
+  const ta = document.getElementById('input');
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  document.getElementById('send-btn').disabled = !ta.value.trim();
+}
+
+function addEntry() {
+  const ta = document.getElementById('input');
+  const text = ta.value.trim();
+  if (!text) return;
+  const d = new Date();
+  const tag = suggestTag(text);
+  entries.push({ id: genId(), ts: d.getTime(), date: dateKey(d), time: nowTime(d), text, tagId: tag.id, auto: true });
+  saveEntries();
+  ta.value = '';
+  onInput();
+  if (activeFilter !== 'all' && activeFilter !== tag.id) activeFilter = 'all';
+  renderAll();
+  scrollToBottom(true);
+}
+
+document.getElementById('input').addEventListener('keydown', e => {
+  // 桌面端回车即记录（Shift+Enter 换行）；手机端一律用发送按钮
+  if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(pointer: fine)').matches) {
+    e.preventDefault();
+    addEntry();
+  }
+});
+
+/* ═══════════════════ Toast ═══════════════════ */
+
+let toastTimer = null;
+function showToast(msg, actionLabel, onAction) {
+  const el = document.getElementById('toast');
+  el.innerHTML = `<span>${esc(msg)}</span>`;
+  if (actionLabel) {
+    const btn = document.createElement('button');
+    btn.className = 'toast-action';
+    btn.textContent = actionLabel;
+    btn.onclick = () => { hideToast(); onAction(); };
+    el.appendChild(btn);
+  }
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, actionLabel ? 4000 : 1600);
+}
+function hideToast() { document.getElementById('toast').classList.remove('show'); }
+
+/* ═══════════════════ Action sheet ═══════════════════ */
+
+function openAction(html) {
+  document.getElementById('action-sheet').innerHTML = html;
+  document.getElementById('action-overlay').classList.add('open');
+}
+function closeAction(e) {
+  if (e && e.target.closest('.action-group')) return;
+  document.getElementById('action-overlay').classList.remove('open');
+}
+function forceCloseAction() { document.getElementById('action-overlay').classList.remove('open'); }
+
+/* 长按气泡 → 操作；轻点气泡 → 也开操作（气泡本身没有别的动作） */
+let longPressTimer = null;
+function bubbleDown(id) {
+  longPressTimer = setTimeout(() => { longPressTimer = 'fired'; openEntryAction(id); }, 500);
+}
+function bubbleUp(id) {
+  if (longPressTimer === 'fired') { longPressTimer = null; return; }
+  clearTimeout(longPressTimer);
+  longPressTimer = null;
+  openEntryAction(id);
+}
+function bubbleCancel() { clearTimeout(longPressTimer); longPressTimer = null; }
+
+function openEntryAction(id) {
+  const e = entryById(id);
+  if (!e) return;
+  const preview = e.text.length > 28 ? e.text.slice(0, 28) + '…' : e.text;
+  openAction(`
+    <div class="action-group">
+      <div class="action-title">${esc(e.date)} ${esc(e.time)}<br>${esc(preview)}</div>
+      <button class="action-btn" onclick="forceCloseAction(); openEditText('${id}')">编辑文本</button>
+      <button class="action-btn" onclick="forceCloseAction(); openTagPicker('${id}')">改标签</button>
+      <button class="action-btn danger" onclick="deleteEntry('${id}')">删除这条</button>
+    </div>
+    <div class="action-group">
+      <button class="action-btn strong" onclick="forceCloseAction()">取消</button>
+    </div>`);
+}
+
+function deleteEntry(id) {
+  entries = entries.filter(e => e.id !== id);
+  saveEntries();
+  forceCloseAction();
+  renderAll();
+  showToast('已删除');
+}
+
+function openTagPicker(id) {
+  const e = entryById(id);
+  if (!e) return;
+  let html = `<div class="action-group"><div class="action-title">选择标签</div>`;
+  tags.forEach(t => {
+    const on = t.id === e.tagId;
+    html += `<button class="action-btn" onclick="setEntryTag('${id}','${t.id}')">
+      ${esc(t.emoji)} ${esc(t.name)} ${on ? '<span class="action-check">✓</span>' : ''}
+    </button>`;
+  });
+  html += `</div><div class="action-group"><button class="action-btn strong" onclick="forceCloseAction()">取消</button></div>`;
+  openAction(html);
+}
+
+function setEntryTag(id, tagId) {
+  const e = entryById(id);
+  if (!e) return;
+  const changed = e.tagId !== tagId;
+  e.tagId = tagId;
+  if (changed) e.auto = false;
+  saveEntries();
+  forceCloseAction();
+  renderAll();
+  const t = tagById(tagId);
+  if (changed) showToast(`已改为 ${t.name}`, '加关键词', () => openLearnKeywords(id, tagId));
+  else showToast(`已是 ${t.name}`);
+}
+
+/* ═══════════════════ Form sheet（编辑文本 / 标签编辑 / 学关键词） ═══════════════════ */
+
+function openForm(title, bodyHtml, cancelLabel) {
+  document.getElementById('form-title').textContent = title;
+  document.getElementById('form-body').innerHTML = bodyHtml;
+  document.querySelector('#form-sheet .sheet-done').textContent = cancelLabel || '取消';
+  document.getElementById('form-overlay').classList.add('open');
+  document.getElementById('form-sheet').classList.add('open');
+}
+function closeForm() {
+  document.getElementById('form-overlay').classList.remove('open');
+  document.getElementById('form-sheet').classList.remove('open');
+}
+
+function openEditText(id) {
+  const e = entryById(id);
+  if (!e) return;
+  openForm('编辑文本', `
+    <div class="form-group">
+      <textarea class="form-area" id="edit-text" style="min-height:120px">${esc(e.text)}</textarea>
+      <div class="form-hint">时间点保持不变（记的是发生时间，不是修改时间）</div>
+    </div>
+    <button class="btn-primary" onclick="saveEditText('${id}')">保存</button>`);
+  setTimeout(() => document.getElementById('edit-text').focus(), 250);
+}
+
+function saveEditText(id) {
+  const e = entryById(id);
+  const v = document.getElementById('edit-text').value.trim();
+  if (!e || !v) return;
+  e.text = v;
+  saveEntries();
+  closeForm();
+  renderAll();
+  showToast('已保存');
+}
+
+function openLearnKeywords(entryId, tagId) {
+  const e = entryById(entryId);
+  const t = tagById(tagId);
+  if (!e || !t) return;
+  const cands = candidateWords(e.text);
+  const chips = cands.length
+    ? cands.map(w => `<button class="kw-chip" onclick="this.classList.toggle('on')">${esc(w)}</button>`).join('')
+    : `<div class="form-hint">这条文本里没有可用的新候选词，可以在标签管理里手动加。</div>`;
+  openForm(`给「${t.name}」加关键词`, `
+    <div class="form-group">
+      <label class="form-label">从这条记录里挑词</label>
+      <div class="kw-list" id="learn-list">${chips}</div>
+      <div class="form-hint">选中的词会加进「${esc(t.name)}」的词表，下次出现同样的词就会自动命中。</div>
+    </div>
+    <button class="btn-primary" onclick="saveLearnKeywords('${tagId}')">加入词表</button>`);
+}
+
+function saveLearnKeywords(tagId) {
+  const t = tagById(tagId);
+  const picked = [...document.querySelectorAll('#learn-list .kw-chip.on')].map(b => b.textContent.trim());
+  if (!picked.length) { closeForm(); return; }
+  picked.forEach(w => { if (!t.keywords.includes(w)) t.keywords.push(w); });
+  saveTags();
+  closeForm();
+  showToast(`已加入 ${picked.length} 个词`);
+}
+
+/* ═══════════════════ Settings ═══════════════════ */
+
+let monthIndex = 0;   // 指向 availableMonths() 的下标
+let advOpen = false;  // 「高级」折叠区是否展开（重渲染时保持）
+
+function openSettings() {
+  monthIndex = Math.max(0, availableMonths().length - 1);
+  renderSettings();
+  document.getElementById('settings-overlay').classList.add('open');
+  document.getElementById('settings-sheet').classList.add('open');
+}
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.remove('open');
+  document.getElementById('settings-sheet').classList.remove('open');
+}
+
+function availableMonths() {
+  const set = new Set(entries.map(e => e.date.slice(0, 7)));
+  return [...set].sort();
+}
+
+function renderSettings() {
+  const months = availableMonths();
+  const cur = months[monthIndex];
+  const counts = {};
+  entries.forEach(e => { counts[e.tagId] = (counts[e.tagId] || 0) + 1; });
+
+  let html = `<div class="card-label">导出</div><div class="card">`;
+  if (months.length) {
+    const [y, m] = cur.split('-');
+    const n = entries.filter(e => e.date.startsWith(cur)).length;
+    html += `
+      <div class="month-nav">
+        <button class="nav-btn" onclick="stepMonth(-1)" ${monthIndex === 0 ? 'disabled' : ''}>‹</button>
+        <div class="month-label">${Number(y)}年${Number(m)}月 · ${n} 条</div>
+        <button class="nav-btn" onclick="stepMonth(1)" ${monthIndex >= months.length - 1 ? 'disabled' : ''}>›</button>
+      </div>
+      <div style="padding: 0 14px 14px">
+        <button class="btn-primary" onclick="exportMarkdown('${cur}')">导出本月 Markdown</button>
+        <div class="filename">📄 ${esc(mdFilename(cur))}</div>
+      </div>
+      <button class="row row-btn" onclick="exportMarkdown(null)">导出全部（${entries.length} 条）</button>`;
+  } else {
+    html += `<div class="row"><div class="row-info"><div class="row-sub">还没有记录</div></div></div>`;
+  }
+  html += `</div>
+    <div class="form-hint" style="margin:8px 2px 0">.md 文件，可以直接丢进 Obsidian，或整份喂给 AI 分析。</div>`;
+
+  html += `<div class="card-label">标签</div><div class="card">`;
+  tags.forEach((t, i) => {
+    const sub = t.fallback ? '兜底标签 · 不参与识别' : `${t.keywords.length} 个关键词${t.pattern ? ' · 有形态规则' : ''} · ${counts[t.id] || 0} 条`;
+    html += `
+      <div class="row">
+        <span class="row-emoji">${esc(t.emoji)}</span>
+        <div class="row-info" onclick="openTagEdit('${t.id}')">
+          <div class="row-name">${esc(t.name)}</div>
+          <div class="row-sub">${esc(sub)}</div>
+        </div>
+        <button class="row-mini" onclick="moveTag(${i},-1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="row-mini" onclick="moveTag(${i},1)" ${i === tags.length - 1 ? 'disabled' : ''}>↓</button>
+      </div>`;
+  });
+  html += `<button class="row row-btn" onclick="openTagEdit(null)">＋ 新建标签</button></div>
+    <div class="form-hint" style="margin:8px 2px 0">顺序即优先级：关键词得分相同时，排在前面的标签胜出。</div>`;
+
+  // JSON 相关一律收进折叠区：它和上面的「导出」是两回事，摆在一起会点串
+  html += `<details class="adv"${advOpen ? ' open' : ''} ontoggle="setAdvOpen(this.open)">
+      <summary>高级</summary>
+      <div class="card">
+        <button class="row row-btn" onclick="exportJSON()">完整备份（JSON，含标签与词表）</button>
+        <button class="row row-btn" onclick="document.getElementById('import-file').click()">从备份恢复</button>
+        <button class="row row-btn danger" onclick="clearAll()">清除全部数据</button>
+      </div>
+      <div class="form-hint" style="margin:8px 2px 0">换机或误删只有 JSON 能完整恢复（Markdown 不可逆、也不含关键词词表）。重复导入不会产生重复记录。</div>
+    </details>`;
+
+  document.getElementById('settings-body').innerHTML = html;
+}
+
+// 内联 ontoggle 够不到模块顶层的 let，得走一个函数声明（会挂到 window 上）
+function setAdvOpen(v) { advOpen = v; }
+
+function stepMonth(d) {
+  const months = availableMonths();
+  monthIndex = Math.min(months.length - 1, Math.max(0, monthIndex + d));
+  renderSettings();
+}
+
+function moveTag(i, d) {
+  const j = i + d;
+  if (j < 0 || j >= tags.length) return;
+  [tags[i], tags[j]] = [tags[j], tags[i]];
+  saveTags();
+  renderSettings();
+  renderFilters();
+}
+
+/* ── 标签编辑 ── */
+
+function openTagEdit(id) {
+  const t = id ? tagById(id) : { id: '', name: '', emoji: '🏷️', keywords: [], pattern: '' };
+  const isNew = !id;
+  openForm(isNew ? '新建标签' : '编辑标签', `
+    <div class="form-row">
+      <div class="form-group" style="width:88px">
+        <label class="form-label">图标</label>
+        <input class="form-input" id="tag-emoji" value="${esc(t.emoji)}" style="text-align:center">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">名称</label>
+        <input class="form-input" id="tag-name" value="${esc(t.name)}" placeholder="如：睡眠">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">关键词（逗号或换行分隔）</label>
+      <textarea class="form-area" id="tag-kw" ${t.fallback ? 'disabled' : ''}>${esc(t.keywords.join('、'))}</textarea>
+      <div class="form-hint">${t.fallback ? '兜底标签不参与识别，无需关键词。' : '文本里出现这些词就会命中；词越长权重越高。'}</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">高级：形态规则（正则，可留空）</label>
+      <input class="form-input" id="tag-pattern" value="${esc(t.pattern || '')}" placeholder="留空即不用">
+      <div class="form-hint">优先级高于所有关键词。摘抄用的是引号/书名号/「——出处」。</div>
+    </div>
+    <button class="btn-primary" onclick="saveTag('${id || ''}')">保存</button>
+    ${(!isNew && !t.fallback) ? `<button class="btn-primary" style="background:var(--red);margin-top:10px" onclick="deleteTag('${id}')">删除标签</button>` : ''}`);
+}
+
+function saveTag(id) {
+  const name = document.getElementById('tag-name').value.trim();
+  const emoji = document.getElementById('tag-emoji').value.trim() || '🏷️';
+  const pattern = document.getElementById('tag-pattern').value.trim();
+  const kwEl = document.getElementById('tag-kw');
+  const keywords = kwEl.disabled ? [] : kwEl.value.split(/[、,，\n]/).map(s => s.trim()).filter(Boolean);
+  if (!name) { showToast('名称不能为空'); return; }
+  if (pattern) {
+    try { new RegExp(pattern, 'm'); }
+    catch { showToast('正则写错了'); return; }
+  }
+  if (id) {
+    const t = tagById(id);
+    Object.assign(t, { name, emoji, pattern, keywords: t.fallback ? [] : keywords });
+  } else {
+    // 新标签插在兜底标签之前
+    const t = { id: genId(), name, emoji, pattern, keywords };
+    const fi = tags.findIndex(x => x.fallback);
+    tags.splice(fi < 0 ? tags.length : fi, 0, t);
+  }
+  saveTags();
+  closeForm();
+  renderSettings();
+  renderAll();
+  showToast('已保存');
+}
+
+function deleteTag(id) {
+  const t = tagById(id);
+  const n = entries.filter(e => e.tagId === id).length;
+  const fb = fallbackTag();
+  if (!confirm(`删除「${t.name}」？${n ? `该标签下的 ${n} 条记录会归到「${fb.name}」。` : ''}`)) return;
+  entries.forEach(e => { if (e.tagId === id) { e.tagId = fb.id; e.auto = false; } });
+  tags = tags.filter(x => x.id !== id);
+  if (activeFilter === id) activeFilter = 'all';
+  saveEntries(); saveTags();
+  closeForm();
+  renderSettings();
+  renderAll();
+  showToast('已删除标签');
+}
+
+/* ═══════════════════ Export / Import ═══════════════════ */
+
+function shareOrDownload(content, filename, mime) {
+  // 优先走 iOS 分享面板（一步直达）。部分 iOS 版本不认 text/markdown 这种 MIME，
+  // canShare 会直接 false，所以再用 text/plain 试一次（扩展名保留 .md，Obsidian 认扩展名）。
+  // 都不行才退回 <a download>；用户主动取消（AbortError）不触发下载。
+  const tryShare = m => {
+    const f = new File([content], filename, { type: m });
+    return (navigator.canShare && navigator.canShare({ files: [f] }))
+      ? navigator.share({ files: [f], title: filename })
+      : null;
+  };
+  const p = tryShare(mime) || tryShare('text/plain');
+  if (!p) { fallbackDownload(content, filename, mime); return; }
+  p.catch(err => { if (!err || err.name !== 'AbortError') fallbackDownload(content, filename, mime); });
+}
+function fallbackDownload(content, filename, mime) {
+  const url = URL.createObjectURL(new Blob([content], { type: mime }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function buildMarkdown(month) {
+  const list = entries
+    .filter(e => !month || e.date.startsWith(month))
+    .sort((a, b) => a.ts - b.ts);
+
+  const title = month
+    ? `# 日录导出 · ${Number(month.slice(0, 4))}年${Number(month.slice(5, 7))}月`
+    : `# 日录导出 · 全部记录`;
+
+  const counts = {};
+  list.forEach(e => { counts[e.tagId] = (counts[e.tagId] || 0) + 1; });
+  const summary = tags.filter(t => counts[t.id]).map(t => `${t.name} ${counts[t.id]}`).join(' / ');
+  const d = new Date();
+  const stamp = `${dateKey(d)} ${nowTime(d)}`;
+
+  const blocks = [`${title}`, `> 导出时间：${stamp} · 共 ${list.length} 条${summary ? ' · ' + summary : ''}`];
+
+  let lastDate = null;
+  list.forEach(e => {
+    if (e.date !== lastDate) {
+      lastDate = e.date;
+      blocks.push(`## ${e.date} ${cnDate(e.date).replace(/^\d+月\d+日 /, '')}`);
+    }
+    const body = e.text.replace(/\n{2,}/g, '\n').split('\n').map(l => '  ' + l.trimEnd()).join('\n');
+    blocks.push(`- **${e.time}** \`#${tagById(e.tagId).name}\`\n${body}`);
+  });
+  return blocks.join('\n\n') + '\n';
+}
+
+function mdFilename(month) { return month ? `daylog-${month}.md` : 'daylog-all.md'; }
+
+function exportMarkdown(month) {
+  const list = entries.filter(e => !month || e.date.startsWith(month));
+  if (!list.length) { showToast('这个范围没有记录'); return; }
+  const filename = mdFilename(month);
+  shareOrDownload(buildMarkdown(month), filename, 'text/markdown');
+  showToast(`已导出 ${filename}`);
+}
+
+function exportJSON() {
+  const filename = `daylog-backup-${todayKey()}.json`;
+  shareOrDownload(JSON.stringify({ version: 1, entries, tags }, null, 2), filename, 'application/json');
+  showToast(`已导出 ${filename}`);
+}
+
+function importJSON(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data || !Array.isArray(data.entries)) throw new Error('格式不对');
+      const have = new Set(entries.map(e => e.id));
+      const fresh = data.entries.filter(e => e && e.id && !have.has(e.id));
+      const tagIds = new Set(tags.map(t => t.id));
+      const newTags = (data.tags || []).filter(t => t && t.id && !tagIds.has(t.id));
+      if (!confirm(`将新增 ${fresh.length} 条记录${newTags.length ? `、${newTags.length} 个标签` : ''}（重复的会跳过）。继续？`)) return;
+      // 已存在的标签不覆盖（关键词表是精心维护的主数据）
+      const fi = tags.findIndex(t => t.fallback);
+      tags.splice(fi < 0 ? tags.length : fi, 0, ...newTags.map(t => ({ ...t, fallback: false })));
+      entries = entries.concat(fresh);
+      // 引用了不存在的标签 → 归到兜底
+      const ids = new Set(tags.map(t => t.id));
+      const fb = fallbackTag();
+      entries.forEach(e => { if (!ids.has(e.tagId)) e.tagId = fb.id; });
+      saveEntries(); saveTags();
+      renderSettings(); renderAll(); scrollToBottom(false);
+      showToast(`已导入 ${fresh.length} 条`);
+    } catch (err) {
+      showToast('导入失败：文件格式不对');
+    }
+  };
+  reader.readAsText(file);
+  ev.target.value = '';
+}
+
+function clearAll() {
+  if (!confirm('清除全部记录和标签设置？此操作不可撤销，建议先导出 JSON 备份。')) return;
+  localStorage.removeItem(ENTRIES_KEY);
+  localStorage.removeItem(TAGS_KEY);
+  entries = [];
+  tags = JSON.parse(JSON.stringify(SEED_TAGS));
+  activeFilter = 'all';
+  saveEntries(); saveTags();
+  renderSettings(); renderAll();
+  showToast('已清空');
+}
+
+/* ═══════════════════ Viewport（iOS 键盘） ═══════════════════ */
+
+function syncViewport() {
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  const top = vv ? vv.offsetTop : 0;
+  const kb = Math.max(0, window.innerHeight - h - top);
+  const root = document.documentElement;
+  root.style.setProperty('--app-h', h + 'px');
+  root.style.setProperty('--vv-top', top + 'px');
+  root.style.setProperty('--kb', kb + 'px');
+  // 键盘弹起时 safe-area 底部内边距会和键盘叠加，关掉它
+  root.style.setProperty('--sab-on', kb > 40 ? 0 : 1);
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', syncViewport);
+  window.visualViewport.addEventListener('scroll', syncViewport);
+}
+window.addEventListener('orientationchange', () => setTimeout(syncViewport, 250));
+window.addEventListener('pageshow', syncViewport);
+window.addEventListener('resize', syncViewport);
+
+/* ═══════════════════ Init ═══════════════════ */
+
+syncViewport();
+saveTags();
+renderAll();
+scrollToBottom(false);
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
