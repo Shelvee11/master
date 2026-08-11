@@ -360,6 +360,36 @@
     .imgs.n2 img, .imgs.n3 img, .imgs.n4 img { aspect-ratio: 1; }
     .imgs.n3 img:first-child { grid-column: span 2; aspect-ratio: 16/9; }
 
+    /* 多张图默认合并成一叠（仿微信）：顶图后面透出两张卡的边 */
+    .imgstack { position: relative; isolation: isolate; width: 168px; max-width: 100%; cursor: pointer; }
+    /* 顶图后面透出两张卡的边；描一道 sep 线，白气泡里也看得见 */
+    .imgstack::before, .imgstack::after {
+      content: ''; position: absolute; top: 9px; bottom: 9px; z-index: 0;
+      border-radius: 12px; background: var(--fill);
+      box-shadow: 0 0 0 0.5px rgba(31,30,26,0.10), -2px 2px 6px rgba(31,30,26,0.14);
+    }
+    .imgstack::before { left: -13px; right: 13px; }
+    .imgstack::after  { left: -6.5px; right: 6.5px; }
+    .imgstack img {
+      position: relative; z-index: 1; display: block; width: 100%;
+      aspect-ratio: 4/3; object-fit: cover; border-radius: 12px;
+      box-shadow: -2px 2px 6px rgba(31,30,26,0.14);
+    }
+    .imgstack:active { opacity: 0.85; }
+
+    /* 气泡 + 旁边的「展开 N / 收起」灰药丸 */
+    .bline { display: flex; align-items: center; gap: 10px; max-width: 100%; }
+    .brow.me .bline { justify-content: flex-end; }
+    .brow:not(.me) .bline { flex-direction: row-reverse; justify-content: flex-end; }
+    .expand-pill {
+      flex: none; border: none; cursor: pointer; font-family: inherit;
+      background: var(--fill); color: var(--label2);
+      border-radius: 999px; padding: 6px 12px;
+      font-size: 12.5px; font-weight: 600; white-space: nowrap;
+    }
+    .expand-pill:active { opacity: 0.6; }
+    body.select .expand-pill { pointer-events: none; }
+
     /* 待发送的附件条 */
     .attach-strip { max-width: 430px; margin: 0 auto 8px; display: flex; gap: 8px; }
     .attach-thumb { position: relative; width: 62px; height: 62px; flex: none; }
@@ -794,10 +824,20 @@ function renderStream() {
     const t = tagById(e.tagId);
     const imgs = e.imgs || [];
     const on = selected.has(e.id);
-    const imgHtml = imgs.length
-      ? `<div class="imgs n${imgs.length}" onpointerdown="event.stopPropagation()" onpointerup="event.stopPropagation()">
-           ${imgs.map(id => `<img data-img="${id}" alt="" onclick="event.stopPropagation(); openLightbox('${e.id}','${id}')">`).join('')}
-         </div>`
+    const stacked = imgs.length >= 2 && !expandedImgs.has(e.id);   // 多张默认叠起来
+    const stop = `onpointerdown="event.stopPropagation()" onpointerup="event.stopPropagation()"`;
+    let imgHtml = '';
+    if (stacked) {
+      imgHtml = `<div class="imgstack" ${stop} onclick="event.stopPropagation(); toggleImgs('${e.id}')">
+                   <img data-img="${imgs[0]}" alt="">
+                 </div>`;
+    } else if (imgs.length) {
+      imgHtml = `<div class="imgs n${imgs.length}" ${stop}>
+                   ${imgs.map(id => `<img data-img="${id}" alt="" onclick="event.stopPropagation(); openLightbox('${e.id}','${id}')">`).join('')}
+                 </div>`;
+    }
+    const pill = imgs.length >= 2
+      ? `<button class="expand-pill" onclick="event.stopPropagation(); toggleImgs('${e.id}')">${stacked ? `展开 ${imgs.length}` : '收起'}</button>`
       : '';
     html += `
       <div class="srow ${on ? 'checked' : ''}" data-id="${e.id}" onclick="rowClick(event, '${e.id}')">
@@ -806,10 +846,13 @@ function renderStream() {
           <svg class="on" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle><polyline points="7.6 12.3 10.7 15.3 16.4 9.2" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
         </button>
         <div class="brow ${e.date === today ? 'me' : ''}">
-          <div class="bubble"
-               onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
-            ${imgHtml}
-            ${e.text ? `<div class="btext">${esc(e.text)}</div>` : ''}
+          <div class="bline">
+            ${pill}
+            <div class="bubble"
+                 onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
+              ${imgHtml}
+              ${e.text ? `<div class="btext">${esc(e.text)}</div>` : ''}
+            </div>
           </div>
           <div class="bmeta">
             <span class="tagchip" onclick="event.stopPropagation(); openTagPicker('${e.id}')">${esc(t.emoji)} ${esc(t.name)}</span>
@@ -821,6 +864,20 @@ function renderStream() {
   });
   el.innerHTML = html;
   hydrateImages();
+}
+
+// 「展开 N / 收起」——只是视图状态，不写进 localStorage，刷新后重新叠起来
+const expandedImgs = new Set();
+function toggleImgs(id) {
+  if (selectMode) return;
+  const opening = !expandedImgs.has(id);
+  if (opening) expandedImgs.add(id); else expandedImgs.delete(id);
+  renderStream();
+  // 展开后变高，别把这条顶出屏幕
+  if (opening) {
+    const row = document.querySelector(`.srow[data-id="${id}"]`);
+    if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
 }
 
 // innerHTML 里的 <img> 先不带 src，渲染完再异步从 IDB 灌进去

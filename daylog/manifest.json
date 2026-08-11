@@ -1,7 +1,7 @@
 {
-  "name": "日录 — 对话式记录",
-  "short_name": "日录",
-  "description": "日录 — 一句话记下吃了什么、动了多久，自动打标签，按月导出 Markdown",
+  "name": "Aside — 对话式记录",
+  "short_name": "Aside",
+  "description": "Aside — 一句话记下吃了什么、动了多久，自动打标签，按月导出 Markdown",
   "start_url": "/master/daylog/",
   "display": "standalone",
   "background_color": "#ffffff",
