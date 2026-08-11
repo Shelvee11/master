@@ -7,6 +7,16 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Aside">
   <meta name="theme-color" content="#efeeea">
+  <!-- 主题必须在首屏画之前定下来，否则会闪一下默认色 -->
+  <script>
+    try {
+      var th = localStorage.getItem('daylog-theme');
+      if (th && th !== 'mynd') {
+        document.documentElement.setAttribute('data-theme', th);
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', th === 'blue' ? '#ffffff' : '#efeeea');
+      }
+    } catch (e) {}
+  </script>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-512.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,14 +37,34 @@
       --label3:  #a3a29b;
       --fill:    #e7e6e1;
       --fill2:   #dedcd6;
-      --bg:      #efeeea;   /* 暖灰页面底 */
-      --bg2:     #ffffff;   /* 气泡 / 卡片 */
+      --bg:      #efeeea;   /* 页面底 */
+      --bg2:     #ffffff;   /* 往日的气泡 / 输入框 / 筛选 chip / 圆按钮 */
+      --card:    #ffffff;   /* 设置卡片 / 面板 / 操作表 */
+      --bg-blur: rgba(239,238,234,0.92);   /* 顶栏和输入条的毛玻璃底 */
       --sep:     #e2e0da;
       --radius:  18px;
       --bubble-r: 20px;
       --app-h:   100dvh;
       --vv-top:  0px;
       --kb:      0px;
+    }
+
+    /* 备选配色：白底天蓝（参照 iMessage）——灰气泡在左，蓝气泡在右 */
+    :root[data-theme="blue"] {
+      --accent:  #1f8cf5;
+      --accent2: #4aa3f7;
+      --accent-fg: #ffffff;
+      --red:     #e5484d;
+      --label:   #000000;
+      --label2:  #6e6e73;
+      --label3:  #aeaeb2;
+      --fill:    #e9e9eb;
+      --fill2:   #dcdce0;
+      --bg:      #ffffff;
+      --bg2:     #e9e9eb;
+      --card:    #ffffff;
+      --bg-blur: rgba(255,255,255,0.9);
+      --sep:     #e3e3e6;
     }
 
     html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
@@ -57,7 +87,7 @@
     /* ── Header ── */
     header {
       flex: none;
-      background: rgba(239,238,234,0.92);
+      background: var(--bg-blur);
       backdrop-filter: saturate(180%) blur(20px);
       -webkit-backdrop-filter: saturate(180%) blur(20px);
       padding: 14px 20px 12px;
@@ -88,7 +118,7 @@
 
     /* ── Filter chips ── */
     .filters {
-      flex: none; background: rgba(239,238,234,0.92);
+      flex: none; background: var(--bg-blur);
       backdrop-filter: saturate(180%) blur(20px);
       -webkit-backdrop-filter: saturate(180%) blur(20px);
       overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -158,7 +188,7 @@
     /* ── Composer ── */
     .composer {
       flex: none;
-      background: rgba(239,238,234,0.92);
+      background: var(--bg-blur);
       backdrop-filter: saturate(180%) blur(20px);
       -webkit-backdrop-filter: saturate(180%) blur(20px);
       padding: 8px 16px 12px;
@@ -222,7 +252,7 @@
     .overlay.open { opacity: 1; pointer-events: auto; }
     .sheet {
       position: fixed; left: 0; right: 0; bottom: var(--kb); z-index: 201;
-      background: var(--bg2);
+      background: var(--card);
       border-radius: var(--radius) var(--radius) 0 0;
       padding: 18px 20px calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 20px);
       transform: translateY(110%); transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
@@ -252,7 +282,7 @@
     }
     .action-overlay.open .action-sheet { transform: translateY(0); }
     .action-group {
-      background: var(--bg2); border-radius: var(--radius);
+      background: var(--card); border-radius: var(--radius);
       overflow: hidden; margin-bottom: 10px;
     }
     .action-title {
@@ -260,7 +290,7 @@
       text-align: center; border-bottom: 1px solid var(--sep); line-height: 1.5;
     }
     .action-btn {
-      width: 100%; padding: 15px; border: none; background: var(--bg2);
+      width: 100%; padding: 15px; border: none; background: var(--card);
       font-size: 16px; font-family: inherit; color: var(--label); cursor: pointer;
       border-bottom: 1px solid var(--sep); display: flex; align-items: center; gap: 10px;
       justify-content: center;
@@ -278,14 +308,14 @@
     }
     .card-label:first-of-type { margin-top: 0; }
     .card {
-      background: var(--bg2); border-radius: var(--radius); overflow: hidden;
+      background: var(--card); border-radius: var(--radius); overflow: hidden;
     }
     .row {
       display: flex; align-items: center; gap: 10px;
       padding: 13px 14px; border-bottom: 1px solid var(--sep);
     }
     .row:last-child { border-bottom: none; }
-    .row-btn { width: 100%; border: none; background: var(--bg2); font-family: inherit;
+    .row-btn { width: 100%; border: none; background: var(--card); font-family: inherit;
       font-size: 15px; color: var(--accent); cursor: pointer; text-align: left; font-weight: 600; }
     .row-btn:active { background: var(--fill); }
     .row-btn.danger { color: var(--red); }
@@ -318,7 +348,7 @@
     .form-input, .form-area {
       width: 100%; padding: 10px 12px; border: 1.5px solid var(--sep);
       border-radius: 10px; font-size: 15px; font-family: inherit; color: var(--label);
-      outline: none; transition: border-color 0.15s; background: var(--bg2);
+      outline: none; transition: border-color 0.15s; background: var(--card);
     }
     .form-area { resize: vertical; min-height: 88px; line-height: 1.5; }
     .form-input:focus, .form-area:focus { border-color: var(--accent); }
@@ -441,12 +471,25 @@
     .lb-btn.danger { color: #ff6b5c; }
     .lb-btn:active { opacity: 0.6; }
 
+    /* 配色选项：一块小色板，里面两颗气泡表示往日 / 今天 */
+    .theme-row { cursor: pointer; }
+    .theme-row:active { background: var(--fill); }
+    .theme-swatch {
+      flex: none; width: 44px; height: 34px; border-radius: 9px;
+      box-shadow: inset 0 0 0 0.5px rgba(31,30,26,0.14);
+      display: flex; flex-direction: column; justify-content: center; gap: 4px;
+      padding: 0 5px; overflow: hidden;
+    }
+    .theme-swatch i { display: block; height: 8px; border-radius: 4px; }
+    .theme-swatch i:first-child { width: 62%; align-self: flex-start; }
+    .theme-swatch i:last-child  { width: 78%; align-self: flex-end; }
+
     .imgman { display: flex; flex-wrap: wrap; gap: 12px; padding: 14px 16px; justify-content: center; }
-    .imgman .attach-x { border-color: var(--bg2); }
+    .imgman .attach-x { border-color: var(--card); }
 
     .kw-list { display: flex; flex-wrap: wrap; gap: 8px; }
     .kw-chip {
-      border: 1px solid var(--sep); background: var(--bg2); color: var(--label2);
+      border: 1px solid var(--sep); background: var(--card); color: var(--label2);
       border-radius: 999px; padding: 7px 13px; font-size: 14px;
       font-family: inherit; cursor: pointer;
     }
@@ -635,6 +678,13 @@ const SEED_TAGS = [
       '明天要', '得去', '需要去', '安排一下', '回头', '有空', '截止', 'deadline', '交表', '报名']
   },
   {
+    id: 'idea', name: '念头', emoji: '💭',
+    pattern: '',
+    keywords: ['突然想到', '忽然想', '想到', '在想', '一直在想', '念头', '灵感', '好像明白', '意识到', '发现自己',
+      '为什么', '也许', '或许', '大概是因为', '其实', '说不定', '感觉自己', '有点想', '要不要', '值不值得',
+      '纠结', '犹豫', '困惑', '想不通', '想通了', '反正', '算了', '突然觉得', '一个想法', '如果']
+  },
+  {
     // 形态规则优先级高于所有关键词打分，所以摘抄排在后面也照样先命中引号句
     id: 'quote', name: '摘抄', emoji: '📖',
     pattern: '[“”「」『』《》]|^\\s*>|——\\s*\\S',
@@ -653,10 +703,13 @@ if (!tags || !tags.length) { tags = JSON.parse(JSON.stringify(SEED_TAGS)); }
 if (!entries) { entries = []; }
 if (!tags.some(t => t.fallback)) { tags[tags.length - 1].fallback = true; }
 
-// 一次性迁移：把已存在的种子标签重排成指定顺序（只动顺序，不碰 name/emoji/keywords/pattern）
+/* 一次性迁移：SEED_TAGS 只对全新安装生效，已写进 localStorage 的标签得单独补。
+   v1 曾经漏掉写回，重排下次刷新就丢了；这里 v2 一并补齐并落盘。
+   只动「有没有」和「顺序」，不碰任何标签的 name/emoji/keywords/pattern。 */
 const MIG_KEY = 'daylog-migration';
-if (Number(localStorage.getItem(MIG_KEY) || 0) < 1) {
-  const order = ['diet', 'sport', 'todo', 'quote', 'other'];
+if (Number(localStorage.getItem(MIG_KEY) || 0) < 2) {
+  if (!tags.some(t => t.id === 'idea')) tags.push(JSON.parse(JSON.stringify(SEED_TAGS.find(t => t.id === 'idea'))));
+  const order = ['diet', 'sport', 'todo', 'idea', 'quote', 'other'];
   tags = tags
     .map((t, i) => ({ t, i, k: order.indexOf(t.id) }))
     .sort((a, b) => {
@@ -666,7 +719,8 @@ if (Number(localStorage.getItem(MIG_KEY) || 0) < 1) {
       return a.k - b.k;
     })
     .map(x => x.t);
-  localStorage.setItem(MIG_KEY, '1');
+  localStorage.setItem(TAGS_KEY, JSON.stringify(tags));
+  localStorage.setItem(MIG_KEY, '2');
 }
 
 function saveEntries() { localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); }
@@ -1230,6 +1284,29 @@ function deleteEntry(id) {
   showToast('已删除');
 }
 
+/* ═══════════════════ 配色主题 ═══════════════════ */
+
+const THEME_KEY = 'daylog-theme';
+const THEMES = [
+  { id: 'mynd', name: '暖灰墨绿', desc: '默认 · 参照 mynd', bg: '#efeeea', old: '#ffffff', me: '#3d4f45', bar: '#efeeea' },
+  { id: 'blue', name: '白底天蓝', desc: '参照 iMessage',   bg: '#ffffff', old: '#e9e9eb', me: '#1f8cf5', bar: '#ffffff' },
+];
+
+function currentTheme() {
+  const id = localStorage.getItem(THEME_KEY) || 'mynd';
+  return THEMES.some(t => t.id === id) ? id : 'mynd';
+}
+
+function setTheme(id) {
+  const t = THEMES.find(x => x.id === id) || THEMES[0];
+  localStorage.setItem(THEME_KEY, t.id);
+  if (t.id === 'mynd') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', t.id);
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', t.bar);
+  renderSettings();
+  showToast(`配色：${t.name}`);
+}
+
 /* ═══════════════════ 多选删除（仿「信息」的批量删除） ═══════════════════ */
 
 let selectMode = false;
@@ -1452,6 +1529,24 @@ function renderSettings() {
   }
   html += `</div>
     <div class="form-hint" style="margin:8px 2px 0">.md 文件，可以直接丢进 Obsidian，或整份喂给 AI 分析。</div>`;
+
+  html += `<div class="card-label">配色</div><div class="card">`;
+  THEMES.forEach(t => {
+    const on = t.id === currentTheme();
+    html += `
+      <div class="row theme-row" onclick="setTheme('${t.id}')">
+        <span class="theme-swatch" style="background:${t.bg}">
+          <i style="background:${t.old}"></i>
+          <i style="background:${t.me}"></i>
+        </span>
+        <div class="row-info">
+          <div class="row-name">${esc(t.name)}</div>
+          <div class="row-sub">${esc(t.desc)}</div>
+        </div>
+        ${on ? '<span class="action-check">✓</span>' : ''}
+      </div>`;
+  });
+  html += `</div>`;
 
   html += `<div class="card-label">标签</div><div class="card">`;
   tags.forEach((t, i) => {
