@@ -306,6 +306,46 @@
     .adv > summary::before { content: '▸ '; }
     .adv[open] > summary::before { content: '▾ '; }
     .adv > summary:active { opacity: 0.5; }
+    /* ── 图片 ── */
+    .imgs { display: grid; gap: 4px; margin-bottom: 8px; }
+    .imgs:last-child { margin-bottom: 0; }
+    .imgs.n1 { grid-template-columns: 1fr; }
+    .imgs.n2, .imgs.n3, .imgs.n4 { grid-template-columns: 1fr 1fr; }
+    .imgs img {
+      width: 100%; display: block; border-radius: 10px;
+      background: var(--fill); object-fit: cover;
+    }
+    .imgs.n1 img { max-height: 300px; object-fit: contain; object-position: left; border-radius: 12px; }
+    .imgs.n2 img, .imgs.n3 img, .imgs.n4 img { aspect-ratio: 1; }
+    .imgs.n3 img:first-child { grid-column: span 2; aspect-ratio: 16/9; }
+
+    /* 待发送的附件条 */
+    .attach-strip { max-width: 430px; margin: 0 auto 8px; display: flex; gap: 8px; }
+    .attach-thumb { position: relative; width: 62px; height: 62px; flex: none; }
+    .attach-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: block; }
+    .attach-x {
+      position: absolute; top: -6px; right: -6px; width: 22px; height: 22px;
+      border-radius: 50%; border: 2px solid var(--bg); background: var(--label);
+      color: #fff; font-size: 12px; line-height: 1; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-family: inherit;
+    }
+    .plus-btn {
+      flex: none; width: 44px; height: 44px; border-radius: 50%; border: none;
+      background: var(--bg2); color: var(--label); cursor: pointer; line-height: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .plus-btn:active { transform: scale(0.92); }
+    .plus-btn:disabled { color: var(--label3); }
+
+    /* 看大图 */
+    .lightbox {
+      position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,0.92);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .lightbox.open { opacity: 1; pointer-events: auto; }
+    .lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
+
     .kw-list { display: flex; flex-wrap: wrap; gap: 8px; }
     .kw-chip {
       border: 1px solid var(--sep); background: var(--bg2); color: var(--label2);
@@ -341,7 +381,14 @@
   </div>
 
   <div class="composer">
+    <div class="attach-strip hidden" id="attach-strip"></div>
     <div class="composer-inner">
+      <button class="plus-btn" id="plus-btn" onclick="openAttachSheet()" aria-label="添加图片">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
       <textarea id="input" rows="1" placeholder="记点什么…" oninput="onInput()"></textarea>
       <button class="send-btn" id="send-btn" onclick="addEntry()" disabled aria-label="记录">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -380,7 +427,10 @@
   <div id="form-body"></div>
 </div>
 
+<div class="lightbox" id="lightbox" onclick="closeLightbox()"><img id="lightbox-img" alt=""></div>
+
 <input type="file" id="import-file" accept="application/json,.json" class="hidden" onchange="importJSON(event)">
+<input type="file" id="pick-file" accept="image/*" multiple class="hidden" onchange="onPickFiles(event)">
 
 <script>
 /* ═══════════════════ Constants & Utils ═══════════════════ */
@@ -482,6 +532,67 @@ function tagById(id) { return tags.find(t => t.id === id) || fallbackTag(); }
 function fallbackTag() { return tags.find(t => t.fallback) || tags[tags.length - 1]; }
 function entryById(id) { return entries.find(e => e.id === id); }
 
+/* ═══════════════════ 图片：IndexedDB（localStorage 只有 5MB，存不下几张） ═══════════════════ */
+
+const MAX_IMGS = 4;        // 一条记录最多几张
+const IMG_MAX_SIDE = 1280; // 长边上限
+const IMG_QUALITY = 0.72;
+
+let dbPromise = null;
+function db() {
+  if (!dbPromise) {
+    dbPromise = new Promise((res, rej) => {
+      const r = indexedDB.open('daylog', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('images', { keyPath: 'id' });
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  return dbPromise;
+}
+function idbRun(mode, fn) {
+  return db().then(d => new Promise((res, rej) => {
+    const tx = d.transaction('images', mode);
+    const req = fn(tx.objectStore('images'));
+    tx.onerror = () => rej(tx.error);
+    tx.oncomplete = () => res(req && req.result);
+  }));
+}
+const putImage = rec  => idbRun('readwrite', s => s.put(rec));
+const delImage = id   => idbRun('readwrite', s => s.delete(id));
+const readImage = id  => idbRun('readonly',  s => s.get(id));
+const allImages = ()  => idbRun('readonly',  s => s.getAll());
+
+// 渲染用的小缓存，避免每次重渲染都读一遍 IDB
+const imgCache = new Map();
+const IMG_CACHE_MAX = 60;
+function cacheImg(id, url) {
+  imgCache.set(id, url);
+  if (imgCache.size > IMG_CACHE_MAX) imgCache.delete(imgCache.keys().next().value);
+}
+async function imgURL(id) {
+  if (imgCache.has(id)) return imgCache.get(id);
+  const rec = await readImage(id);
+  if (!rec) return null;
+  cacheImg(id, rec.data);
+  return rec.data;
+}
+
+// 压到长边 1280 的 JPEG，原图动辄 3~5MB，存下来会撑爆配额
+async function shrinkToDataURL(blob) {
+  let bmp;
+  try { bmp = await createImageBitmap(blob, { imageOrientation: 'from-image' }); }
+  catch { bmp = await createImageBitmap(blob); }
+  const scale = Math.min(1, IMG_MAX_SIDE / Math.max(bmp.width, bmp.height));
+  const w = Math.max(1, Math.round(bmp.width * scale));
+  const h = Math.max(1, Math.round(bmp.height * scale));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(bmp, 0, 0, w, h);
+  bmp.close && bmp.close();
+  return c.toDataURL('image/jpeg', IMG_QUALITY);
+}
+
 /* ═══════════════════ Auto tagging ═══════════════════ */
 
 function suggestTag(text) {
@@ -575,11 +686,18 @@ function renderStream() {
       html += `<div class="daysep">${e.date === today ? '今天' : esc(cnDate(e.date))}</div>`;
     }
     const t = tagById(e.tagId);
+    const imgs = e.imgs || [];
+    const imgHtml = imgs.length
+      ? `<div class="imgs n${imgs.length}" onpointerdown="event.stopPropagation()" onpointerup="event.stopPropagation()">
+           ${imgs.map(id => `<img data-img="${id}" alt="" onclick="event.stopPropagation(); openLightbox('${id}')">`).join('')}
+         </div>`
+      : '';
     html += `
       <div class="brow ${e.date === today ? 'me' : ''}" data-id="${e.id}">
         <div class="bubble"
              onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
-          <div class="btext">${esc(e.text)}</div>
+          ${imgHtml}
+          ${e.text ? `<div class="btext">${esc(e.text)}</div>` : ''}
         </div>
         <div class="bmeta">
           <span class="tagchip" onclick="openTagPicker('${e.id}')">${esc(t.emoji)} ${esc(t.name)}</span>
@@ -589,6 +707,27 @@ function renderStream() {
       </div>`;
   });
   el.innerHTML = html;
+  hydrateImages();
+}
+
+// innerHTML 里的 <img> 先不带 src，渲染完再异步从 IDB 灌进去
+function hydrateImages() {
+  document.querySelectorAll('#stream img[data-img]').forEach(async el => {
+    const url = await imgURL(el.dataset.img);
+    if (url) el.src = url; else el.remove();
+  });
+}
+
+function openLightbox(id) {
+  imgURL(id).then(url => {
+    if (!url) return;
+    document.getElementById('lightbox-img').src = url;
+    document.getElementById('lightbox').classList.add('open');
+  });
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-img').src = '';
 }
 
 function scrollToBottom(smooth) {
@@ -600,23 +739,108 @@ function renderAll() { renderHeader(); renderFilters(); renderStream(); }
 
 /* ═══════════════════ Compose ═══════════════════ */
 
+let pendingImgs = [];   // 待发送的图片 dataURL
+
 function onInput() {
   const ta = document.getElementById('input');
   ta.style.height = 'auto';
   ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-  document.getElementById('send-btn').disabled = !ta.value.trim();
+  document.getElementById('send-btn').disabled = !ta.value.trim() && !pendingImgs.length;
+  document.getElementById('plus-btn').disabled = pendingImgs.length >= MAX_IMGS;
 }
 
-function addEntry() {
+function renderAttachStrip() {
+  const strip = document.getElementById('attach-strip');
+  strip.classList.toggle('hidden', !pendingImgs.length);
+  strip.innerHTML = pendingImgs.map((url, i) => `
+    <div class="attach-thumb">
+      <img src="${url}" alt="">
+      <button class="attach-x" onclick="removePending(${i})" aria-label="移除">✕</button>
+    </div>`).join('');
+  onInput();
+}
+function removePending(i) { pendingImgs.splice(i, 1); renderAttachStrip(); }
+
+function openAttachSheet() {
+  if (pendingImgs.length >= MAX_IMGS) { showToast(`最多 ${MAX_IMGS} 张`); return; }
+  openAction(`
+    <div class="action-group">
+      <button class="action-btn" onclick="forceCloseAction(); pickFiles(false)">🖼️ 相册</button>
+      <button class="action-btn" onclick="forceCloseAction(); pickFiles(true)">📷 拍照</button>
+      <button class="action-btn" onclick="forceCloseAction(); pasteImage()">📋 剪贴板</button>
+    </div>
+    <div class="action-group">
+      <button class="action-btn strong" onclick="forceCloseAction()">取消</button>
+    </div>`);
+}
+
+function pickFiles(camera) {
+  const inp = document.getElementById('pick-file');
+  if (camera) inp.setAttribute('capture', 'environment'); else inp.removeAttribute('capture');
+  inp.click();
+}
+
+async function onPickFiles(ev) {
+  const files = [...ev.target.files].filter(f => f.type.startsWith('image/'));
+  ev.target.value = '';
+  await attachBlobs(files);
+}
+
+async function pasteImage() {
+  if (!navigator.clipboard || !navigator.clipboard.read) { showToast('这个浏览器读不了剪贴板'); return; }
+  try {
+    const items = await navigator.clipboard.read();
+    const blobs = [];
+    for (const it of items) {
+      const type = it.types.find(t => t.startsWith('image/'));
+      if (type) blobs.push(await it.getType(type));
+    }
+    if (!blobs.length) { showToast('剪贴板里没有图片'); return; }
+    await attachBlobs(blobs);
+  } catch (err) {
+    showToast(err && err.name === 'NotAllowedError' ? '没有剪贴板权限' : '读剪贴板失败');
+  }
+}
+
+async function attachBlobs(blobs) {
+  const room = MAX_IMGS - pendingImgs.length;
+  if (room <= 0) { showToast(`最多 ${MAX_IMGS} 张`); return; }
+  const take = blobs.slice(0, room);
+  for (const b of take) {
+    try { pendingImgs.push(await shrinkToDataURL(b)); }
+    catch { showToast('这张图读不了'); }
+  }
+  renderAttachStrip();
+  if (blobs.length > room) showToast(`最多 ${MAX_IMGS} 张，多的没加`);
+}
+
+// 桌面端直接往输入框里粘贴图片
+document.getElementById('input').addEventListener('paste', e => {
+  const files = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => f.type.startsWith('image/'));
+  if (!files.length) return;
+  e.preventDefault();
+  attachBlobs(files);
+});
+
+async function addEntry() {
   const ta = document.getElementById('input');
   const text = ta.value.trim();
-  if (!text) return;
+  if (!text && !pendingImgs.length) return;
   const d = new Date();
-  const tag = suggestTag(text);
-  entries.push({ id: genId(), ts: d.getTime(), date: dateKey(d), time: nowTime(d), text, tagId: tag.id, auto: true });
+  const tag = suggestTag(text);          // 纯图片没有文字信号，自然落到兜底的「其他」
+
+  const imgIds = [];
+  for (const data of pendingImgs) {
+    const id = genId();
+    try { await putImage({ id, data, ts: d.getTime() }); imgIds.push(id); }
+    catch { showToast('图片存不下了（空间不足）'); }
+  }
+
+  entries.push({ id: genId(), ts: d.getTime(), date: dateKey(d), time: nowTime(d), text, tagId: tag.id, auto: true, imgs: imgIds });
   saveEntries();
   ta.value = '';
-  onInput();
+  pendingImgs = [];
+  renderAttachStrip();
   if (activeFilter !== 'all' && activeFilter !== tag.id) activeFilter = 'all';
   renderAll();
   scrollToBottom(true);
@@ -691,7 +915,9 @@ function openEntryAction(id) {
 }
 
 function deleteEntry(id) {
-  entries = entries.filter(e => e.id !== id);
+  const e = entryById(id);
+  (e && e.imgs || []).forEach(imgId => { imgCache.delete(imgId); delImage(imgId).catch(() => {}); });
+  entries = entries.filter(x => x.id !== id);
   saveEntries();
   forceCloseAction();
   renderAll();
@@ -1007,8 +1233,11 @@ function buildMarkdown(month) {
       lastDate = e.date;
       blocks.push(`## ${e.date} ${cnDate(e.date).replace(/^\d+月\d+日 /, '')}`);
     }
-    const body = e.text.replace(/\n{2,}/g, '\n').split('\n').map(l => '  ' + l.trimEnd()).join('\n');
-    blocks.push(`- **${e.time}** \`#${tagById(e.tagId).name}\`\n${body}`);
+    // 导出只要文字：图片不内嵌，留一行占位，免得纯图片的记录导出成空条目
+    const lines = [];
+    if (e.text) lines.push(...e.text.replace(/\n{2,}/g, '\n').split('\n').map(l => '  ' + l.trimEnd()));
+    if ((e.imgs || []).length) lines.push(`  _[图片 ×${e.imgs.length}]_`);
+    blocks.push(`- **${e.time}** \`#${tagById(e.tagId).name}\`\n${lines.join('\n')}`);
   });
   return blocks.join('\n\n') + '\n';
 }
@@ -1023,9 +1252,11 @@ function exportMarkdown(month) {
   showToast(`已导出 ${filename}`);
 }
 
-function exportJSON() {
+async function exportJSON() {
   const filename = `daylog-backup-${todayKey()}.json`;
-  shareOrDownload(JSON.stringify({ version: 1, entries, tags }, null, 2), filename, 'application/json');
+  showToast('正在打包…');
+  const images = await allImages().catch(() => []);   // 图片只有 JSON 备份能带走
+  shareOrDownload(JSON.stringify({ version: 2, entries, tags, images }, null, 2), filename, 'application/json');
   showToast(`已导出 ${filename}`);
 }
 
@@ -1033,7 +1264,7 @@ function importJSON(ev) {
   const file = ev.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const data = JSON.parse(reader.result);
       if (!data || !Array.isArray(data.entries)) throw new Error('格式不对');
@@ -1041,7 +1272,8 @@ function importJSON(ev) {
       const fresh = data.entries.filter(e => e && e.id && !have.has(e.id));
       const tagIds = new Set(tags.map(t => t.id));
       const newTags = (data.tags || []).filter(t => t && t.id && !tagIds.has(t.id));
-      if (!confirm(`将新增 ${fresh.length} 条记录${newTags.length ? `、${newTags.length} 个标签` : ''}（重复的会跳过）。继续？`)) return;
+      const imgs = (data.images || []).filter(im => im && im.id && im.data);
+      if (!confirm(`将新增 ${fresh.length} 条记录${newTags.length ? `、${newTags.length} 个标签` : ''}${imgs.length ? `、${imgs.length} 张图片` : ''}（重复的会跳过）。继续？`)) return;
       // 已存在的标签不覆盖（关键词表是精心维护的主数据）
       const fi = tags.findIndex(t => t.fallback);
       tags.splice(fi < 0 ? tags.length : fi, 0, ...newTags.map(t => ({ ...t, fallback: false })));
@@ -1051,6 +1283,7 @@ function importJSON(ev) {
       const fb = fallbackTag();
       entries.forEach(e => { if (!ids.has(e.tagId)) e.tagId = fb.id; });
       saveEntries(); saveTags();
+      for (const im of imgs) { await putImage(im).catch(() => {}); }   // 同 id 覆盖，幂等
       renderSettings(); renderAll(); scrollToBottom(false);
       showToast(`已导入 ${fresh.length} 条`);
     } catch (err) {
@@ -1062,9 +1295,11 @@ function importJSON(ev) {
 }
 
 function clearAll() {
-  if (!confirm('清除全部记录和标签设置？此操作不可撤销，建议先导出 JSON 备份。')) return;
+  if (!confirm('清除全部记录、图片和标签设置？此操作不可撤销，建议先导出 JSON 备份。')) return;
   localStorage.removeItem(ENTRIES_KEY);
   localStorage.removeItem(TAGS_KEY);
+  idbRun('readwrite', s => s.clear()).catch(() => {});
+  imgCache.clear();
   entries = [];
   tags = JSON.parse(JSON.stringify(SEED_TAGS));
   activeFilter = 'all';
@@ -1101,6 +1336,10 @@ syncViewport();
 saveTags();
 renderAll();
 scrollToBottom(false);
+renderAttachStrip();
+
+// 存了图片就得申请持久化，否则 Safari 空间紧张时会把 IndexedDB 清掉
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
