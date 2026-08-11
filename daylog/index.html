@@ -195,6 +195,24 @@
       padding-bottom: calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 12px);
     }
     .composer-inner { max-width: 430px; margin: 0 auto; display: flex; align-items: flex-end; gap: 10px; }
+
+    /* 一次性提示：教「扫描文本」这个系统手势，关掉就不再出现 */
+    .tip {
+      max-width: 430px; margin: 0 auto 8px;
+      display: none; align-items: center; gap: 8px;
+      background: var(--fill); color: var(--label2);
+      border-radius: 999px; padding: 8px 8px 8px 14px;
+      font-size: 12.5px; line-height: 1.4;
+    }
+    .tip.on { display: flex; }
+    body.select .tip { display: none; }
+    .tip-text { flex: 1; min-width: 0; }
+    .tip-x {
+      flex: none; width: 24px; height: 24px; border-radius: 50%; border: none;
+      background: none; color: var(--label3); cursor: pointer; font-family: inherit;
+      font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    }
+    .tip-x:active { opacity: 0.5; }
     /* 多选时输入条换成删除条 */
     body.select .composer-inner, body.select .attach-strip { display: none; }
     .selactions { max-width: 430px; margin: 0 auto; display: none; align-items: center; justify-content: space-between; gap: 12px; }
@@ -539,6 +557,10 @@
   </div>
 
   <div class="composer">
+    <div class="tip" id="tip-scan">
+      <span class="tip-text">📷 想抄书上的字？点一下输入框，选「扫描文本」</span>
+      <button class="tip-x" onclick="dismissScanTip()" aria-label="不再提示">✕</button>
+    </div>
     <div class="attach-strip hidden" id="attach-strip"></div>
     <div class="composer-inner">
       <button class="plus-btn" id="plus-btn" onclick="plusClick()"
@@ -680,9 +702,10 @@ const SEED_TAGS = [
   {
     id: 'idea', name: '念头', emoji: '💭',
     pattern: '',
-    keywords: ['突然想到', '忽然想', '想到', '在想', '一直在想', '念头', '灵感', '好像明白', '意识到', '发现自己',
-      '为什么', '也许', '或许', '大概是因为', '其实', '说不定', '感觉自己', '有点想', '要不要', '值不值得',
-      '纠结', '犹豫', '困惑', '想不通', '想通了', '反正', '算了', '突然觉得', '一个想法', '如果']
+    // 别放「如果 / 其实 / 为什么 / 反正」这类连接词——太常见，会把普通叙述和整页书都吸过来
+    keywords: ['突然想到', '忽然想', '在想', '一直在想', '念头', '灵感', '好像明白', '意识到', '发现自己',
+      '说不定', '感觉自己', '有点想', '要不要', '值不值得',
+      '纠结', '犹豫', '困惑', '想不通', '想通了', '突然觉得', '一个想法']
   },
   {
     // 形态规则优先级高于所有关键词打分，所以摘抄排在后面也照样先命中引号句
@@ -721,6 +744,20 @@ if (Number(localStorage.getItem(MIG_KEY) || 0) < 2) {
     .map(x => x.t);
   localStorage.setItem(TAGS_KEY, JSON.stringify(tags));
   localStorage.setItem(MIG_KEY, '2');
+}
+
+/* v3：v2 发出去的「念头」词表里混了「如果 / 其实 / 为什么 / 也许 / 或许 / 反正 / 算了 /
+   大概是因为 / 想到」这些连接词，太常见会乱吃。只在用户没动过词表时才换掉。 */
+if (Number(localStorage.getItem(MIG_KEY) || 0) < 3) {
+  const shipped = ['突然想到', '忽然想', '想到', '在想', '一直在想', '念头', '灵感', '好像明白', '意识到', '发现自己',
+    '为什么', '也许', '或许', '大概是因为', '其实', '说不定', '感觉自己', '有点想', '要不要', '值不值得',
+    '纠结', '犹豫', '困惑', '想不通', '想通了', '反正', '算了', '突然觉得', '一个想法', '如果'];
+  const idea = tags.find(t => t.id === 'idea');
+  if (idea && idea.keywords.length === shipped.length && idea.keywords.every((w, i) => w === shipped[i])) {
+    idea.keywords = SEED_TAGS.find(t => t.id === 'idea').keywords.slice();
+    localStorage.setItem(TAGS_KEY, JSON.stringify(tags));
+  }
+  localStorage.setItem(MIG_KEY, '3');
 }
 
 function saveEntries() { localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); }
@@ -1084,12 +1121,56 @@ function renderAll() {
 
 let pendingImgs = [];   // 待发送的图片 dataURL
 
+/* 一次插进来 40 字以上，只可能是扫描或粘贴，打字打不出这个量。
+   用它来给「摘抄」加一票，并提示可以整理 OCR 的硬断行。 */
+const BULK_MIN = 40;
+let lastInputLen = 0;
+let bulkInserted = false;
+
 function onInput() {
   const ta = document.getElementById('input');
+  const added = ta.value.length - lastInputLen;
+  lastInputLen = ta.value.length;
   ta.style.height = 'auto';
   ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
   document.getElementById('send-btn').disabled = !ta.value.trim() && !pendingImgs.length;
   document.getElementById('plus-btn').disabled = pendingImgs.length >= MAX_IMGS;
+  if (added >= BULK_MIN) {
+    bulkInserted = true;
+    // OCR 按印刷行断句，一段话会变成七八行硬回车
+    if (countLines(ta.value) >= 2) showToast(`扫到 ${added} 字`, '整理断行', tidyComposer);
+  }
+}
+
+function countLines(s) { return (s.match(/\n/g) || []).length; }
+
+function tidyComposer() {
+  const ta = document.getElementById('input');
+  ta.value = tidyLineBreaks(ta.value);
+  lastInputLen = ta.value.length;
+  onInput();
+  ta.focus();
+}
+
+/* 把 OCR 的硬断行接回段落。保守：句末标点后的换行、空行（段落分隔）都留着，
+   只合并明显是「一行没写完被折走」的那种。 */
+const TERMINAL = /[。！？…”」』.!?]$/;
+const CONTINUES = /^[，。！？；：、）」』”…,.!?;:)]/;
+function tidyLineBreaks(text) {
+  const lines = text.split('\n').map(l => l.trim());
+  const out = [];
+  for (const line of lines) {
+    if (!out.length || line === '' || out[out.length - 1] === '') { out.push(line); continue; }
+    const prev = out[out.length - 1];
+    // 下一行以「，」这类标点开头，一定是被折走的下半句，即使上一行看着已经收尾
+    const join = CONTINUES.test(line) || !TERMINAL.test(prev);
+    if (!join) { out.push(line); continue; }
+    let a = prev;
+    if (/[A-Za-z]-$/.test(a) && /^[a-z]/.test(line)) a = a.slice(0, -1);          // 英文连字符断词
+    else if (/[A-Za-z0-9]$/.test(a) && /^[A-Za-z0-9]/.test(line)) a += ' ';       // 英文词之间补空格
+    out[out.length - 1] = a + line;
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function renderAttachStrip() {
@@ -1172,7 +1253,9 @@ async function addEntry() {
   const text = ta.value.trim();
   if (!text && !pendingImgs.length) return;
   const d = new Date();
-  const tag = suggestTag(text);          // 纯图片没有文字信号，自然落到兜底的「其他」
+  let tag = suggestTag(text);            // 纯图片没有文字信号，自然落到兜底的「其他」
+  // 扫/粘进来的整段文字，本来要掉进「其他」的才改判摘抄；有饮食运动信号的不抢
+  if (bulkInserted && tag.fallback && text.length >= BULK_MIN) tag = tagById('quote') || tag;
 
   const imgIds = [];
   for (const data of pendingImgs) {
@@ -1185,6 +1268,7 @@ async function addEntry() {
   saveEntries();
   ta.value = '';
   pendingImgs = [];
+  bulkInserted = false;
   renderAttachStrip();
   if (activeFilter !== 'all' && activeFilter !== tag.id) activeFilter = 'all';
   renderAll();
@@ -1256,6 +1340,7 @@ function openEntryAction(id) {
     <div class="action-group">
       <div class="action-title">${esc(e.date)} ${esc(e.time)}<br>${esc(preview)}</div>
       <button class="action-btn" onclick="forceCloseAction(); openEditText('${id}')">编辑文本</button>
+      ${countLines(e.text) >= 2 ? `<button class="action-btn" onclick="forceCloseAction(); tidyEntry('${id}')">整理断行</button>` : ''}
       <button class="action-btn" onclick="forceCloseAction(); openTagPicker('${id}')">改标签</button>
       ${nImg ? `<button class="action-btn" onclick="forceCloseAction(); openImageManager('${id}')">管理图片（${nImg} 张）</button>` : ''}
       <button class="action-btn" onclick="forceCloseAction(); enterSelect('${id}')">选择多条…</button>
@@ -1282,6 +1367,23 @@ function deleteEntry(id) {
   forceCloseAction();
   renderAll();
   showToast('已删除');
+}
+
+/* ═══════════════════ 扫描提示（教系统的「扫描文本」手势） ═══════════════════ */
+
+const SCAN_TIP_KEY = 'daylog-tip-scan';
+// 系统扫描是 iOS/iPadOS 的能力，别在桌面上提示一个点不出来的菜单
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+function initScanTip() {
+  if (!isIOS || localStorage.getItem(SCAN_TIP_KEY)) return;
+  document.getElementById('tip-scan').classList.add('on');
+}
+function dismissScanTip() {
+  localStorage.setItem(SCAN_TIP_KEY, '1');
+  document.getElementById('tip-scan').classList.remove('on');
+  showToast('设置里还能找到用法');
 }
 
 /* ═══════════════════ 配色主题 ═══════════════════ */
@@ -1444,6 +1546,24 @@ function openEditText(id) {
   setTimeout(() => document.getElementById('edit-text').focus(), 250);
 }
 
+function tidyEntry(id) {
+  const e = entryById(id);
+  if (!e) return;
+  const tidied = tidyLineBreaks(e.text);
+  if (tidied === e.text) { showToast('这条不用整理'); return; }
+  const before = e.text;
+  e.text = tidied;
+  saveEntries();
+  renderAll();
+  showToast(`${countLines(before) + 1} 行并成 ${countLines(tidied) + 1} 行`, '撤销', () => {
+    const x = entryById(id);
+    if (!x) return;
+    x.text = before;
+    saveEntries();
+    renderAll();
+  });
+}
+
 function saveEditText(id) {
   const e = entryById(id);
   const v = document.getElementById('edit-text').value.trim();
@@ -1547,6 +1667,14 @@ function renderSettings() {
       </div>`;
   });
   html += `</div>`;
+
+  html += `<div class="card-label">小技巧</div><div class="card">
+      <div class="row"><div class="row-info">
+        <div class="row-name">📷 扫描书上的文字</div>
+        <div class="row-sub">1. 点一下输入框，再点一下光标<br>2. 选菜单里的「扫描文本」<br>3. 镜头对准书页，文字直接填进来</div>
+      </div></div>
+    </div>
+    <div class="form-hint" style="margin:8px 2px 0">这是 iOS 自带的能力（Apple Vision），识别中文比网页方案准得多，也不用联网。扫进来的整段文字会自动归到「摘抄」；断行太碎的话，长按气泡选「整理断行」。</div>`;
 
   html += `<div class="card-label">标签</div><div class="card">`;
   tags.forEach((t, i) => {
@@ -1821,6 +1949,7 @@ saveTags();
 renderAll();
 scrollToBottom(false);
 renderAttachStrip();
+initScanTip();
 
 // 存了图片就得申请持久化，否则 Safari 空间紧张时会把 IndexedDB 清掉
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
