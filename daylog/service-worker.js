@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daylog-v5';
+const CACHE_NAME = 'daylog-v6';
 const BASE = '/master/daylog/';
 const ASSETS = [BASE, BASE + 'index.html', BASE + 'manifest.json'];
 

@@ -348,17 +348,14 @@
     .adv[open] > summary::before { content: '▾ '; }
     .adv > summary:active { opacity: 0.5; }
     /* ── 图片 ── */
-    .imgs { display: grid; gap: 4px; margin-bottom: 8px; }
+    /* 展开就是一张张大图竖着排，不做宫格缩略图；宽高按原图比例，不裁不留黑边 */
+    .imgs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; align-items: flex-start; }
     .imgs:last-child { margin-bottom: 0; }
-    .imgs.n1 { grid-template-columns: 1fr; }
-    .imgs.n2, .imgs.n3, .imgs.n4 { grid-template-columns: 1fr 1fr; }
     .imgs img {
-      width: 100%; display: block; border-radius: 10px;
-      background: var(--fill); object-fit: cover;
+      display: block; width: auto; height: auto;
+      max-width: 100%; max-height: 380px;
+      border-radius: 12px; background: var(--fill);
     }
-    .imgs.n1 img { max-height: 300px; object-fit: contain; object-position: left; border-radius: 12px; }
-    .imgs.n2 img, .imgs.n3 img, .imgs.n4 img { aspect-ratio: 1; }
-    .imgs.n3 img:first-child { grid-column: span 2; aspect-ratio: 16/9; }
 
     /* 多张图默认合并成一叠（仿微信）：顶图后面透出两张卡的边 */
     .imgstack { position: relative; isolation: isolate; width: 168px; max-width: 100%; cursor: pointer; }
@@ -378,7 +375,9 @@
     .imgstack:active { opacity: 0.85; }
 
     /* 气泡 + 旁边的「展开 N / 收起」灰药丸 */
-    .bline { display: flex; align-items: center; gap: 10px; max-width: 100%; }
+    /* width:100% 是必须的：.bline 若是 shrink-to-fit，气泡的 max-width:84%
+       会拿自己的内容宽去算百分比，结果气泡被越算越窄、文字乱折行 */
+    .bline { display: flex; align-items: center; gap: 10px; width: 100%; }
     .brow.me .bline { justify-content: flex-end; }
     .brow:not(.me) .bline { flex-direction: row-reverse; justify-content: flex-end; }
     .expand-pill {
@@ -417,7 +416,17 @@
       opacity: 0; pointer-events: none; transition: opacity 0.2s;
     }
     .lightbox.open { opacity: 1; pointer-events: auto; }
-    .lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
+    .lightbox img {
+      max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px;
+      -webkit-user-drag: none; user-select: none; pointer-events: none;   /* 让滑动落在灯箱上 */
+    }
+    .lb-count {
+      position: absolute; left: 0; right: 0;
+      top: calc(env(safe-area-inset-top) + 18px);
+      text-align: center; color: rgba(255,255,255,0.85);
+      font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums;
+      pointer-events: none;
+    }
     .lightbox-bar {
       position: absolute; left: 0; right: 0; bottom: 0;
       padding: 16px 20px calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 20px);
@@ -548,9 +557,10 @@
   <div id="form-body"></div>
 </div>
 
-<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+<div class="lightbox" id="lightbox">
+  <div class="lb-count" id="lb-count"></div>
   <img id="lightbox-img" alt="">
-  <div class="lightbox-bar" onclick="event.stopPropagation()">
+  <div class="lightbox-bar">
     <button class="lb-btn" onclick="closeLightbox()">关闭</button>
     <button class="lb-btn danger" onclick="deleteCurrentImage()">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -888,29 +898,77 @@ function hydrateImages() {
   });
 }
 
-let lightboxCtx = null;   // { entryId, imgId }：删除这张时要知道它挂在哪条记录上
+/* 灯箱：整条记录的图都在里面，可以左右滑 */
+let lbEntry = null, lbList = [], lbIndex = 0;
+
 function openLightbox(entryId, imgId) {
   if (selectMode) return;
-  imgURL(imgId).then(url => {
+  const e = entryById(entryId);
+  if (!e) return;
+  lbEntry = entryId;
+  lbList = (e.imgs || []).slice();
+  lbIndex = Math.max(0, lbList.indexOf(imgId));
+  showLightboxImage();
+}
+
+function showLightboxImage() {
+  const id = lbList[lbIndex];
+  if (!id) { closeLightbox(); return; }
+  imgURL(id).then(url => {
     if (!url) return;
-    lightboxCtx = { entryId, imgId };
     document.getElementById('lightbox-img').src = url;
+    document.getElementById('lb-count').textContent = lbList.length > 1 ? `${lbIndex + 1} / ${lbList.length}` : '';
     document.getElementById('lightbox').classList.add('open');
   });
 }
-function closeLightbox(e) {
-  if (e && e.target.closest('.lightbox-bar')) return;
+
+function lbGo(delta) {
+  if (lbList.length < 2) return;
+  lbIndex = (lbIndex + delta + lbList.length) % lbList.length;   // 到头绕回去
+  showLightboxImage();
+}
+
+function closeLightbox() {
   document.getElementById('lightbox').classList.remove('open');
   document.getElementById('lightbox-img').src = '';
-  lightboxCtx = null;
+  lbEntry = null; lbList = []; lbIndex = 0;
 }
 
 function deleteCurrentImage() {
-  if (!lightboxCtx) return;
-  const { entryId, imgId } = lightboxCtx;
-  closeLightbox();
-  removeImageFromEntry(entryId, imgId);
+  const imgId = lbList[lbIndex];
+  if (!imgId) return;
+  const emptied = removeImageFromEntry(lbEntry, imgId);
+  lbList.splice(lbIndex, 1);
+  // 还有剩的就停在灯箱里看下一张，别把人踢出去
+  if (emptied || !lbList.length) { closeLightbox(); return; }
+  if (lbIndex >= lbList.length) lbIndex = lbList.length - 1;
+  showLightboxImage();
 }
+
+/* 左右滑动翻页：滑动了就不当成「点空白关闭」 */
+(() => {
+  const lb = document.getElementById('lightbox');
+  let startX = null, swiped = false;
+  lb.addEventListener('pointerdown', e => { startX = e.clientX; swiped = false; });
+  lb.addEventListener('pointerup', e => {
+    if (startX === null) return;
+    const dx = e.clientX - startX;
+    startX = null;
+    if (Math.abs(dx) > 45) { swiped = true; lbGo(dx < 0 ? 1 : -1); }
+  });
+  lb.addEventListener('pointercancel', () => { startX = null; });
+  lb.addEventListener('click', e => {
+    if (swiped) { swiped = false; return; }
+    if (e.target.closest('.lightbox-bar')) return;
+    closeLightbox();
+  });
+  document.addEventListener('keydown', e => {
+    if (!lb.classList.contains('open')) return;
+    if (e.key === 'ArrowLeft') lbGo(-1);
+    else if (e.key === 'ArrowRight') lbGo(1);
+    else if (e.key === 'Escape') closeLightbox();
+  });
+})();
 
 // 返回 true 表示这条记录被整条收掉了（图删光且没有文字）
 function removeImageFromEntry(entryId, imgId) {
