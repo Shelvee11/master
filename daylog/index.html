@@ -337,6 +337,32 @@
     .plus-btn:active { transform: scale(0.92); }
     .plus-btn:disabled { color: var(--label3); }
 
+    /* ── 加号菜单：贴着加号浮起的毛玻璃小面板（仿 mynd），不是全宽 action sheet ── */
+    .attach-overlay {
+      position: fixed; inset: 0; z-index: 400;
+      opacity: 0; pointer-events: none; transition: opacity 0.18s;
+    }
+    .attach-overlay.open { opacity: 1; pointer-events: auto; }
+    .attach-menu {
+      position: absolute; min-width: 196px; padding: 7px;
+      background: rgba(255,255,255,0.68);
+      backdrop-filter: saturate(180%) blur(28px);
+      -webkit-backdrop-filter: saturate(180%) blur(28px);
+      border-radius: 24px;
+      box-shadow: 0 14px 44px rgba(31,30,26,0.18), inset 0 0 0 0.5px rgba(255,255,255,0.7);
+      transform: scale(0.88) translateY(10px); transform-origin: bottom left; opacity: 0;
+      transition: transform 0.24s cubic-bezier(0.32,0.72,0,1), opacity 0.18s;
+    }
+    .attach-overlay.open .attach-menu { transform: none; opacity: 1; }
+    .attach-item {
+      width: 100%; display: flex; align-items: center; gap: 15px;
+      padding: 13px 16px; border: none; background: none; border-radius: 18px;
+      font-family: inherit; font-size: 17px; color: var(--label);
+      text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .attach-item:active { background: rgba(31,30,26,0.07); }
+    .attach-item svg { flex: none; }
+
     /* 看大图 */
     .lightbox {
       position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,0.92);
@@ -383,7 +409,7 @@
   <div class="composer">
     <div class="attach-strip hidden" id="attach-strip"></div>
     <div class="composer-inner">
-      <button class="plus-btn" id="plus-btn" onclick="openAttachSheet()" aria-label="添加图片">
+      <button class="plus-btn" id="plus-btn" onclick="openAttachMenu()" aria-label="添加图片">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -397,6 +423,35 @@
         </svg>
       </button>
     </div>
+  </div>
+</div>
+
+<!-- 加号菜单：JS 按加号位置定位，见 openAttachMenu() -->
+<div class="attach-overlay" id="attach-overlay" onclick="closeAttachMenu(event)">
+  <div class="attach-menu" id="attach-menu">
+    <button class="attach-item" onclick="closeAttachMenu(); pickFiles(true)">
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 8.6A2.6 2.6 0 0 1 5.6 6h1.6a1 1 0 0 0 .83-.45l.93-1.4a1 1 0 0 1 .84-.45h4.4a1 1 0 0 1 .84.45l.93 1.4A1 1 0 0 0 16.8 6h1.6A2.6 2.6 0 0 1 21 8.6v7.8A2.6 2.6 0 0 1 18.4 19H5.6A2.6 2.6 0 0 1 3 16.4z"></path>
+        <circle cx="12" cy="12.4" r="3.5"></circle>
+      </svg>
+      相机
+    </button>
+    <button class="attach-item" onclick="closeAttachMenu(); pickFiles(false)">
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4.5" width="18" height="15" rx="3.2"></rect>
+        <circle cx="8.5" cy="10" r="1.6"></circle>
+        <path d="M3.4 17.6l4.6-4.1a2 2 0 0 1 2.7 0l3.1 2.8"></path>
+        <path d="M13.1 14.5l1.8-1.6a2 2 0 0 1 2.7 0l3 2.7"></path>
+      </svg>
+      相册
+    </button>
+    <button class="attach-item" onclick="closeAttachMenu(); pasteImage()">
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="8.5" y="3.5" width="11.5" height="14.5" rx="3"></rect>
+        <path d="M15.6 21H7a3 3 0 0 1-3-3V7.2"></path>
+      </svg>
+      剪贴板
+    </button>
   </div>
 </div>
 
@@ -761,21 +816,24 @@ function renderAttachStrip() {
 }
 function removePending(i) { pendingImgs.splice(i, 1); renderAttachStrip(); }
 
-function openAttachSheet() {
+function openAttachMenu() {
   if (pendingImgs.length >= MAX_IMGS) { showToast(`最多 ${MAX_IMGS} 张`); return; }
-  openAction(`
-    <div class="action-group">
-      <button class="action-btn" onclick="forceCloseAction(); pickFiles(false)">🖼️ 相册</button>
-      <button class="action-btn" onclick="forceCloseAction(); pickFiles(true)">📷 拍照</button>
-      <button class="action-btn" onclick="forceCloseAction(); pasteImage()">📋 剪贴板</button>
-    </div>
-    <div class="action-group">
-      <button class="action-btn strong" onclick="forceCloseAction()">取消</button>
-    </div>`);
+  const ov = document.getElementById('attach-overlay');
+  const menu = document.getElementById('attach-menu');
+  const r = document.getElementById('plus-btn').getBoundingClientRect();
+  // 左下角对齐加号，向上浮起；两者都用视口坐标，键盘抬起时加号自己会动，这里跟着它就行
+  menu.style.left = Math.max(10, r.left) + 'px';
+  menu.style.bottom = (window.innerHeight - r.top + 10) + 'px';
+  ov.classList.add('open');
+}
+function closeAttachMenu(e) {
+  if (e && e.target.closest('.attach-menu')) return;
+  document.getElementById('attach-overlay').classList.remove('open');
 }
 
 function pickFiles(camera) {
   const inp = document.getElementById('pick-file');
+  // capture 让 iOS 直接开相机，跳过「照片图库 / 拍照 / 选取文件」那层系统菜单
   if (camera) inp.setAttribute('capture', 'environment'); else inp.removeAttribute('capture');
   inp.click();
 }
