@@ -8,9 +8,32 @@
   <meta name="apple-mobile-web-app-title" content="Aside">
   <meta name="theme-color" content="#efeeea">
   <!-- 主题必须在首屏画之前定下来，否则会闪一下默认色 -->
+  <!-- 改名迁移：项目原叫 DayLog，所有键从 daylog-* 换到 aside-*。必须跑在任何一次
+       读键之前（包括紧接着的主题读取），否则老用户开机看见的是一个空 App。
+       逐键「拷完就删」，不一次性铺开——localStorage 只有 5MB，同时留两份可能撑爆。 -->
   <script>
     try {
-      var th = localStorage.getItem('daylog-theme');
+      if (!localStorage.getItem('aside-renamed')) {
+        var olds = [];
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf('daylog-') === 0) olds.push(k);
+        }
+        for (var j = 0; j < olds.length; j++) {
+          var nk = 'aside-' + olds[j].slice(7);
+          if (localStorage.getItem(nk) === null) localStorage.setItem(nk, localStorage.getItem(olds[j]));
+          localStorage.removeItem(olds[j]);
+        }
+        // Worker 也一起改名了，把存着的老地址换掉，省得每台设备进设置重填
+        var su = localStorage.getItem('aside-sync-url');
+        if (su && su.indexOf('daylog-sync.') > -1) {
+          localStorage.setItem('aside-sync-url', su.replace('daylog-sync.', 'aside-sync.'));
+        }
+        localStorage.setItem('aside-renamed', '1');
+      }
+    } catch (e) {}
+    try {
+      var th = localStorage.getItem('aside-theme');
       if (th && th !== 'mynd') {
         document.documentElement.setAttribute('data-theme', th);
         document.querySelector('meta[name="theme-color"]').setAttribute('content', th === 'blue' ? '#ffffff' : '#efeeea');
@@ -48,7 +71,7 @@
       /* 气泡：三个大圆角 + 尾巴那一角收小（照 mynd）。
          想微调松紧就改这四个数，别去改 .bubble 本身 */
       --bubble-r:     20px;
-      --bubble-tail:   7px;   /* 靠说话人那一侧的下角 */
+      --bubble-tail:   7px;   /* 靠说话人那一侧的上角 */
       --bubble-pad-y:  9px;
       --bubble-pad-x: 14px;
       --app-h:   100dvh;
@@ -179,17 +202,23 @@
     .bubble {
       max-width: 88%; padding: var(--bubble-pad-y) var(--bubble-pad-x);
       background: var(--bg2); color: var(--label);
-      /* 往日在左，收小的是左下角；今天在右，收小的是右下角（下面覆盖） */
-      border-radius: var(--bubble-r) var(--bubble-r) var(--bubble-r) var(--bubble-tail);
+      /* 收小的那一角贴着说话人：往日在左，收左上角；今天在右，收右上角（下面覆盖）。
+         四个值的顺序是 左上 右上 右下 左下 */
+      border-radius: var(--bubble-tail) var(--bubble-r) var(--bubble-r) var(--bubble-r);
       cursor: pointer;
       /* 关掉系统选词：双击要用来开待办，不然每次都先蹦出一个「拷贝」气泡。
          复制走长按菜单里的「复制文本」 */
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+      /* 横滑归我们，竖向滚动照旧交给浏览器——写 none 会把整条时间线滚不动 */
+      touch-action: pan-y;
+      transition: transform 0.18s ease;
     }
     .brow.me .bubble {
       background: var(--accent); color: var(--accent-fg);
-      border-radius: var(--bubble-r) var(--bubble-r) var(--bubble-tail) var(--bubble-r);
+      border-radius: var(--bubble-r) var(--bubble-tail) var(--bubble-r) var(--bubble-r);
     }
+    /* 右滑循环的第四态：位置在右、颜色还是原本那身白 */
+    .brow.me .bubble.plain { background: var(--bg2); color: var(--label); }
     .bubble:active { opacity: 0.8; }
 
     /* 高光：整条气泡换成便签黄，左右两侧都盖掉 */
@@ -221,6 +250,9 @@
     .bubble.td.done .td-box .tick { display: block; color: #fff; }
     .brow.me .bubble.td.done .td-box { background: var(--accent-fg); border-color: var(--accent-fg); }
     .brow.me .bubble.td.done .td-box .tick { color: var(--accent); }
+    /* 右侧白气泡：底色回到白的，勾也得跟着换回绿底白勾，否则白勾落在白底上看不见 */
+    .brow.me .bubble.plain.td.done .td-box { background: var(--accent); border-color: var(--accent); }
+    .brow.me .bubble.plain.td.done .td-box .tick { color: #fff; }
     .bubble.td.done .btext { text-decoration: line-through; opacity: 0.5; }
     .tdrow .tdwrap { flex: 1; min-width: 0; }
 
@@ -857,14 +889,30 @@
 <script>
 /* ═══════════════════ Constants & Utils ═══════════════════ */
 
-const ENTRIES_KEY = 'daylog-entries';
-const TAGS_KEY    = 'daylog-tags';
+const ENTRIES_KEY = 'aside-entries';
+const TAGS_KEY    = 'aside-tags';
 
 const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function dateKey(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function todayKey() { return dateKey(new Date()); }
+
+/* ── 靠哪边 ────────────────────────────────────────────────────
+   右边 = 「刚记的」：4 小时内自动靠右，过了就自己漂到左边。判定用的是记录自己的
+   date+time，所以补记写到上周的条目一落笔就在左边。
+   e.side 是右滑手动定的覆盖值，一旦有值就不再随时间变：
+     0 / undefined  自动（按 4 小时判定）
+     1              强制靠右，用主题色
+     2              强制靠右，用原本的白底  */
+const RECENT_MS = 4 * 60 * 60 * 1000;
+function entryTs(e) {
+  const [y, m, d]  = e.date.split('-').map(Number);
+  const [hh, mm]   = (e.time || '00:00').split(':').map(Number);
+  return new Date(y, m - 1, d, hh || 0, mm || 0).getTime();
+}
+function isRecent(e) { return Date.now() - entryTs(e) < RECENT_MS; }
+function onRight(e)  { return !!e.side || isRecent(e); }
 function nowTime(d) { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -942,7 +990,7 @@ if (!tags.some(t => t.fallback)) { tags[tags.length - 1].fallback = true; }
 /* 一次性迁移：SEED_TAGS 只对全新安装生效，已写进 localStorage 的标签得单独补。
    v1 曾经漏掉写回，重排下次刷新就丢了；这里 v2 一并补齐并落盘。
    只动「有没有」和「顺序」，不碰任何标签的 name/emoji/keywords/pattern。 */
-const MIG_KEY = 'daylog-migration';
+const MIG_KEY = 'aside-migration';
 if (Number(localStorage.getItem(MIG_KEY) || 0) < 2) {
   if (!tags.some(t => t.id === 'idea')) tags.push(JSON.parse(JSON.stringify(SEED_TAGS.find(t => t.id === 'idea'))));
   const order = ['diet', 'sport', 'todo', 'idea', 'quote', 'other'];
@@ -988,15 +1036,56 @@ const IMG_MAX_SIDE = 1280; // 长边上限
 const IMG_QUALITY = 0.72;
 
 let dbPromise = null;
-function db() {
-  if (!dbPromise) {
-    dbPromise = new Promise((res, rej) => {
-      const r = indexedDB.open('daylog', 1);
+let asidePromise = null;
+
+function openAsideDB() {
+  if (!asidePromise) {
+    asidePromise = new Promise((res, rej) => {
+      const r = indexedDB.open('aside', 1);
       r.onupgradeneeded = () => r.result.createObjectStore('images', { keyPath: 'id' });
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error);
     });
   }
+  return asidePromise;
+}
+
+/* 改名迁移：图片库从 daylog 挪到 aside。open 不带版本号，老库不存在时浏览器会顺手
+   建一个空的，所以检不到 images 表就直接删掉、不留垃圾。整段失败也只是这次不迁移，
+   下次打开重来一遍——绝不让它挡住正常读写。 */
+const IDB_MIG_KEY = 'aside-idb-migrated';
+function migrateImages() {
+  if (localStorage.getItem(IDB_MIG_KEY)) return Promise.resolve();
+  return new Promise(res => {
+    const r = indexedDB.open('daylog');
+    r.onerror = () => res(null);
+    r.onsuccess = () => {
+      const old = r.result;
+      if (!old.objectStoreNames.contains('images')) { old.close(); res(null); return; }
+      const tx = old.transaction('images', 'readonly');
+      const all = tx.objectStore('images').getAll();
+      tx.oncomplete = () => { old.close(); res(all.result || []); };
+      tx.onerror    = () => { old.close(); res(null); };
+    };
+  }).then(recs => {
+    if (!recs || !recs.length) return;
+    return openAsideDB().then(d => new Promise((res, rej) => {
+      const tx = d.transaction('images', 'readwrite');
+      const s = tx.objectStore('images');
+      recs.forEach(rec => s.put(rec));
+      tx.oncomplete = () => res();
+      tx.onerror    = () => rej(tx.error);
+    }));
+  }).then(() => new Promise(res => {
+    const del = indexedDB.deleteDatabase('daylog');
+    del.onsuccess = del.onerror = del.onblocked = () => res();
+  })).then(() => {
+    localStorage.setItem(IDB_MIG_KEY, '1');
+  }).catch(() => {});
+}
+
+function db() {
+  if (!dbPromise) dbPromise = migrateImages().then(openAsideDB);
   return dbPromise;
 }
 function idbRun(mode, fn) {
@@ -1211,10 +1300,10 @@ function renderStream() {
           <svg class="off" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9.5"></circle></svg>
           <svg class="on" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle><polyline points="7.6 12.3 10.7 15.3 16.4 9.2" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
         </button>
-        <div class="brow ${e.date === today ? 'me' : ''}">
+        <div class="brow ${onRight(e) ? 'me' : ''}">
           <div class="bline">
             ${pill}
-            <div class="bubble ${e.hl ? 'hl' : ''} ${e.qt ? 'qt' : ''} ${e.td ? 'td' : ''} ${e.td === 2 ? 'done' : ''} ${e.msk ? 'msk' : ''}"
+            <div class="bubble ${e.hl ? 'hl' : ''} ${e.side === 2 ? 'plain' : ''} ${e.qt ? 'qt' : ''} ${e.td ? 'td' : ''} ${e.td === 2 ? 'done' : ''} ${e.msk ? 'msk' : ''}"
                  onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
               ${body}
               ${veil}
@@ -1651,6 +1740,8 @@ function bubbleDown(id) {
 }
 function bubbleUp(id) {
   if (selectMode) return;
+  // 刚横滑完，这一下 pointerup 是收尾不是轻点
+  if (swSuppress) { clearTimeout(longPressTimer); longPressTimer = null; lastTapId = null; return; }
   if (longPressTimer === 'fired') { longPressTimer = null; return; }
   clearTimeout(longPressTimer);
   longPressTimer = null;
@@ -1667,7 +1758,93 @@ function bubbleUp(id) {
   clearTimeout(tapTimer);
   tapTimer = setTimeout(() => { lastTapId = null; openEntryAction(id); }, DBL_MS);
 }
-function bubbleCancel() { clearTimeout(longPressTimer); longPressTimer = null; }
+function bubbleCancel() { clearTimeout(longPressTimer); longPressTimer = null; swEnd(); }
+
+/* ── 气泡横滑：一个手势管「靠哪边」和「高不高光」两件事 ───────────────
+   历史消息（自动靠左）走四态循环，到了右边就不会自己回去：
+     ① 左·白底 →右滑→ ② 右·主题色 →右滑→ ③ 右·高光 →右滑→ ④ 右·白底 →右滑→ ②…
+   左滑只管位置，把它还回左边（高光保持原样，不一起清掉）。
+   近 4 小时的消息本来就在右边，右滑只在「普通 / 高光」之间切，左滑滑不动。
+
+   监听挂在 #stream 的**捕获阶段**：图片和药丸自己 stopPropagation 了（免得点图
+   也算点气泡），冒泡阶段收不到，捕获阶段先于目标触发，所以从图片上起手也能滑。
+   轻点/双击/长按仍旧走气泡上那三个内联 handler，这里只负责横滑并在锁定后掐掉它们。 */
+const SWIPE_LOCK = 10;   // 越过它才判定为横向意图
+const SWIPE_GO   = 52;   // 松手时位移越过它才生效
+let sw = null;           // { id, el, x0, y0, dx, locked }
+let swSuppress = false;  // 横滑刚结束，吃掉紧跟着的那次 pointerup
+
+function swEnd() {
+  if (sw && sw.el) { sw.el.style.transition = ''; sw.el.style.transform = ''; }
+  sw = null;
+}
+
+function swDown(ev) {
+  if (selectMode) return;
+  const el = ev.target.closest && ev.target.closest('.bubble');
+  const row = el && el.closest('.srow');
+  if (!el || !row) return;
+  sw = { id: row.dataset.id, el, x0: ev.clientX, y0: ev.clientY, dx: 0, locked: false };
+}
+
+function swMove(ev) {
+  if (!sw) return;
+  const dx = ev.clientX - sw.x0, dy = ev.clientY - sw.y0;
+  if (!sw.locked) {
+    // 竖向为主 → 这是在滚时间线，撒手让浏览器接管
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > SWIPE_LOCK) { swEnd(); return; }
+    if (Math.abs(dx) < SWIPE_LOCK) return;
+    sw.locked = true;
+    clearTimeout(longPressTimer); longPressTimer = null;   // 横滑赢了，别再弹操作表
+    clearTimeout(tapTimer); lastTapId = null;
+    try { sw.el.setPointerCapture(ev.pointerId); } catch (err) {}
+    sw.el.style.transition = 'none';
+  }
+  const e = entryById(sw.id);
+  // 滑不动的方向给三分之一阻尼：滑得出去一点，手感上告诉你「这边到头了」
+  const dead = dx < 0 && !(e && e.side);
+  sw.dx = dead ? dx / 3 : dx;
+  sw.el.style.transform = `translateX(${sw.dx}px)`;
+}
+
+function swUp() {
+  if (!sw) return;
+  const { id, dx, locked } = sw;
+  swEnd();
+  if (!locked) return;
+  swSuppress = true;
+  setTimeout(() => { swSuppress = false; }, 0);   // 只挡紧跟着的那一次 pointerup
+  if (dx >= SWIPE_GO) swipeRight(id);
+  else if (dx <= -SWIPE_GO) swipeLeft(id);
+}
+
+/* 四态机。状态从 side + hl 反推，不另存字段——JSON 备份和云同步（按整条内容
+   算 hash）都自动带上，不用改任何一处序列化。 */
+function swipeState(e) {
+  if (!e.side) return 0;              // 自动位置
+  if (e.side === 2) return 3;         // 右·白底
+  return e.hl ? 2 : 1;                // 右·高光 / 右·主题色
+}
+function swipeRight(id) {
+  const e = entryById(id);
+  if (!e) return;
+  // 本来就在右边的：右滑只切高光，不动位置
+  if (swipeState(e) === 0 && isRecent(e)) { e.hl = !e.hl; }
+  else {
+    const next = { 0: 1, 1: 2, 2: 3, 3: 1 }[swipeState(e)];
+    e.side = next === 3 ? 2 : 1;
+    e.hl   = next === 2;
+  }
+  saveEntries();
+  renderAll();
+}
+function swipeLeft(id) {
+  const e = entryById(id);
+  if (!e || !e.side) return;   // 近消息滑不回左边
+  e.side = 0;
+  saveEntries();
+  renderAll();
+}
 
 function openEntryAction(id) {
   const e = entryById(id);
@@ -2091,7 +2268,7 @@ function jumpToDate(key) {
 
 /* ═══════════════════ 扫描提示（教系统的「扫描文本」手势） ═══════════════════ */
 
-const SCAN_TIP_KEY = 'daylog-tip-scan';
+const SCAN_TIP_KEY = 'aside-tip-scan';
 // 系统扫描是 iOS/iPadOS 的能力，别在桌面上提示一个点不出来的菜单
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -2108,7 +2285,7 @@ function dismissScanTip() {
 
 /* ═══════════════════ 配色主题 ═══════════════════ */
 
-const THEME_KEY = 'daylog-theme';
+const THEME_KEY = 'aside-theme';
 const THEMES = [
   { id: 'mynd', name: '暖灰墨绿', desc: '默认 · 参照 mynd', bg: '#efeeea', old: '#ffffff', me: '#3d4f45', bar: '#efeeea' },
   { id: 'blue', name: '白底天蓝', desc: '参照 iMessage',   bg: '#ffffff', old: '#e9e9eb', me: '#1f8cf5', bar: '#ffffff' },
@@ -2702,11 +2879,11 @@ function clearAll() {
    划算。电脑端拉到带图的记录时图会自动隐藏、文字照常显示，图片仍然只能靠 JSON
    备份带走（跟导出 Markdown 的取舍一致）。 */
 
-const SYNC_URL_KEY   = 'daylog-sync-url';
-const SYNC_TOKEN_KEY = 'daylog-sync-token';
-const SYNC_AT_KEY    = 'daylog-sync-at';    // 上次同步拿到的服务器时间，增量拉取的游标
-const SYNC_SNAP_KEY  = 'daylog-sync-snap';  // id → 内容 hash，用来算「哪几条改过」
-const SYNC_TAGH_KEY  = 'daylog-sync-tagh';  // 标签表的 hash，单独存——混进 snap 会被当成一条记录，进而生成假墓碑
+const SYNC_URL_KEY   = 'aside-sync-url';
+const SYNC_TOKEN_KEY = 'aside-sync-token';
+const SYNC_AT_KEY    = 'aside-sync-at';    // 上次同步拿到的服务器时间，增量拉取的游标
+const SYNC_SNAP_KEY  = 'aside-sync-snap';  // id → 内容 hash，用来算「哪几条改过」
+const SYNC_TAGH_KEY  = 'aside-sync-tagh';  // 标签表的 hash，单独存——混进 snap 会被当成一条记录，进而生成假墓碑
 
 let syncSnap     = loadJSON(SYNC_SNAP_KEY, {}) || {};
 let syncing      = false;
@@ -2874,7 +3051,7 @@ function openSyncSetup() {
   openForm('云同步', `
     <div class="form-group">
       <label class="form-label">Worker 地址</label>
-      <input class="form-input" id="sync-url" value="${esc(c.url)}" placeholder="https://daylog-sync.xxx.workers.dev"
+      <input class="form-input" id="sync-url" value="${esc(c.url)}" placeholder="https://aside-sync.xxx.workers.dev"
              autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url">
       <div class="form-hint">部署 sync-worker 之后 Cloudflare 给的那个网址。</div>
     </div>
@@ -2948,6 +3125,24 @@ window.addEventListener('resize', syncViewport);
 syncViewport();
 saveTags();
 renderAll();
+
+// 横滑：捕获阶段，理由见 swDown 上面那段
+(() => {
+  const s = document.getElementById('stream');
+  s.addEventListener('pointerdown',   swDown, true);
+  s.addEventListener('pointermove',   swMove, true);
+  s.addEventListener('pointerup',     swUp,   true);
+  s.addEventListener('pointercancel', swEnd,  true);
+})();
+
+/* 4 小时的界限会自己走过去。每分钟对一次「该在哪边」，只有真变了才重画——
+   不设这个的话，一条消息要等到下次点按才肯漂到左边。 */
+let lastSides = entries.map(onRight).join('');
+setInterval(() => {
+  const now = entries.map(onRight).join('');
+  if (now !== lastSides) { lastSides = now; renderAll(); }
+}, 60 * 1000);
+
 scrollToBottom(false);
 renderAttachStrip();
 initScanTip();

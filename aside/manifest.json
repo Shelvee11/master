@@ -2,7 +2,7 @@
   "name": "Aside — 对话式记录",
   "short_name": "Aside",
   "description": "Aside — 一句话记下吃了什么、动了多久，自动打标签，按月导出 Markdown",
-  "start_url": "/master/daylog/",
+  "start_url": "/master/aside/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#efeeea",

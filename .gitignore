@@ -2,4 +2,10 @@
 白熊咖啡厅台词本.docx
 myPWA.md
 PWA_DESIGN_GUIDE.md
+aside/mynd-参考.md
+# 以下目录各自是独立的 private repo，不纳入本仓库
 calendar-sorter/
+launchd/
+# 云同步服务端不推公开仓库：Worker 地址和 D1 id 不该公开
+# （密钥另有 sync-worker/.gitignore 挡着 .dev.vars）
+aside/sync-worker/

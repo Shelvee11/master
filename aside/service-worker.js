@@ -1,5 +1,5 @@
-const CACHE_NAME = 'daylog-v12';
-const BASE = '/master/daylog/';
+const CACHE_NAME = 'aside-v1';
+const BASE = '/master/aside/';
 const ASSETS = [BASE, BASE + 'index.html', BASE + 'manifest.json'];
 
 self.addEventListener('install', e => {
