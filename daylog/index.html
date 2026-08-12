@@ -147,7 +147,7 @@
     }
     .daysep {
       align-self: center; margin: 10px 0 2px;
-      color: var(--label3);
+      color: var(--label3); padding: 3px 10px; border-radius: 999px;
       font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
     }
     .daysep:first-child { margin-top: 0; }
@@ -176,6 +176,9 @@
       background: var(--bg2); color: var(--label);
       border-radius: var(--bubble-r);
       cursor: pointer;
+      /* 关掉系统选词：双击要用来开待办，不然每次都先蹦出一个「拷贝」气泡。
+         复制走长按菜单里的「复制文本」 */
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
     }
     .brow.me .bubble { background: var(--accent); color: var(--accent-fg); }
     .bubble:active { opacity: 0.8; }
@@ -191,6 +194,62 @@
     /* 从置顶列表跳回来时闪一下 */
     @keyframes flash { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 30%, 70% { box-shadow: 0 0 0 4px var(--accent2); } }
     .srow.flash .bubble { animation: flash 1.1s ease; }
+
+    /* 待办：气泡里长出一个能勾的方框。勾掉之后划掉正文并压暗 */
+    .bubble.td { display: flex; align-items: flex-start; gap: 9px; }
+    .td-box {
+      flex: none; width: 19px; height: 19px; margin-top: 1px; padding: 0;
+      border-radius: 6px; border: 1.8px solid currentColor; opacity: 0.55;
+      background: none; color: inherit; cursor: pointer; line-height: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .td-box:active { transform: scale(0.88); }
+    .td-box .tick { display: none; }
+    /* 勾上用主题色，不用 currentColor——往日气泡的正文色是近黑，勾上去太重，
+       跟这套暖灰配色打架。今天的气泡本身就是主题色，那里反过来用白底绿勾 */
+    .bubble.td.done .td-box { opacity: 1; background: var(--accent); border-color: var(--accent); }
+    .bubble.td.done .td-box .tick { display: block; color: #fff; }
+    .brow.me .bubble.td.done .td-box { background: var(--accent-fg); border-color: var(--accent-fg); }
+    .brow.me .bubble.td.done .td-box .tick { color: var(--accent); }
+    .bubble.td.done .btext { text-decoration: line-through; opacity: 0.5; }
+    .bubble.td .tdwrap { flex: 1; min-width: 0; }
+
+    /* 隐藏：糊掉正文再盖一层遮罩，点一下才揭开（只揭这一次，刷新后重新遮上） */
+    /* min-width 是给遮罩上那行字留的位：正文只有两三个字时，气泡会窄过「点一下看」 */
+    .bubble.msk { position: relative; min-width: 116px; -webkit-user-select: none; user-select: none; }
+    .bubble.msk > * { filter: blur(7px); opacity: 0.5; }
+    .msk-veil {
+      position: absolute; inset: 0; z-index: 2; border-radius: inherit;
+      display: flex; align-items: center; justify-content: center;
+      filter: none !important; opacity: 1 !important;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+    }
+    .msk-veil span { opacity: 0.75; }
+
+    /* 回复：气泡上方挂一条原文引用，点它跳回被回复的那条 */
+    .requote {
+      max-width: 84%; margin-bottom: 4px; cursor: pointer;
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 11px; border-radius: 999px;
+      background: var(--fill); color: var(--label2);
+      font-size: 11.5px; line-height: 1.35;
+    }
+    .requote-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .requote.gone { cursor: default; opacity: 0.55; font-style: italic; }
+    .requote:not(.gone):active { opacity: 0.6; }
+    .threadchip { color: var(--label2); font-weight: 600; white-space: nowrap; cursor: pointer; }
+    .threadchip:active { opacity: 0.5; }
+
+    /* thread 列表：按层级缩进，当前这条描一圈 */
+    .th-row { display: flex; align-items: flex-start; gap: 8px; padding: 10px 2px; cursor: pointer; }
+    .th-row + .th-row { border-top: 1px solid var(--sep); }
+    .th-rail { flex: none; width: 2px; align-self: stretch; border-radius: 2px; background: var(--fill2); }
+    .th-row.cur .th-rail { background: var(--accent); }
+    .th-body { flex: 1; min-width: 0; }
+    .th-text { font-size: 14.5px; line-height: 1.5; color: var(--label); }
+    .th-row.done .th-text { text-decoration: line-through; opacity: 0.55; }
+    .th-meta { font-size: 11.5px; color: var(--label3); margin-top: 3px; }
+    .th-row:active { opacity: 0.6; }
 
     /* 置顶只在顶部露一颗气球，气泡旁边不挂标记（用户要气球不要钉子） */
     .pinbar {
@@ -259,6 +318,37 @@
       font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center;
     }
     .tip-x:active { opacity: 0.5; }
+
+    /* 输入条上方的两条状态：补记（写进过去的某天）和回复（挂到某条底下）。
+       两条可以同时亮着——补记到上周，同时回复上周的某条。 */
+    .cbar {
+      max-width: 430px; margin: 0 auto 8px;
+      display: none; align-items: center; gap: 8px;
+      border-radius: 999px; padding: 6px 6px 6px 13px;
+      font-size: 12.5px; line-height: 1.35;
+    }
+    .cbar.on { display: flex; }
+    body.select .cbar { display: none; }
+    /* 状态条亮着时把扫描提示收起来，输入框上面不叠三层 */
+    body.backfilling .tip, body.replying .tip { display: none; }
+    .cbar-label { flex: none; font-weight: 700; opacity: 0.7; }
+    .cbar-main {
+      flex: 1; min-width: 0; text-align: left; padding: 0;
+      border: none; background: none; color: inherit; font-family: inherit;
+      font-size: 12.5px; font-weight: 700; cursor: pointer;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .cbar-x {
+      flex: none; width: 24px; height: 24px; border-radius: 50%; border: none;
+      background: rgba(127,127,127,0.18); color: inherit; cursor: pointer;
+      font-family: inherit; font-size: 12px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cbar-x:active { opacity: 0.5; }
+    #backfill-bar { background: var(--accent); color: var(--accent-fg); }
+    #backfill-bar .cbar-main { text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+    #backfill-bar .cbar-x { background: rgba(255,255,255,0.22); }
+    #reply-bar { background: var(--fill); color: var(--label2); }
     /* 多选时输入条换成删除条 */
     body.select .composer-inner, body.select .attach-strip { display: none; }
     .selactions { max-width: 430px; margin: 0 auto; display: none; align-items: center; justify-content: space-between; gap: 12px; }
@@ -445,6 +535,8 @@
     /* 展开就是一张张大图竖着排，不做宫格缩略图；宽高按原图比例，不裁不留黑边 */
     .imgs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; align-items: flex-start; }
     .imgs:last-child { margin-bottom: 0; }
+    /* 图片不参与云同步：别的设备拉过来的记录只剩文字，纯图片的记录就靠这个占位撑住 */
+    .imgmiss { font-size: 13px; opacity: 0.45; }
     .imgs img {
       display: block; width: auto; height: auto;
       max-width: 100%; max-height: 380px;
@@ -558,6 +650,45 @@
       font-family: inherit; cursor: pointer;
     }
     .kw-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── 日历（回溯 + 补记入口） ── */
+    .cal-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .cal-when { text-align: center; }
+    .cal-title { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .cal-sub { font-size: 11.5px; color: var(--label3); margin-top: 2px; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-wd { text-align: center; font-size: 11px; font-weight: 600; color: var(--label3); padding-bottom: 2px; }
+    .cal-cell {
+      aspect-ratio: 1 / 1; border: none; background: none; padding: 0;
+      border-radius: 12px; font-family: inherit; color: var(--label); cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+    }
+    .cal-cell.blank { visibility: hidden; }
+    .cal-cell:disabled { color: var(--label3); opacity: 0.3; cursor: default; }
+    .cal-d { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .cal-dot { width: 5px; height: 5px; border-radius: 50%; background: transparent; }
+    /* 三档密度：一眼看出哪几天记得多，不做连续天数（跟 mynd 一样不催更） */
+    .cal-cell.lv1 { background: var(--fill); }
+    .cal-cell.lv2 { background: var(--fill2); }
+    .cal-cell.lv3 { background: var(--accent); color: var(--accent-fg); }
+    .cal-cell.lv1 .cal-dot, .cal-cell.lv2 .cal-dot { background: var(--accent); }
+    .cal-cell.lv3 .cal-dot { background: var(--accent-fg); }
+    .cal-cell.today { box-shadow: inset 0 0 0 1.6px var(--accent); }
+    .cal-cell.today .cal-d { color: var(--accent); }
+    .cal-cell.lv3.today .cal-d { color: var(--accent-fg); }
+    .cal-cell.bf { box-shadow: inset 0 0 0 2px var(--red); }
+    .cal-cell:active:not(:disabled) { opacity: 0.55; }
+    .cal-legend { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 12px; font-size: 11px; color: var(--label3); }
+    .cal-legend i { width: 13px; height: 13px; border-radius: 4px; display: block; }
+
+    /* 日历跳回某天时，那天的分隔条闪一下 */
+    @keyframes flashday {
+      0%, 55% { background: var(--accent); color: var(--accent-fg); }
+      100% { background: transparent; color: var(--label3); }
+    }
+    .daysep.flash-day { animation: flashday 1.6s ease; }
+
     .hidden { display: none !important; }
   </style>
 </head>
@@ -571,6 +702,14 @@
         <p id="subtitle">—</p>
       </div>
       <div class="head-btns">
+      <button class="icon-btn" onclick="openCalendar()" aria-label="日历">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="5" width="18" height="16" rx="3"></rect>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+          <line x1="8" y1="3" x2="8" y2="6.5"></line>
+          <line x1="16" y1="3" x2="16" y2="6.5"></line>
+        </svg>
+      </button>
       <button class="icon-btn" onclick="enterSelect()" aria-label="选择记录">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="3 7 5.2 9.2 9.4 5"></polyline>
@@ -608,6 +747,16 @@
     <div class="tip" id="tip-scan">
       <span class="tip-text">📷 想抄书上的字？点一下输入框，选「扫描文本」</span>
       <button class="tip-x" onclick="dismissScanTip()" aria-label="不再提示">✕</button>
+    </div>
+    <div class="cbar" id="reply-bar">
+      <span class="cbar-label">↩ 回复</span>
+      <button class="cbar-main" id="reply-what" onclick="jumpToReplyTarget()"></button>
+      <button class="cbar-x" onclick="exitReply()" aria-label="不回复了">✕</button>
+    </div>
+    <div class="cbar" id="backfill-bar">
+      <span class="cbar-label">补记</span>
+      <button class="cbar-main" id="bf-when" onclick="openBackfillWhen()"></button>
+      <button class="cbar-x" onclick="exitBackfill()" aria-label="回到今天">✕</button>
     </div>
     <div class="attach-strip hidden" id="attach-strip"></div>
     <div class="composer-inner">
@@ -658,6 +807,16 @@
     <button class="sheet-done" onclick="closeSettings()">完成</button>
   </div>
   <div id="settings-body"></div>
+</div>
+
+<!-- 日历：点有记录的日子回到那天，长按任意一天补记 -->
+<div class="overlay" id="cal-overlay" onclick="closeCalendar()"></div>
+<div class="sheet" id="cal-sheet">
+  <div class="sheet-head">
+    <div class="sheet-title">日历</div>
+    <button class="sheet-done" onclick="closeCalendar()">完成</button>
+  </div>
+  <div id="cal-body"></div>
 </div>
 
 <!-- 编辑文本 / 标签编辑 / 学关键词：通用表单 sheet -->
@@ -808,8 +967,9 @@ if (Number(localStorage.getItem(MIG_KEY) || 0) < 3) {
   localStorage.setItem(MIG_KEY, '3');
 }
 
-function saveEntries() { localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); }
-function saveTags()    { localStorage.setItem(TAGS_KEY, JSON.stringify(tags)); }
+// 全项目只有这两个写入口，云同步就挂在这儿——任何地方改了数据都会自动排上传队列
+function saveEntries() { localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); scheduleSync(); }
+function saveTags()    { localStorage.setItem(TAGS_KEY, JSON.stringify(tags)); scheduleSync(); }
 
 function tagById(id) { return tags.find(t => t.id === id) || fallbackTag(); }
 function fallbackTag() { return tags.find(t => t.fallback) || tags[tags.length - 1]; }
@@ -927,6 +1087,23 @@ function visibleEntries() {
   return list.slice().sort((a, b) => a.ts - b.ts);
 }
 
+// 摘要：置顶条、thread 列表、操作表标题都用它。隐藏的记录一律不吐正文，
+// 否则遮了气泡、却在别处把话原样漏出去
+function preview(e, n = 40) {
+  if (!e) return '';
+  if (e.msk) return '（已隐藏）';
+  const txt = (e.text || '').replace(/\n/g, ' ').trim();
+  if (!txt) return `${(e.imgs || []).length} 张图片`;
+  return txt.length > n ? txt.slice(0, n) + '…' : txt;
+}
+
+// id → 直接回复它的条数。渲染前算一次，别在循环里反复扫全表
+function replyCounts() {
+  const c = {};
+  entries.forEach(e => { if (e.re) c[e.re] = (c[e.re] || 0) + 1; });
+  return c;
+}
+
 function renderHeader() {
   const n = entries.length;
   const suffix = activeFilter === 'all' ? `共 ${n} 条` : `${tagById(activeFilter).name} ${visibleEntries().length} 条 / 共 ${n} 条`;
@@ -963,12 +1140,13 @@ function renderStream() {
     return;
   }
   const today = todayKey();
+  const rc = replyCounts();
   let html = '';
   let lastDate = null;
   list.forEach(e => {
     if (e.date !== lastDate) {
       lastDate = e.date;
-      html += `<div class="daysep">${e.date === today ? '今天' : esc(cnDate(e.date))}</div>`;
+      html += `<div class="daysep" data-date="${e.date}">${e.date === today ? '今天' : esc(cnDate(e.date))}</div>`;
     }
     const t = tagById(e.tagId);
     const imgs = e.imgs || [];
@@ -988,6 +1166,32 @@ function renderStream() {
     const pill = imgs.length >= 2
       ? `<button class="expand-pill" onclick="event.stopPropagation(); toggleImgs('${e.id}')">${stacked ? `展开 ${imgs.length}` : '收起'}</button>`
       : '';
+
+    const inner = `${imgHtml}${e.text ? `<div class="btext">${esc(e.text)}</div>` : ''}`;
+    // 待办：正文让位给一个能勾的方框，勾选自己吃掉点击，不然会连带触发气泡的手势
+    const body = e.td
+      ? `<button class="td-box" ${stop} onclick="event.stopPropagation(); toggleDone('${e.id}')"
+                 aria-label="${e.td === 2 ? '取消完成' : '标记完成'}">
+           <svg class="tick" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 9.5 18 20 6.5"></polyline></svg>
+         </button><div class="tdwrap">${inner}</div>`
+      : inner;
+    // 遮罩盖在最上层：既是「点一下看」的提示，也顺手挡住底下图片的点击
+    const masked = e.msk && !revealed.has(e.id);
+    const veil = masked ? `<div class="msk-veil"><span>👁 点一下看</span></div>` : '';
+
+    let requote = '';
+    if (e.re) {
+      const p = entryById(e.re);
+      requote = p
+        ? `<div class="requote" onclick="event.stopPropagation(); jumpToEntry('${p.id}')">↩<span class="requote-text">${esc(preview(p, 30))}</span></div>`
+        : `<div class="requote gone">↩ 原记录已删除</div>`;
+    }
+    const nre = rc[e.id] || 0;
+    const thread = (nre || e.re)
+      ? `<span>·</span><span class="threadchip" onclick="event.stopPropagation(); openThread('${e.id}')">💬${nre ? ' ' + nre : ''}</span>`
+      : '';
+
     html += `
       <div class="srow ${on ? 'checked' : ''}" data-id="${e.id}" onclick="rowClick(event, '${e.id}')">
         <button class="selcirc ${on ? 'checked' : ''}" tabindex="-1" aria-label="选择">
@@ -995,18 +1199,20 @@ function renderStream() {
           <svg class="on" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle><polyline points="7.6 12.3 10.7 15.3 16.4 9.2" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
         </button>
         <div class="brow ${e.date === today ? 'me' : ''}">
+          ${requote}
           <div class="bline">
             ${pill}
-            <div class="bubble ${e.hl ? 'hl' : ''} ${e.qt ? 'qt' : ''}"
+            <div class="bubble ${e.hl ? 'hl' : ''} ${e.qt ? 'qt' : ''} ${e.td ? 'td' : ''} ${e.td === 2 ? 'done' : ''} ${masked ? 'msk' : ''}"
                  onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
-              ${imgHtml}
-              ${e.text ? `<div class="btext">${esc(e.text)}</div>` : ''}
+              ${body}
+              ${veil}
             </div>
           </div>
           <div class="bmeta">
             <span class="tagchip" onclick="event.stopPropagation(); openTagPicker('${e.id}')">${esc(t.emoji)} ${esc(t.name)}</span>
             <span>·</span>
             <span class="btime">${esc(e.time)}</span>
+            ${thread}
           </div>
         </div>
       </div>`;
@@ -1033,7 +1239,19 @@ function toggleImgs(id) {
 function hydrateImages() {
   document.querySelectorAll('#stream img[data-img]').forEach(async el => {
     const url = await imgURL(el.dataset.img);
-    if (url) el.src = url; else el.remove();
+    if (url) { el.src = url; return; }
+    // 图片不参与云同步，所以别的设备拉过来的记录会带着本机没有的图片 id。
+    // 只 remove 掉 <img> 的话，叠图卡的伪元素会剩个空壳、「展开 N」药丸也还杵着，得一起收掉
+    const holder = el.closest('.imgstack, .imgs');
+    el.remove();
+    if (!holder || holder.querySelector('img')) return;
+    const bubble = holder.closest('.bubble');
+    holder.remove();
+    const pill = bubble && bubble.parentElement.querySelector('.expand-pill');
+    if (pill) pill.remove();
+    if (bubble && !bubble.querySelector('.btext')) {
+      bubble.innerHTML = '<div class="imgmiss">[图片未同步]</div>';   // 纯图片的记录，别留个空气泡
+    }
   });
 }
 
@@ -1158,7 +1376,7 @@ function scrollToBottom(smooth) {
 }
 
 function renderAll() {
-  renderHeader(); renderFilters(); renderPinBar(); renderStream();
+  renderHeader(); renderFilters(); renderPinBar(); renderStream(); renderComposerBars();
   if (selectMode) {
     selected.forEach(id => { if (!entryById(id)) selected.delete(id); });   // 删掉的别留在选区里
     if (!entries.length) exitSelect(); else renderSelBar();
@@ -1300,7 +1518,7 @@ async function addEntry() {
   const ta = document.getElementById('input');
   const text = ta.value.trim();
   if (!text && !pendingImgs.length) return;
-  const d = new Date();
+  const when = composeWhen();            // 补记时这里给的是过去的那个时间点
   let tag = suggestTag(text);            // 纯图片没有文字信号，自然落到兜底的「其他」
   // 扫/粘进来的整段文字，本来要掉进「其他」的才改判摘抄；有饮食运动信号的不抢
   if (bulkInserted && tag.fallback && text.length >= BULK_MIN) tag = tagById('quote') || tag;
@@ -1308,19 +1526,26 @@ async function addEntry() {
   const imgIds = [];
   for (const data of pendingImgs) {
     const id = genId();
-    try { await putImage({ id, data, ts: d.getTime() }); imgIds.push(id); }
+    try { await putImage({ id, data, ts: when.ts }); imgIds.push(id); }
     catch { showToast('图片存不下了（空间不足）'); }
   }
 
-  entries.push({ id: genId(), ts: d.getTime(), date: dateKey(d), time: nowTime(d), text, tagId: tag.id, auto: true, imgs: imgIds });
+  const id = genId();
+  const entry = { id, ts: when.ts, date: when.date, time: when.time, text, tagId: tag.id, auto: true, imgs: imgIds };
+  if (replyTo && entryById(replyTo)) entry.re = replyTo;
+  entries.push(entry);
   saveEntries();
   ta.value = '';
   pendingImgs = [];
   bulkInserted = false;
+  const wasBackfill = !!backfill;
+  replyTo = null;      // 回复是一次性的，发完就断开，不然后面每条都挂到同一串上
   renderAttachStrip();
   if (activeFilter !== 'all' && activeFilter !== tag.id) activeFilter = 'all';
   renderAll();
-  scrollToBottom(true);
+  // 补记落在过去，滚到底根本看不见它——直接跳过去闪一下，让人确认写对了地方
+  if (wasBackfill) { jumpToEntry(id); showToast(`已补记到 ${cnDate(when.date)}`); }
+  else scrollToBottom(true);
 }
 
 document.getElementById('input').addEventListener('keydown', e => {
@@ -1362,18 +1587,44 @@ function closeAction(e) {
 }
 function forceCloseAction() { document.getElementById('action-overlay').classList.remove('open'); }
 
-/* 长按气泡 → 操作；轻点气泡 → 也开操作（气泡本身没有别的动作） */
+/* 气泡上的三种手势：
+     长按 → 操作表（立刻）
+     双击 → 待办开关
+     轻点 → 操作表，但要压后 DBL_MS 才动手——不等一下就没法判断这是不是双击的第一下。
+   代价是轻点开操作表慢了四分之一秒；换掉这个延迟的办法只有牺牲双击，不划算。
+   被遮住的气泡例外：第一下只负责揭开，不参与双击判定。 */
+const DBL_MS = 260;
 let longPressTimer = null;
+let tapTimer = null, lastTapId = null, lastTapAt = 0;
+
 function bubbleDown(id) {
   if (selectMode) return;
-  longPressTimer = setTimeout(() => { longPressTimer = 'fired'; openEntryAction(id); }, 500);
+  longPressTimer = setTimeout(() => {
+    longPressTimer = 'fired';
+    clearTimeout(tapTimer);            // 长按赢了，别让排队的那次轻点再弹一遍
+    lastTapId = null;
+    openEntryAction(id);
+  }, 500);
 }
 function bubbleUp(id) {
   if (selectMode) return;
   if (longPressTimer === 'fired') { longPressTimer = null; return; }
   clearTimeout(longPressTimer);
   longPressTimer = null;
-  openEntryAction(id);
+
+  if (isMasked(id)) { revealEntry(id); lastTapId = null; return; }
+
+  const now = Date.now();
+  if (lastTapId === id && now - lastTapAt < DBL_MS) {
+    clearTimeout(tapTimer);
+    lastTapId = null;
+    toggleTodo(id);
+    return;
+  }
+  lastTapId = id;
+  lastTapAt = now;
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(() => { lastTapId = null; openEntryAction(id); }, DBL_MS);
 }
 function bubbleCancel() { clearTimeout(longPressTimer); longPressTimer = null; }
 
@@ -1381,16 +1632,21 @@ function openEntryAction(id) {
   const e = entryById(id);
   if (!e) return;
   const nImg = (e.imgs || []).length;
-  const preview = e.text
-    ? (e.text.length > 28 ? e.text.slice(0, 28) + '…' : e.text)
-    : `${nImg} 张图片`;
+  const nThread = (e.re || replyCounts()[id]) ? threadOf(id).length : 0;
   openAction(`
     <div class="action-group">
-      <div class="action-title">${esc(e.date)} ${esc(e.time)}<br>${esc(preview)}</div>
+      <div class="action-title">${esc(e.date)} ${esc(e.time)}<br>${esc(preview(e, 28))}</div>
+      <button class="action-btn" onclick="forceCloseAction(); startReply('${id}')">↩ 回复这条</button>
+      ${nThread > 1 ? `<button class="action-btn" onclick="forceCloseAction(); openThread('${id}')">💬 查看整串（${nThread} 条）</button>` : ''}
+      <button class="action-btn" onclick="toggleTodo('${id}')">${e.td ? '取消待办' : '✅ 转成待办'}</button>
+      <button class="action-btn" onclick="toggleMark('${id}','msk')">${e.msk ? '取消隐藏' : '🫥 隐藏'}</button>
       <button class="action-btn" onclick="toggleMark('${id}','hl')">${e.hl ? '取消高光' : '🖍 高光'}</button>
       <button class="action-btn" onclick="toggleMark('${id}','qt')">${e.qt ? '取消摘抄格式' : '“ 摘抄'}</button>
       <button class="action-btn" onclick="toggleMark('${id}','pin')">${e.pin ? '取消置顶' : '🎈 置顶'}</button>
+    </div>
+    <div class="action-group">
       <button class="action-btn" onclick="forceCloseAction(); openEditText('${id}')">编辑文本</button>
+      ${e.text ? `<button class="action-btn" onclick="copyEntry('${id}')">📋 复制文本</button>` : ''}
       ${countLines(e.text) >= 2 ? `<button class="action-btn" onclick="forceCloseAction(); tidyEntry('${id}')">整理断行</button>` : ''}
       <button class="action-btn" onclick="forceCloseAction(); openTagPicker('${id}')">改标签</button>
       ${nImg ? `<button class="action-btn" onclick="forceCloseAction(); openImageManager('${id}')">管理图片（${nImg} 张）</button>` : ''}
@@ -1414,10 +1670,12 @@ function toggleMark(id, kind) {
   else e[kind] = on;
   // 摘抄样式和「摘抄」标签一起走，导出和筛选才对得上
   if (kind === 'qt' && on && tags.some(t => t.id === 'quote')) { e.tagId = 'quote'; e.auto = false; }
+  // 重新遮上就得把「这次揭开过」忘掉，否则遮罩加了、气泡还亮着
+  if (kind === 'msk' && on) revealed.delete(id);
   saveEntries();
   renderAll();
-  showToast(on ? { hl: '已高光', qt: '已排成摘抄', pin: '已置顶' }[kind]
-               : { hl: '已取消高光', qt: '已取消摘抄格式', pin: '已取消置顶' }[kind]);
+  showToast(on ? { hl: '已高光', qt: '已排成摘抄', pin: '已置顶', msk: '已隐藏' }[kind]
+               : { hl: '已取消高光', qt: '已取消摘抄格式', pin: '已取消置顶', msk: '已取消隐藏' }[kind]);
 }
 
 function pinnedEntries() {
@@ -1430,10 +1688,9 @@ function renderPinBar() {
   bar.classList.toggle('on', list.length > 0);
   if (!list.length) { bar.innerHTML = ''; return; }
   const top = list[0];
-  const txt = top.text || `${(top.imgs || []).length} 张图片`;
   bar.innerHTML = `<div class="pinbar-pill">
       <span>🎈</span>
-      <span class="pinbar-text">${esc(txt.replace(/\n/g, ' '))}</span>
+      <span class="pinbar-text">${esc(preview(top, 60))}</span>
       ${list.length > 1 ? `<span class="pinbar-n">· ${list.length} 条</span>` : ''}
     </div>`;
 }
@@ -1442,10 +1699,9 @@ function openPinned() {
   const list = pinnedEntries();
   if (!list.length) return;
   const rows = list.map(e => {
-    const txt = e.text || `${(e.imgs || []).length} 张图片`;
     return `<div class="pin-row">
         <div class="pin-row-info" onclick="jumpToEntry('${e.id}')">
-          <div class="pin-row-text">${esc(txt.length > 60 ? txt.slice(0, 60) + '…' : txt)}</div>
+          <div class="pin-row-text">${esc(preview(e, 60))}</div>
           <div class="pin-row-meta">${esc(cnDate(e.date))} ${esc(e.time)} · ${esc(tagById(e.tagId).name)}</div>
         </div>
         <button class="pin-row-off" onclick="unpinFromList('${e.id}')">取消</button>
@@ -1486,6 +1742,10 @@ function purgeEntries(ids) {
     (e.imgs || []).forEach(imgId => { imgCache.delete(imgId); delImage(imgId).catch(() => {}); });
   });
   entries = entries.filter(e => !set.has(e.id));
+  // 被回复的那条没了，回复方的 re 就是个空指针：断开它，别一直显示「原记录已删除」
+  entries.forEach(e => { if (e.re && set.has(e.re)) delete e.re; });
+  ids.forEach(id => revealed.delete(id));
+  if (replyTo && set.has(replyTo)) replyTo = null;
   saveEntries();
 }
 
@@ -1494,6 +1754,323 @@ function deleteEntry(id) {
   forceCloseAction();
   renderAll();
   showToast('已删除');
+}
+
+/* 气泡关掉了系统选词（双击要留给待办），复制从这里走。
+   clipboard 只在 https / localhost 有，退回一个隐藏 textarea + execCommand */
+function copyEntry(id) {
+  const e = entryById(id);
+  if (!e || !e.text) return;
+  forceCloseAction();
+  const done = () => showToast('已复制');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(e.text).then(done).catch(() => legacyCopy(e.text, done));
+  } else legacyCopy(e.text, done);
+}
+function legacyCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); done(); } catch { showToast('复制失败'); }
+  ta.remove();
+}
+
+/* ═══════════════════ 待办（双击气泡开关，方框勾掉） ═══════════════════ */
+
+// e.td：0 / 没有这个字段 = 不是待办，1 = 待办未完成，2 = 已完成
+function toggleTodo(id) {
+  const e = entryById(id);
+  if (!e) return;
+  forceCloseAction();
+  const on = !e.td;
+  e.td = on ? 1 : 0;
+  // 跟「摘抄」一个路子：形态和标签一起走，筛选和导出才对得上
+  if (on && tags.some(t => t.id === 'todo')) { e.tagId = 'todo'; e.auto = false; }
+  saveEntries();
+  renderAll();
+  showToast(on ? '已转成待办' : '已取消待办');
+}
+
+function toggleDone(id) {
+  const e = entryById(id);
+  if (!e || !e.td) return;
+  e.td = e.td === 2 ? 1 : 2;
+  saveEntries();
+  renderAll();
+  showToast(e.td === 2 ? '已勾掉' : '已取消勾选');
+}
+
+/* ═══════════════════ 隐藏（剧透遮罩） ═══════════════════ */
+
+// 揭开只活在这次会话里：刷新后重新遮上。手机递给别人看照片时，
+// 遮着的那条不会因为「上次点开过」就一直亮着
+const revealed = new Set();
+
+function isMasked(id) {
+  const e = entryById(id);
+  return !!(e && e.msk && !revealed.has(id));
+}
+
+// 只掀这一个气泡，不走 renderAll——整屏重画会重新 hydrate 图片，滚动位置跟着跳
+function revealEntry(id) {
+  if (selectMode) return;
+  revealed.add(id);
+  const b = document.querySelector(`.srow[data-id="${id}"] .bubble`);
+  if (!b) return;
+  b.classList.remove('msk');
+  const veil = b.querySelector('.msk-veil');
+  if (veil) veil.remove();
+}
+
+/* ═══════════════════ 回复 → thread ═══════════════════ */
+
+let replyTo = null;   // 待回复的那条 id。只活在这次会话里，发出去就清掉
+
+function startReply(id) {
+  if (!entryById(id)) return;
+  replyTo = id;
+  renderComposerBars();
+  document.getElementById('input').focus();
+}
+
+function exitReply() {
+  replyTo = null;
+  renderComposerBars();
+}
+
+function jumpToReplyTarget() { if (replyTo) jumpToEntry(replyTo); }
+
+// 顺着 re 一路往上走到串头。数据里不该有环，但导入和同步来的东西不保证，加个步数上限
+function rootIdOf(e, byId) {
+  let cur = e, guard = 0;
+  while (cur && cur.re && guard++ < 200) {
+    const p = byId.get(cur.re);
+    if (!p) break;
+    cur = p;
+  }
+  return cur ? cur.id : null;
+}
+function depthOf(e, byId) {
+  let cur = e, d = 0;
+  while (cur && cur.re && d < 200) {
+    const p = byId.get(cur.re);
+    if (!p) break;
+    cur = p; d++;
+  }
+  return d;
+}
+
+// 整串 = 跟它同一个串头的所有记录，按时间排。
+// 先把 id 表铺成 Map：不然每层都走一次 entries.find，条数一多就是平方级
+function threadOf(id) {
+  const byId = new Map(entries.map(e => [e.id, e]));
+  const start = byId.get(id);
+  if (!start) return [];
+  const rid = rootIdOf(start, byId);
+  return entries.filter(e => rootIdOf(e, byId) === rid).sort((a, b) => a.ts - b.ts);
+}
+
+function openThread(id) {
+  const list = threadOf(id);
+  if (list.length < 2) { showToast('这条还没有回复'); return; }
+  const byId = new Map(entries.map(e => [e.id, e]));
+  const rows = list.map(e => {
+    const box = e.td ? (e.td === 2 ? '☑ ' : '☐ ') : '';
+    return `<div class="th-row ${e.id === id ? 'cur' : ''} ${e.td === 2 ? 'done' : ''}"
+                 style="padding-left:${Math.min(depthOf(e, byId), 5) * 14}px" onclick="jumpToEntry('${e.id}')">
+        <span class="th-rail"></span>
+        <div class="th-body">
+          <div class="th-text">${box}${esc(preview(e, 60))}</div>
+          <div class="th-meta">${esc(cnDate(e.date))} ${esc(e.time)} · ${esc(tagById(e.tagId).name)}</div>
+        </div>
+      </div>`;
+  }).join('');
+  openForm(`整串 ${list.length} 条`, `<div>${rows}</div>
+    <div class="form-hint" style="margin-top:10px">点任意一条回到它在时间线里的位置。</div>`, '完成');
+}
+
+/* ═══════════════════ 补记（写进过去的某一天） ═══════════════════ */
+
+/* null = 记今天。补记状态只活在这次会话里，刷新就回到今天——
+   隔天打开还在不声不响往上周写，是这类功能最容易踩的坑 */
+let backfill = null;   // { date: 'YYYY-MM-DD', time: 'HH:MM' }
+
+function enterBackfill(key, time) {
+  if (key > todayKey()) return;
+  closeCalendar();
+  backfill = { date: key, time: time || nowTime(new Date()) };
+  renderComposerBars();
+  document.getElementById('input').focus();
+  showToast(`接下来记的写进 ${cnDate(key)}`);
+}
+
+function exitBackfill() {
+  if (!backfill) return;
+  backfill = null;
+  renderComposerBars();
+  showToast('回到今天');
+}
+
+function openBackfillWhen() {
+  if (!backfill) return;
+  openForm('补记到哪天', `
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">日期</label>
+        <input class="form-input" type="date" id="bf-date" value="${backfill.date}" max="${todayKey()}">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">时间</label>
+        <input class="form-input" type="time" id="bf-time" value="${backfill.time}">
+      </div>
+    </div>
+    <div class="form-hint" style="margin:-6px 0 14px">时间只决定这条排在那天的第几位。</div>
+    <button class="btn-primary" onclick="saveBackfillWhen()">确定</button>`);
+}
+
+function saveBackfillWhen() {
+  const d = document.getElementById('bf-date').value;
+  const t = document.getElementById('bf-time').value;
+  if (!d || !t) { showToast('日期和时间都要填'); return; }
+  if (d > todayKey()) { showToast('补记不能写到未来'); return; }
+  backfill = { date: d, time: t };
+  closeForm();
+  renderComposerBars();
+}
+
+/* 补记的 ts 由「那天 + 那个点」现算，流里才会插到该在的位置。
+   同一分钟连补几条会撞上同一个 ts，往后挪毫秒——只影响排序，显示的还是同一个 HH:MM */
+function composeWhen() {
+  const now = new Date();
+  if (!backfill) return { ts: now.getTime(), date: dateKey(now), time: nowTime(now) };
+  const [y, mo, da] = backfill.date.split('-').map(Number);
+  const [hh, mi] = backfill.time.split(':').map(Number);
+  let ts = new Date(y, mo - 1, da, hh, mi, 0, 0).getTime();
+  const used = new Set(entries.map(e => e.ts));
+  while (used.has(ts)) ts++;
+  return { ts, date: backfill.date, time: backfill.time };
+}
+
+/* 输入条上方那两条状态。被回复的记录可能已经删了，顺手把悬空的引用清掉 */
+function renderComposerBars() {
+  const target = replyTo ? entryById(replyTo) : null;
+  if (replyTo && !target) replyTo = null;
+
+  const rb = document.getElementById('reply-bar');
+  rb.classList.toggle('on', !!replyTo);
+  document.body.classList.toggle('replying', !!replyTo);
+  if (target) document.getElementById('reply-what').textContent = preview(target, 34);
+
+  const bb = document.getElementById('backfill-bar');
+  bb.classList.toggle('on', !!backfill);
+  document.body.classList.toggle('backfilling', !!backfill);
+  if (backfill) document.getElementById('bf-when').textContent = `${cnDate(backfill.date)} · ${backfill.time}`;
+
+  document.getElementById('input').placeholder =
+    backfill ? `补记 ${cnDate(backfill.date)}…` : replyTo ? '回复这条…' : '记点什么…';
+}
+
+/* ═══════════════════ 日历回溯 ═══════════════════ */
+
+let calMonth = '';   // 日历翻到的月份 'YYYY-MM'
+
+function monthOf(key) { return key.slice(0, 7); }
+function shiftMonth(mk, d) {
+  const [y, m] = mk.split('-').map(Number);
+  const t = new Date(y, m - 1 + d, 1);
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}`;
+}
+function dayCounts() {
+  const c = {};
+  entries.forEach(e => { c[e.date] = (c[e.date] || 0) + 1; });
+  return c;
+}
+
+function openCalendar() {
+  calMonth = monthOf(backfill ? backfill.date : todayKey());
+  renderCalendar();
+  document.getElementById('cal-overlay').classList.add('open');
+  document.getElementById('cal-sheet').classList.add('open');
+}
+function closeCalendar() {
+  document.getElementById('cal-overlay').classList.remove('open');
+  document.getElementById('cal-sheet').classList.remove('open');
+}
+
+// 往回可以一直翻（补记很久以前的事），往前顶到本月：未来没有记录，也不该补
+function calStep(d) {
+  const next = shiftMonth(calMonth, d);
+  if (next > monthOf(todayKey())) return;
+  calMonth = next;
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const [y, m] = calMonth.split('-').map(Number);
+  const today = todayKey();
+  const counts = dayCounts();
+  const days = new Date(y, m, 0).getDate();       // 下个月第 0 天 = 这个月最后一天
+  const lead = new Date(y, m - 1, 1).getDay();
+
+  let cells = DAY_LABELS.map(d => `<div class="cal-wd">${d}</div>`).join('');
+  for (let i = 0; i < lead; i++) cells += `<div class="cal-cell blank"></div>`;
+  let total = 0;
+  for (let d = 1; d <= days; d++) {
+    const key = `${calMonth}-${pad(d)}`;
+    const n = counts[key] || 0;
+    total += n;
+    const lv = !n ? '' : n <= 2 ? ' lv1' : n <= 5 ? ' lv2' : ' lv3';
+    const cls = lv + (key === today ? ' today' : '') + (backfill && backfill.date === key ? ' bf' : '');
+    cells += `<button class="cal-cell${cls}" aria-label="${key}${n ? ` ${n} 条` : ' 没有记录'}"
+        ${key > today ? 'disabled' : `onpointerdown="calDown('${key}')" onpointerup="calUp('${key}')" onpointercancel="calCancel()"`}>
+        <span class="cal-d">${d}</span><span class="cal-dot"></span>
+      </button>`;
+  }
+
+  document.getElementById('cal-body').innerHTML = `
+    <div class="cal-nav">
+      <button class="nav-btn" onclick="calStep(-1)">‹</button>
+      <div class="cal-when">
+        <div class="cal-title">${y}年${m}月</div>
+        <div class="cal-sub">${total ? `${total} 条` : '这个月还没记'}</div>
+      </div>
+      <button class="nav-btn" onclick="calStep(1)" ${calMonth >= monthOf(today) ? 'disabled' : ''}>›</button>
+    </div>
+    <div class="cal-grid">${cells}</div>
+    <div class="cal-legend">
+      <i style="background:var(--fill)"></i><i style="background:var(--fill2)"></i><i style="background:var(--accent)"></i>
+      <span>记得越多，颜色越深</span>
+    </div>
+    <div class="form-hint" style="text-align:center;margin-top:10px">点有记录的日子回到那天 · 长按任意一天补记</div>`;
+}
+
+// 手势跟气泡一致：轻点回溯，长按补记
+let calTimer = null;
+function calDown(key) {
+  clearTimeout(calTimer);
+  calTimer = setTimeout(() => { calTimer = 'fired'; enterBackfill(key); }, 500);
+}
+function calUp(key) {
+  if (calTimer === 'fired') { calTimer = null; return; }
+  clearTimeout(calTimer);
+  calTimer = null;
+  if (dayCounts()[key]) jumpToDate(key); else enterBackfill(key);
+}
+function calCancel() { clearTimeout(calTimer); calTimer = null; }
+
+function jumpToDate(key) {
+  closeCalendar();
+  // 日历是跨标签的：筛着某个标签时，那天的记录可能一条都不在流里，先把筛选摘掉
+  if (activeFilter !== 'all') { activeFilter = 'all'; renderFilters(); renderHeader(); renderStream(); }
+  const sep = document.querySelector(`.daysep[data-date="${key}"]`);
+  if (!sep) { showToast('这天没有记录'); return; }
+  sep.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  sep.classList.remove('flash-day');
+  void sep.offsetWidth;               // 重启动画
+  sep.classList.add('flash-day');
+  setTimeout(() => sep.classList.remove('flash-day'), 1700);
 }
 
 /* ═══════════════════ 扫描提示（教系统的「扫描文本」手势） ═══════════════════ */
@@ -1795,6 +2372,22 @@ function renderSettings() {
   });
   html += `</div>`;
 
+  html += `<div class="card-label">手势</div><div class="card">
+      <div class="row"><div class="row-info">
+        <div class="row-name">📅 日历</div>
+        <div class="row-sub">右上角日历：点有记录的日子回到那天，长按任意一天补记到那天</div>
+      </div></div>
+      <div class="row"><div class="row-info">
+        <div class="row-name">✅ 双击气泡</div>
+        <div class="row-sub">把这条变成待办，气泡里长出方框，点方框勾掉</div>
+      </div></div>
+      <div class="row"><div class="row-info">
+        <div class="row-name">👆 长按气泡</div>
+        <div class="row-sub">回复（挂成一串）· 隐藏（遮起来，点一下才看得见）· 高光 · 摘抄 · 置顶</div>
+      </div></div>
+    </div>
+    <div class="form-hint" style="margin:8px 2px 0">隐藏只遮显示，导出的 Markdown 里会写成 ||剧透|| ——遮的是别人的眼睛，不是你自己的档案。</div>`;
+
   html += `<div class="card-label">小技巧</div><div class="card">
       <div class="row"><div class="row-info">
         <div class="row-name">📷 扫描书上的文字</div>
@@ -1819,6 +2412,18 @@ function renderSettings() {
   });
   html += `<button class="row row-btn" onclick="openTagEdit(null)">＋ 新建标签</button></div>
     <div class="form-hint" style="margin:8px 2px 0">顺序即优先级：关键词得分相同时，排在前面的标签胜出。</div>`;
+
+  html += `<div class="card-label">云同步</div><div class="card">
+      <div class="row">
+        <span class="row-emoji">☁️</span>
+        <div class="row-info" onclick="openSyncSetup()">
+          <div class="row-name">${syncOn() ? '同步设置' : '开启云同步'}</div>
+          <div class="row-sub" id="sync-state">${esc(syncStateText())}</div>
+        </div>
+      </div>
+      ${syncOn() ? '<button class="row row-btn" onclick="doSync({manual:true})">立即同步</button>' : ''}
+    </div>
+    <div class="form-hint" style="margin:8px 2px 0">开启后记的内容会自动上传，在电脑上打开同一个网址、填同一个密钥就能看到，不用手动导来导去。配图不参与同步，仍然只能靠 JSON 备份带走。</div>`;
 
   // JSON 相关一律收进折叠区：它和上面的「导出」是两回事，摆在一起会点串
   html += `<details class="adv"${advOpen ? ' open' : ''} ontoggle="setAdvOpen(this.open)">
@@ -1972,17 +2577,28 @@ function buildMarkdown(month) {
       lastDate = e.date;
       blocks.push(`## ${e.date} ${cnDate(e.date).replace(/^\d+月\d+日 /, '')}`);
     }
-    // 导出只要文字：图片不内嵌，留一行占位，免得纯图片的记录导出成空条目
-    // 摘抄排成 blockquote、高光用 Obsidian 的 ==高亮==、置顶留个 🎈，格式跟着一起走
-    const pad = e.qt ? '  > ' : '  ';
+    // 导出只要文字：图片不内嵌，留一行占位，免得纯图片的记录导出成空条目。
+    // 摘抄排成 blockquote、高光用 Obsidian 的 ==高亮==、待办排成能勾的 task list、
+    // 隐藏的用 ||剧透|| 包住、置顶留个 🎈、回复标 ↩ 指回原条——形态跟着一起走。
+    // 局部变量别再叫 pad，会盖掉全局那个补零的 pad()
+    const ind = e.qt ? '  > ' : '  ';
+    const box = e.td ? (e.td === 2 ? '- [x] ' : '- [ ] ') : '';
+    const dress = l => {
+      let s = l;
+      if (e.hl && s.trim()) s = `==${s}==`;
+      if (e.msk && s.trim()) s = `||${s}||`;
+      return s;
+    };
     const lines = [];
     if (e.text) {
-      lines.push(...e.text.replace(/\n{2,}/g, '\n').split('\n')
-        .map(l => l.trimEnd())
-        .map(l => pad + (e.hl && l.trim() ? `==${l}==` : l)));
+      // 待办的后续行要多缩两格，否则跳出这个 task item 变成同级正文
+      e.text.replace(/\n{2,}/g, '\n').split('\n').map(l => l.trimEnd())
+        .forEach((l, i) => lines.push(ind + (i === 0 ? box : box ? '  ' : '') + dress(l)));
     }
     if ((e.imgs || []).length) lines.push(`  _[图片 ×${e.imgs.length}]_`);
-    blocks.push(`- **${e.time}** \`#${tagById(e.tagId).name}\`${e.pin ? ' 🎈' : ''}\n${lines.join('\n')}`);
+    const p = e.re ? entryById(e.re) : null;
+    const ref = p ? ` ↩ ${p.date === e.date ? '' : cnDate(p.date).replace(/ 周./, '') + ' '}${p.time}` : '';
+    blocks.push(`- **${e.time}** \`#${tagById(e.tagId).name}\`${e.pin ? ' 🎈' : ''}${ref}\n${lines.join('\n')}`);
   });
   return blocks.join('\n\n') + '\n';
 }
@@ -2040,7 +2656,8 @@ function importJSON(ev) {
 }
 
 function clearAll() {
-  if (!confirm('清除全部记录、图片和标签设置？此操作不可撤销，建议先导出 JSON 备份。')) return;
+  if (!confirm('清除全部记录、图片和标签设置？此操作不可撤销，建议先导出 JSON 备份。'
+    + (syncOn() ? '\n\n云端数据不会被删除，下次同步会重新拉回来。' : ''))) return;
   localStorage.removeItem(ENTRIES_KEY);
   localStorage.removeItem(TAGS_KEY);
   idbRun('readwrite', s => s.clear()).catch(() => {});
@@ -2048,10 +2665,245 @@ function clearAll() {
   entries = [];
   tags = JSON.parse(JSON.stringify(SEED_TAGS));
   activeFilter = 'all';
+  // 清空只清这台设备。快照和游标一起归零，下次同步就当新设备走全量拉取；
+  // 标签 hash 按重置后的值写回，免得把 SEED_TAGS 当成「改动」推上去覆盖云端词表
+  localStorage.removeItem(SYNC_AT_KEY);
+  localStorage.removeItem(SYNC_SNAP_KEY);
+  syncSnap = {};
+  localStorage.setItem(SYNC_TAGH_KEY, hashStr(JSON.stringify(tags)));
   saveEntries(); saveTags();
   renderSettings(); renderAll();
   showToast('已清空');
 }
+
+/* ═══════════════════ 云同步（Cloudflare Worker + D1） ═══════════════════ */
+
+/* 手机记的东西要在电脑上直接看见，中间不能有任何手动步骤，所以做成后台自动同步：
+   存一条 → 2.5 秒后推上去；回到前台 / 网络恢复 → 拉一次。服务端在 sync-worker/，
+   部署步骤见那儿的 README.md。
+
+   只同步文字和标签，不同步图片——图片是 base64 dataURL，一张几百 KB，走 D1 不
+   划算。电脑端拉到带图的记录时图会自动隐藏、文字照常显示，图片仍然只能靠 JSON
+   备份带走（跟导出 Markdown 的取舍一致）。 */
+
+const SYNC_URL_KEY   = 'daylog-sync-url';
+const SYNC_TOKEN_KEY = 'daylog-sync-token';
+const SYNC_AT_KEY    = 'daylog-sync-at';    // 上次同步拿到的服务器时间，增量拉取的游标
+const SYNC_SNAP_KEY  = 'daylog-sync-snap';  // id → 内容 hash，用来算「哪几条改过」
+const SYNC_TAGH_KEY  = 'daylog-sync-tagh';  // 标签表的 hash，单独存——混进 snap 会被当成一条记录，进而生成假墓碑
+
+let syncSnap     = loadJSON(SYNC_SNAP_KEY, {}) || {};
+let syncing      = false;
+let syncTimer    = null;
+let syncErr      = '';
+let syncLastAt   = 0;      // 上次「尝试」同步的时刻，给回前台的触发做节流
+let suppressSync = false;  // 同步过程里回写本地会调 saveEntries，别让它再触发一轮
+
+function syncCfg() {
+  return {
+    url:   (localStorage.getItem(SYNC_URL_KEY) || '').trim().replace(/\/+$/, ''),
+    token: (localStorage.getItem(SYNC_TOKEN_KEY) || '').trim(),
+  };
+}
+function syncOn() { const c = syncCfg(); return !!(c.url && c.token); }
+
+// djb2。只存 hash 不存原文：几千条记录的快照压到几十 KB，不跟正文抢 localStorage 那 5MB
+function hashStr(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+// 跟上次同步后的快照比，算出「改过的」和「被删的」。
+// 好处是不用往每条 entry 上加 updated 字段——12 个 saveEntries() 调用点一个都不用动。
+function collectDirty() {
+  const out = [];
+  const live = new Set();
+  for (const e of entries) {
+    live.add(e.id);
+    const data = JSON.stringify(e);
+    if (syncSnap[e.id] !== hashStr(data)) out.push({ id: e.id, data });
+  }
+  // 快照里有、现在没了 → 本机删过。必须给服务端留墓碑，否则下次拉取它又活过来
+  for (const id in syncSnap) if (!live.has(id)) out.push({ id, deleted: 1 });
+  return out;
+}
+
+function applyRemote(rows) {
+  let n = 0;
+  for (const r of rows) {
+    if (!r || !r.id) continue;
+    const i = entries.findIndex(e => e.id === r.id);
+    if (r.deleted) {
+      if (i >= 0) {
+        (entries[i].imgs || []).forEach(id => { imgCache.delete(id); delImage(id).catch(() => {}); });
+        entries.splice(i, 1);
+        n++;
+      }
+      delete syncSnap[r.id];
+      continue;
+    }
+    let e;
+    try { e = JSON.parse(r.data); } catch { continue; }
+    if (!e || !e.id) continue;
+    if (i >= 0) entries[i] = e; else entries.push(e);
+    syncSnap[e.id] = hashStr(JSON.stringify(e));
+    n++;
+  }
+  if (n) {
+    entries.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    // 别的设备可能引用了本机没有的标签 → 归到兜底，跟 importJSON 的处理一致
+    const ids = new Set(tags.map(t => t.id));
+    const fb = fallbackTag();
+    entries.forEach(e => { if (!ids.has(e.tagId)) e.tagId = fb.id; });
+  }
+  return n;
+}
+
+function scheduleSync(delay = 2500) {
+  if (suppressSync || !syncOn()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => doSync(), delay);
+}
+
+async function doSync(opts = {}) {
+  const manual = !!opts.manual;
+  if (!syncOn())        { if (manual) showToast('还没设置云同步'); return; }
+  if (syncing)          { if (manual) showToast('正在同步…'); return; }
+  if (!navigator.onLine) { if (manual) showToast('当前没有网络'); return; }
+  // 多选、灯箱开着的时候拉到新数据会整屏重绘，打断操作，等一会儿再说
+  if (!manual && (document.body.classList.contains('select') || lbEntry)) { scheduleSync(8000); return; }
+
+  syncing = true;
+  syncLastAt = Date.now();
+  setSyncStateText('正在同步…');
+  try {
+    const cfg = syncCfg();
+    const since = Number(localStorage.getItem(SYNC_AT_KEY) || 0);
+    const dirty = collectDirty();
+    const tagsJSON = JSON.stringify(tags);
+    const tagsDirty = hashStr(tagsJSON) !== localStorage.getItem(SYNC_TAGH_KEY);
+
+    const res = await fetch(cfg.url + '/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.token },
+      body: JSON.stringify({ since, entries: dirty, tags: tagsDirty ? tagsJSON : null }),
+    });
+    if (res.status === 401) throw new Error('密钥不对');
+    if (!res.ok) throw new Error('服务端 ' + res.status);
+    const out = await res.json();
+
+    // 推成功了快照才跟上。失败就原样留着，下次整批重推——宁可重推也不能漏推
+    for (const d of dirty) {
+      if (d.deleted) delete syncSnap[d.id];
+      else syncSnap[d.id] = hashStr(d.data);
+    }
+    if (tagsDirty) localStorage.setItem(SYNC_TAGH_KEY, hashStr(tagsJSON));
+
+    let changed = 0;
+    // 标签先落地，再合并记录——applyRemote 结尾要拿新标签表校验 tagId
+    if (out.tags) {
+      try {
+        const rt = JSON.parse(out.tags);
+        if (Array.isArray(rt) && rt.length) {
+          tags = rt;
+          if (!tags.some(t => t.fallback)) tags[tags.length - 1].fallback = true;
+          localStorage.setItem(SYNC_TAGH_KEY, hashStr(JSON.stringify(tags)));
+          changed++;
+        }
+      } catch { /* 云端标签坏了就不动本地的 */ }
+    }
+    changed += applyRemote(out.entries || []);
+
+    localStorage.setItem(SYNC_AT_KEY, String(out.now));
+    localStorage.setItem(SYNC_SNAP_KEY, JSON.stringify(syncSnap));
+    syncErr = '';
+
+    if (changed) {
+      suppressSync = true;
+      saveEntries(); saveTags();
+      suppressSync = false;
+      renderAll();
+      if (document.getElementById('settings-sheet').classList.contains('open')) renderSettings();
+    }
+    setSyncStateText();
+    if (manual) showToast(changed ? `已同步，更新 ${changed} 条` : '已是最新');
+    if (out.truncated) scheduleSync(600);   // 这批没拉完，接着拉下一批
+  } catch (err) {
+    syncErr = err.message || '同步失败';
+    setSyncStateText();
+    if (manual) showToast('同步失败：' + syncErr);
+  } finally {
+    syncing = false;
+  }
+}
+
+function syncStateText() {
+  if (!syncOn()) return '未开启 · 记录只存在这台设备上';
+  if (syncErr) return '上次失败：' + syncErr;
+  const at = Number(localStorage.getItem(SYNC_AT_KEY) || 0);
+  if (!at) return '已设置 · 还没同步过';
+  const d = new Date(at);
+  const k = dateKey(d);
+  return `上次同步 ${k === todayKey() ? '' : cnDate(k) + ' '}${nowTime(d)}`;
+}
+// 设置页没开着时元素不存在，直接跳过就行
+function setSyncStateText(msg) {
+  const el = document.getElementById('sync-state');
+  if (el) el.textContent = msg || syncStateText();
+}
+
+function openSyncSetup() {
+  const c = syncCfg();
+  openForm('云同步', `
+    <div class="form-group">
+      <label class="form-label">Worker 地址</label>
+      <input class="form-input" id="sync-url" value="${esc(c.url)}" placeholder="https://daylog-sync.xxx.workers.dev"
+             autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url">
+      <div class="form-hint">部署 sync-worker 之后 Cloudflare 给的那个网址。</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">同步密钥</label>
+      <input class="form-input" id="sync-token" value="${esc(c.token)}" placeholder="部署时设的 SYNC_KEY"
+             autocapitalize="off" autocorrect="off" spellcheck="false">
+      <div class="form-hint">每台设备填同一个，填错会提示「密钥不对」。</div>
+    </div>
+    <button class="btn-primary" onclick="saveSyncCfg()">保存并同步</button>
+    ${syncOn() ? `<button class="btn-primary" style="background:var(--red);margin-top:10px" onclick="disableSync()">停用同步</button>` : ''}`);
+}
+
+function saveSyncCfg() {
+  const url = document.getElementById('sync-url').value.trim().replace(/\/+$/, '');
+  const token = document.getElementById('sync-token').value.trim();
+  if (!/^https?:\/\//.test(url)) { showToast('地址要以 https:// 开头'); return; }
+  if (!token) { showToast('密钥不能为空'); return; }
+  localStorage.setItem(SYNC_URL_KEY, url);
+  localStorage.setItem(SYNC_TOKEN_KEY, token);
+  syncErr = '';
+  closeForm();
+  renderSettings();
+  doSync({ manual: true });
+}
+
+function disableSync() {
+  if (!confirm('停用后这台设备不再上传和下载。云端已有的数据不受影响。')) return;
+  localStorage.removeItem(SYNC_URL_KEY);
+  localStorage.removeItem(SYNC_TOKEN_KEY);
+  // 游标和快照一并清掉：下次重新启用时当新设备走一次全量。留着残留快照的话，
+  // 停用期间删掉的记录会在重新启用时被当成墓碑推上去，把别的设备上的也删了
+  localStorage.removeItem(SYNC_AT_KEY);
+  localStorage.removeItem(SYNC_SNAP_KEY);
+  localStorage.removeItem(SYNC_TAGH_KEY);
+  syncSnap = {};
+  syncErr = '';
+  renderSettings();
+  showToast('已停用同步');
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && Date.now() - syncLastAt > 30000) doSync();
+});
+window.addEventListener('online', () => doSync());
 
 /* ═══════════════════ Viewport（iOS 键盘） ═══════════════════ */
 
@@ -2083,6 +2935,9 @@ renderAll();
 scrollToBottom(false);
 renderAttachStrip();
 initScanTip();
+
+// 启动先拉一次：在电脑上打开时立刻看到手机上记的内容，不用等 debounce
+if (syncOn()) doSync();
 
 // 存了图片就得申请持久化，否则 Safari 空间紧张时会把 IndexedDB 清掉
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});

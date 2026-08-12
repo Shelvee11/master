@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daylog-v10';
+const CACHE_NAME = 'daylog-v12';
 const BASE = '/master/daylog/';
 const ASSETS = [BASE, BASE + 'index.html', BASE + 'manifest.json'];
 
@@ -16,6 +16,9 @@ self.addEventListener('activate', e => {
 
 // network-first：在线永远拿最新版，离线回退到最近一次成功加载的缓存
 self.addEventListener('fetch', e => {
+  // 云同步是跨域 POST。Cache API 只认 GET，硬走下面的 put 会 reject 刷一片报错；
+  // 离线时 caches.match 又只会返回 undefined，白白把请求变成网络错误。直接放行
+  if (e.request.method !== 'GET') return;
   e.respondWith(
     fetch(e.request).then(r => {
       const clone = r.clone();
