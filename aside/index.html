@@ -167,7 +167,10 @@
     .fchip:active { opacity: 0.75; }
 
     /* ── Stream ── */
-    .stream-wrap { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    /* overflow-x 必须显式写 hidden：只写 overflow-y 的话另一个轴会被算成 auto，
+       气泡横滑出边界就撑出一条横向滚动，iOS 会把手势判给容器滚动、发 pointercancel，
+       这一滑就白滑了 */
+    .stream-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
     .stream {
       max-width: 430px; margin: 0 auto;
       padding: 12px 16px 24px;
@@ -180,8 +183,10 @@
     }
     .daysep:first-child { margin-top: 0; }
 
-    /* 一行 = 左侧勾选圈（多选时才滑出）+ 记录本体 */
-    .srow { display: flex; align-items: center; }
+    /* 一行 = 左侧勾选圈（多选时才滑出）+ 记录本体
+       横滑的判定区是整行不是气泡：一行只有一个气泡，不存在歧义，而气泡短的时候
+       （「好」「买菜」这种）实在按不住。pan-y 放在这儿，竖向滚动照旧交给浏览器 */
+    .srow { display: flex; align-items: center; touch-action: pan-y; }
     .selcirc {
       flex: none; width: 0; opacity: 0; margin-right: 0; border: none; padding: 0;
       background: none; cursor: pointer; line-height: 0; color: var(--label3);
@@ -1719,18 +1724,19 @@ function forceCloseAction() { document.getElementById('action-overlay').classLis
 /* 气泡上的三种手势：
      长按 → 操作表（立刻）
      双击 → 待办开关
-     轻点 → 操作表，但要压后 DBL_MS 才动手——不等一下就没法判断这是不是双击的第一下。
-   代价是轻点开操作表慢了四分之一秒；换掉这个延迟的办法只有牺牲双击，不划算。
-   被遮住的气泡例外：第一下只负责揭开，不参与双击判定。 */
+     单击 → 什么都不做
+   单击留白是用户定的：操作表太容易误触，只有长按才配打开它。
+   顺带解决了一个老包袱——旧版本单击开操作表，为了分辨「这是不是双击的第一下」
+   必须整整压后 DBL_MS 才动手，白白慢四分之一秒。现在单击不做事，第二下一到就
+   直接翻待办，双击零延迟，DBL_MS 只剩「两下算不算连击」这一个用途。 */
 const DBL_MS = 260;
 let longPressTimer = null;
-let tapTimer = null, lastTapId = null, lastTapAt = 0;
+let lastTapId = null, lastTapAt = 0;
 
 function bubbleDown(id) {
   if (selectMode) return;
   longPressTimer = setTimeout(() => {
     longPressTimer = 'fired';
-    clearTimeout(tapTimer);            // 长按赢了，别让排队的那次轻点再弹一遍
     lastTapId = null;
     openEntryAction(id);
   }, 500);
@@ -1745,15 +1751,13 @@ function bubbleUp(id) {
 
   const now = Date.now();
   if (lastTapId === id && now - lastTapAt < DBL_MS) {
-    clearTimeout(tapTimer);
     lastTapId = null;
     toggleTodo(id);
     return;
   }
+  // 单击本身不做事，只记一笔等第二下
   lastTapId = id;
   lastTapAt = now;
-  clearTimeout(tapTimer);
-  tapTimer = setTimeout(() => { lastTapId = null; openEntryAction(id); }, DBL_MS);
 }
 function bubbleCancel() { clearTimeout(longPressTimer); longPressTimer = null; swEnd(); }
 
@@ -1778,9 +1782,10 @@ function swEnd() {
 
 function swDown(ev) {
   if (selectMode) return;
-  const el = ev.target.closest && ev.target.closest('.bubble');
-  const row = el && el.closest('.srow');
-  if (!el || !row) return;
+  // 起手点落在这一行任何地方都算——空白处、标签、时间、图片都行
+  const row = ev.target.closest && ev.target.closest('.srow');
+  const el  = row && row.querySelector('.bubble');
+  if (!row || !el) return;
   sw = { id: row.dataset.id, el, x0: ev.clientX, y0: ev.clientY, dx: 0, locked: false };
 }
 
@@ -1793,7 +1798,7 @@ function swMove(ev) {
     if (Math.abs(dx) < SWIPE_LOCK) return;
     sw.locked = true;
     clearTimeout(longPressTimer); longPressTimer = null;   // 横滑赢了，别再弹操作表
-    clearTimeout(tapTimer); lastTapId = null;
+    lastTapId = null;
     try { sw.el.setPointerCapture(ev.pointerId); } catch (err) {}
     sw.el.style.transition = 'none';
   }
@@ -1809,6 +1814,11 @@ function swUp() {
   if (!locked) return;
   swSuppress = true;
   setTimeout(() => { swSuppress = false; }, 0);   // 只挡紧跟着的那一次 pointerup
+  /* 再挡掉浏览器随后补的那一次 click。判定区扩到整行之后，起手点可能落在标签、
+     时间或图片上，它们各自有 onclick——不挡的话滑一下会顺手开个标签选择器或灯箱。 */
+  const killClick = ce => { ce.stopPropagation(); ce.preventDefault(); };
+  document.addEventListener('click', killClick, true);
+  setTimeout(() => document.removeEventListener('click', killClick, true), 350);
   if (Math.abs(dx) >= SWIPE_GO) swipeTo(id, dx > 0 ? 1 : -1);
 }
 

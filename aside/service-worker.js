@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aside-v1';
+const CACHE_NAME = 'aside-v2';
 const BASE = '/master/aside/';
 const ASSETS = [BASE, BASE + 'index.html', BASE + 'manifest.json'];
 
