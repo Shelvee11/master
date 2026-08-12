@@ -45,7 +45,12 @@
       --hl-fg:   #4a4126;
       --sep:     #e2e0da;
       --radius:  18px;
-      --bubble-r: 20px;
+      /* 气泡：三个大圆角 + 尾巴那一角收小（照 mynd）。
+         想微调松紧就改这四个数，别去改 .bubble 本身 */
+      --bubble-r:     20px;
+      --bubble-tail:   7px;   /* 靠说话人那一侧的下角 */
+      --bubble-pad-y:  9px;
+      --bubble-pad-x: 14px;
       --app-h:   100dvh;
       --vv-top:  0px;
       --kb:      0px;
@@ -172,15 +177,19 @@
     .brow { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; max-width: 100%; }
     .brow.me { align-items: flex-end; }
     .bubble {
-      max-width: 84%; padding: 12px 15px;
+      max-width: 88%; padding: var(--bubble-pad-y) var(--bubble-pad-x);
       background: var(--bg2); color: var(--label);
-      border-radius: var(--bubble-r);
+      /* 往日在左，收小的是左下角；今天在右，收小的是右下角（下面覆盖） */
+      border-radius: var(--bubble-r) var(--bubble-r) var(--bubble-r) var(--bubble-tail);
       cursor: pointer;
       /* 关掉系统选词：双击要用来开待办，不然每次都先蹦出一个「拷贝」气泡。
          复制走长按菜单里的「复制文本」 */
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
     }
-    .brow.me .bubble { background: var(--accent); color: var(--accent-fg); }
+    .brow.me .bubble {
+      background: var(--accent); color: var(--accent-fg);
+      border-radius: var(--bubble-r) var(--bubble-r) var(--bubble-tail) var(--bubble-r);
+    }
     .bubble:active { opacity: 0.8; }
 
     /* 高光：整条气泡换成便签黄，左右两侧都盖掉 */
@@ -215,17 +224,11 @@
     .bubble.td.done .btext { text-decoration: line-through; opacity: 0.5; }
     .tdrow .tdwrap { flex: 1; min-width: 0; }
 
-    /* 隐藏：糊掉正文再盖一层遮罩，点一下才揭开（只揭这一次，刷新后重新遮上） */
-    /* min-width 是给遮罩上那行字留的位：正文只有两三个字时，气泡会窄过「点一下看」 */
-    .bubble.msk { position: relative; min-width: 116px; -webkit-user-select: none; user-select: none; }
+    /* 隐藏：糊掉就是糊掉，没有「点一下看」。要看得长按走菜单里的「取消隐藏」。
+       veil 是一层透明挡板，专门吃掉落在图片上的点击（图片有自己的 onclick） */
+    .bubble.msk { position: relative; -webkit-user-select: none; user-select: none; }
     .bubble.msk > * { filter: blur(7px); opacity: 0.5; }
-    .msk-veil {
-      position: absolute; inset: 0; z-index: 2; border-radius: inherit;
-      display: flex; align-items: center; justify-content: center;
-      filter: none !important; opacity: 1 !important;
-      font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
-    }
-    .msk-veil span { opacity: 0.75; }
+    .msk-veil { position: absolute; inset: 0; z-index: 2; border-radius: inherit; }
 
     /* 回复：原文引用嵌在气泡顶部（照 mynd）——竖线 + 日期时间 + 原文摘要。
        用 currentColor + opacity，白气泡和主题色气泡上都不用各配一套颜色 */
@@ -281,7 +284,7 @@
       font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 2px 0;
     }
     .pin-row-off:active { opacity: 0.5; }
-    .btext { font-size: 15.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+    .btext { font-size: 15.5px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
     .bmeta {
       display: flex; align-items: center; gap: 6px;
       padding: 6px 6px 0; font-size: 12px; color: var(--label3);
@@ -1182,9 +1185,8 @@ function renderStream() {
            <div class="tdwrap">${inner}</div>
          </div>`
       : inner;
-    // 遮罩盖在最上层：既是「点一下看」的提示，也顺手挡住底下图片的点击
-    const masked = e.msk && !revealed.has(e.id);
-    const veil = masked ? `<div class="msk-veil"><span>👁 点一下看</span></div>` : '';
+    // 挡板盖在最上层，挡住底下图片的点击；气泡本身的长按/双击照常穿透上来
+    const veil = e.msk ? `<div class="msk-veil"></div>` : '';
 
     // 引用嵌在气泡顶部。stop 是必须的：不拦住 pointer 事件，点引用会同时触发气泡的双击判定
     let requote = '';
@@ -1212,7 +1214,7 @@ function renderStream() {
         <div class="brow ${e.date === today ? 'me' : ''}">
           <div class="bline">
             ${pill}
-            <div class="bubble ${e.hl ? 'hl' : ''} ${e.qt ? 'qt' : ''} ${e.td ? 'td' : ''} ${e.td === 2 ? 'done' : ''} ${masked ? 'msk' : ''}"
+            <div class="bubble ${e.hl ? 'hl' : ''} ${e.qt ? 'qt' : ''} ${e.td ? 'td' : ''} ${e.td === 2 ? 'done' : ''} ${e.msk ? 'msk' : ''}"
                  onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
               ${body}
               ${veil}
@@ -1653,8 +1655,6 @@ function bubbleUp(id) {
   clearTimeout(longPressTimer);
   longPressTimer = null;
 
-  if (isMasked(id)) { revealEntry(id); lastTapId = null; return; }
-
   const now = Date.now();
   if (lastTapId === id && now - lastTapAt < DBL_MS) {
     clearTimeout(tapTimer);
@@ -1711,8 +1711,6 @@ function toggleMark(id, kind) {
   else e[kind] = on;
   // 摘抄样式和「摘抄」标签一起走，导出和筛选才对得上
   if (kind === 'qt' && on && tags.some(t => t.id === 'quote')) { e.tagId = 'quote'; e.auto = false; }
-  // 重新遮上就得把「这次揭开过」忘掉，否则遮罩加了、气泡还亮着
-  if (kind === 'msk' && on) revealed.delete(id);
   saveEntries();
   renderAll();
   showToast(on ? { hl: '已高光', qt: '已排成摘抄', pin: '已置顶', msk: '已隐藏' }[kind]
@@ -1785,7 +1783,6 @@ function purgeEntries(ids) {
   entries = entries.filter(e => !set.has(e.id));
   // 被回复的那条没了，回复方的 re 就是个空指针：断开它，别一直显示「原记录已删除」
   entries.forEach(e => { if (e.re && set.has(e.re)) delete e.re; });
-  ids.forEach(id => revealed.delete(id));
   if (replyTo && set.has(replyTo)) replyTo = null;
   saveEntries();
 }
@@ -1841,28 +1838,6 @@ function toggleDone(id) {
   saveEntries();
   renderAll();
   showToast(e.td === 2 ? '已勾掉' : '已取消勾选');
-}
-
-/* ═══════════════════ 隐藏（剧透遮罩） ═══════════════════ */
-
-// 揭开只活在这次会话里：刷新后重新遮上。手机递给别人看照片时，
-// 遮着的那条不会因为「上次点开过」就一直亮着
-const revealed = new Set();
-
-function isMasked(id) {
-  const e = entryById(id);
-  return !!(e && e.msk && !revealed.has(id));
-}
-
-// 只掀这一个气泡，不走 renderAll——整屏重画会重新 hydrate 图片，滚动位置跟着跳
-function revealEntry(id) {
-  if (selectMode) return;
-  revealed.add(id);
-  const b = document.querySelector(`.srow[data-id="${id}"] .bubble`);
-  if (!b) return;
-  b.classList.remove('msk');
-  const veil = b.querySelector('.msk-veil');
-  if (veil) veil.remove();
 }
 
 /* ═══════════════════ 回复 → thread ═══════════════════ */
