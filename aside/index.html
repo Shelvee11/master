@@ -217,8 +217,6 @@
       background: var(--accent); color: var(--accent-fg);
       border-radius: var(--bubble-r) var(--bubble-tail) var(--bubble-r) var(--bubble-r);
     }
-    /* 右滑循环的第四态：位置在右、颜色还是原本那身白 */
-    .brow.me .bubble.plain { background: var(--bg2); color: var(--label); }
     .bubble:active { opacity: 0.8; }
 
     /* 高光：整条气泡换成便签黄，左右两侧都盖掉 */
@@ -250,9 +248,6 @@
     .bubble.td.done .td-box .tick { display: block; color: #fff; }
     .brow.me .bubble.td.done .td-box { background: var(--accent-fg); border-color: var(--accent-fg); }
     .brow.me .bubble.td.done .td-box .tick { color: var(--accent); }
-    /* 右侧白气泡：底色回到白的，勾也得跟着换回绿底白勾，否则白勾落在白底上看不见 */
-    .brow.me .bubble.plain.td.done .td-box { background: var(--accent); border-color: var(--accent); }
-    .brow.me .bubble.plain.td.done .td-box .tick { color: #fff; }
     .bubble.td.done .btext { text-decoration: line-through; opacity: 0.5; }
     .tdrow .tdwrap { flex: 1; min-width: 0; }
 
@@ -901,10 +896,12 @@ function todayKey() { return dateKey(new Date()); }
 /* ── 靠哪边 ────────────────────────────────────────────────────
    右边 = 「刚记的」：4 小时内自动靠右，过了就自己漂到左边。判定用的是记录自己的
    date+time，所以补记写到上周的条目一落笔就在左边。
-   e.side 是右滑手动定的覆盖值，一旦有值就不再随时间变：
+   e.side 是横滑手动定的覆盖值，一旦有值就不再随时间变——你放哪边它就待在哪边：
      0 / undefined  自动（按 4 小时判定）
-     1              强制靠右，用主题色
-     2              强制靠右，用原本的白底  */
+     1              强制靠右
+    -1              强制靠左
+   （老版本用过 side=2 表示「靠右但用白底」，白底那一态已经去掉；下面用 > 0 判断，
+     旧数据会被当成靠右，再滑一次就归一到 ±1）  */
 const RECENT_MS = 4 * 60 * 60 * 1000;
 function entryTs(e) {
   const [y, m, d]  = e.date.split('-').map(Number);
@@ -912,7 +909,7 @@ function entryTs(e) {
   return new Date(y, m - 1, d, hh || 0, mm || 0).getTime();
 }
 function isRecent(e) { return Date.now() - entryTs(e) < RECENT_MS; }
-function onRight(e)  { return !!e.side || isRecent(e); }
+function onRight(e)  { return e.side ? e.side > 0 : isRecent(e); }
 function nowTime(d) { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -1303,7 +1300,7 @@ function renderStream() {
         <div class="brow ${onRight(e) ? 'me' : ''}">
           <div class="bline">
             ${pill}
-            <div class="bubble ${e.hl ? 'hl' : ''} ${e.side === 2 ? 'plain' : ''} ${e.qt ? 'qt' : ''} ${e.td ? 'td' : ''} ${e.td === 2 ? 'done' : ''} ${e.msk ? 'msk' : ''}"
+            <div class="bubble ${e.hl ? 'hl' : ''} ${e.qt ? 'qt' : ''} ${e.td ? 'td' : ''} ${e.td === 2 ? 'done' : ''} ${e.msk ? 'msk' : ''}"
                  onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
               ${body}
               ${veil}
@@ -1761,10 +1758,10 @@ function bubbleUp(id) {
 function bubbleCancel() { clearTimeout(longPressTimer); longPressTimer = null; swEnd(); }
 
 /* ── 气泡横滑：一个手势管「靠哪边」和「高不高光」两件事 ───────────────
-   历史消息（自动靠左）走四态循环，到了右边就不会自己回去：
-     ① 左·白底 →右滑→ ② 右·主题色 →右滑→ ③ 右·高光 →右滑→ ④ 右·白底 →右滑→ ②…
-   左滑只管位置，把它还回左边（高光保持原样，不一起清掉）。
-   近 4 小时的消息本来就在右边，右滑只在「普通 / 高光」之间切，左滑滑不动。
+   规则只有一条，两个方向完全对称：
+     朝某个方向滑 → 还没在那边就挪过去；已经在那边了就切高光（来回切，不封顶）
+   于是：右边的气泡左滑一下到左边，再左滑就在高光/非高光之间反复切；左边的同理。
+   往自己已经在的那侧滑，等于「只切高光」，所以没有任何一个方向是死的。
 
    监听挂在 #stream 的**捕获阶段**：图片和药丸自己 stopPropagation 了（免得点图
    也算点气泡），冒泡阶段收不到，捕获阶段先于目标触发，所以从图片上起手也能滑。
@@ -1800,11 +1797,9 @@ function swMove(ev) {
     try { sw.el.setPointerCapture(ev.pointerId); } catch (err) {}
     sw.el.style.transition = 'none';
   }
-  const e = entryById(sw.id);
-  // 滑不动的方向给三分之一阻尼：滑得出去一点，手感上告诉你「这边到头了」
-  const dead = dx < 0 && !(e && e.side);
-  sw.dx = dead ? dx / 3 : dx;
-  sw.el.style.transform = `translateX(${sw.dx}px)`;
+  // 两个方向都有意义（挪位置 or 切高光），所以不再有需要加阻尼的死方向
+  sw.dx = dx;
+  sw.el.style.transform = `translateX(${dx}px)`;
 }
 
 function swUp() {
@@ -1814,34 +1809,17 @@ function swUp() {
   if (!locked) return;
   swSuppress = true;
   setTimeout(() => { swSuppress = false; }, 0);   // 只挡紧跟着的那一次 pointerup
-  if (dx >= SWIPE_GO) swipeRight(id);
-  else if (dx <= -SWIPE_GO) swipeLeft(id);
+  if (Math.abs(dx) >= SWIPE_GO) swipeTo(id, dx > 0 ? 1 : -1);
 }
 
-/* 四态机。状态从 side + hl 反推，不另存字段——JSON 备份和云同步（按整条内容
-   算 hash）都自动带上，不用改任何一处序列化。 */
-function swipeState(e) {
-  if (!e.side) return 0;              // 自动位置
-  if (e.side === 2) return 3;         // 右·白底
-  return e.hl ? 2 : 1;                // 右·高光 / 右·主题色
-}
-function swipeRight(id) {
+/* dir: 1 = 右滑, -1 = 左滑。
+   side 和 hl 都是记录自己的字段，JSON 备份和云同步（按整条内容算 hash）自动带上，
+   不用改任何一处序列化。 */
+function swipeTo(id, dir) {
   const e = entryById(id);
   if (!e) return;
-  // 本来就在右边的：右滑只切高光，不动位置
-  if (swipeState(e) === 0 && isRecent(e)) { e.hl = !e.hl; }
-  else {
-    const next = { 0: 1, 1: 2, 2: 3, 3: 1 }[swipeState(e)];
-    e.side = next === 3 ? 2 : 1;
-    e.hl   = next === 2;
-  }
-  saveEntries();
-  renderAll();
-}
-function swipeLeft(id) {
-  const e = entryById(id);
-  if (!e || !e.side) return;   // 近消息滑不回左边
-  e.side = 0;
+  if (onRight(e) === (dir > 0)) e.hl = !e.hl;   // 已经在这一侧 → 切高光
+  else e.side = dir;                            // 还没过来 → 挪过来（从此钉死在这边）
   saveEntries();
   renderAll();
 }
