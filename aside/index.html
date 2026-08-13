@@ -2873,12 +2873,23 @@ const SYNC_AT_KEY    = 'aside-sync-at';    // 上次同步拿到的服务器时�
 const SYNC_SNAP_KEY  = 'aside-sync-snap';  // id → 内容 hash，用来算「哪几条改过」
 const SYNC_TAGH_KEY  = 'aside-sync-tagh';  // 标签表的 hash，单独存——混进 snap 会被当成一条记录，进而生成假墓碑
 
+/* 瞬时故障的退避重试。没有这个的话，一次抖动就把这台设备晾到用户下次动手为止：
+   catch 里只记个错误，下一轮同步要等到「又存了一条 / 切回前台 / 网络恢复」。
+   电脑上 App 开着一直在动，几秒后就被下一次写入带过去了；手机记完就锁屏，
+   一次 500 能卡上一整天——这正是「电脑同步好好的、手机没同步上」的由来。 */
+const SYNC_BACKOFF = [3000, 15000, 60000];
+const SYNC_TIMEOUT = 20000;  // 挂死的请求必须自己断，见 doSync 里的 AbortController
+
 let syncSnap     = loadJSON(SYNC_SNAP_KEY, {}) || {};
 let syncing      = false;
 let syncTimer    = null;
 let syncErr      = '';
+let syncRetry    = 0;      // 连续失败次数，即 SYNC_BACKOFF 的下标。成功或换个由头重来就清零
 let syncLastAt   = 0;      // 上次「尝试」同步的时刻，给回前台的触发做节流
 let suppressSync = false;  // 同步过程里回写本地会调 saveEntries，别让它再触发一轮
+
+// fatal = 重试多少次都一样、非改配置不可，别浪费退避轮次
+function syncFail(msg, fatal) { const e = new Error(msg); e.fatal = !!fatal; return e; }
 
 function syncCfg() {
   return {
@@ -2954,6 +2965,8 @@ async function doSync(opts = {}) {
   if (!navigator.onLine) { if (manual) showToast('当前没有网络'); return; }
   // 多选、灯箱开着的时候拉到新数据会整屏重绘，打断操作，等一会儿再说
   if (!manual && (document.body.classList.contains('select') || lbEntry)) { scheduleSync(8000); return; }
+  // 换了个由头重来（手点、回前台、网络恢复），退避从头算，别接着上一轮的 60 秒
+  if (manual || opts.fresh) syncRetry = 0;
 
   syncing = true;
   syncLastAt = Date.now();
@@ -2965,13 +2978,28 @@ async function doSync(opts = {}) {
     const tagsJSON = JSON.stringify(tags);
     const tagsDirty = hashStr(tagsJSON) !== localStorage.getItem(SYNC_TAGH_KEY);
 
-    const res = await fetch(cfg.url + '/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.token },
-      body: JSON.stringify({ since, entries: dirty, tags: tagsDirty ? tagsJSON : null }),
-    });
-    if (res.status === 401) throw new Error('密钥不对');
-    if (!res.ok) throw new Error('服务端 ' + res.status);
+    /* 超时必须自己掐。移动网络下 fetch 可以吊着永不 reject，而 syncing 是在
+       finally 里才放开的——真挂住的话这台设备后面每一次同步都会被「正在同步…」
+       挡回去，直到用户重启 App。 */
+    const ac = new AbortController();
+    const killer = setTimeout(() => ac.abort(), SYNC_TIMEOUT);
+    let res;
+    try {
+      res = await fetch(cfg.url + '/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.token },
+        body: JSON.stringify({ since, entries: dirty, tags: tagsDirty ? tagsJSON : null }),
+        signal: ac.signal,
+      });
+    } catch (e) {
+      throw syncFail(e.name === 'AbortError' ? '超时' : '连不上服务器');
+    } finally {
+      clearTimeout(killer);
+    }
+    if (res.status === 401) throw syncFail('密钥不对', true);
+    // 5xx 和 429 是服务端一时不行（冷启动撞上 D1 抖动就会抛 500），值得重试；
+    // 其余 4xx 是这个请求本身有问题，重发一模一样的内容不会有别的结果
+    if (!res.ok) throw syncFail('服务端 ' + res.status, res.status < 500 && res.status !== 429);
     const out = await res.json();
 
     // 推成功了快照才跟上。失败就原样留着，下次整批重推——宁可重推也不能漏推
@@ -2999,6 +3027,7 @@ async function doSync(opts = {}) {
     localStorage.setItem(SYNC_AT_KEY, String(out.now));
     localStorage.setItem(SYNC_SNAP_KEY, JSON.stringify(syncSnap));
     syncErr = '';
+    syncRetry = 0;
 
     if (changed) {
       suppressSync = true;
@@ -3012,8 +3041,19 @@ async function doSync(opts = {}) {
     if (out.truncated) scheduleSync(600);   // 这批没拉完，接着拉下一批
   } catch (err) {
     syncErr = err.message || '同步失败';
-    setSyncStateText();
     if (manual) showToast('同步失败：' + syncErr);
+    /* 退避重试走 scheduleSync 而不是自己起 timer，为的是共用 syncTimer：期间用户
+       又存了一条的话，那 2.5 秒的正常同步会顶掉排队中的重试，不会两个计时器打架。
+       三轮走完就把计数清零交回给自然触发（存记录 / 回前台 / 网络恢复），
+       不无限重试——服务端要是真的躺了，每分钟敲一次没有意义。 */
+    if (!err.fatal && syncRetry < SYNC_BACKOFF.length) {
+      const wait = SYNC_BACKOFF[syncRetry++];
+      syncErr += `，${Math.round(wait / 1000)} 秒后重试`;
+      scheduleSync(wait);
+    } else {
+      syncRetry = 0;
+    }
+    setSyncStateText();
   } finally {
     syncing = false;
   }
@@ -3082,9 +3122,9 @@ function disableSync() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && Date.now() - syncLastAt > 30000) doSync();
+  if (!document.hidden && Date.now() - syncLastAt > 30000) doSync({ fresh: true });
 });
-window.addEventListener('online', () => doSync());
+window.addEventListener('online', () => doSync({ fresh: true }));
 
 /* ═══════════════════ Viewport（iOS 键盘） ═══════════════════ */
 
@@ -3136,7 +3176,7 @@ renderAttachStrip();
 initScanTip();
 
 // 启动先拉一次：在电脑上打开时立刻看到手机上记的内容，不用等 debounce
-if (syncOn()) doSync();
+if (syncOn()) doSync({ fresh: true });
 
 // 存了图片就得申请持久化，否则 Safari 空间紧张时会把 IndexedDB 清掉
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
