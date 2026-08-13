@@ -1506,8 +1506,8 @@ function onInput() {
   document.getElementById('plus-btn').disabled = pendingImgs.length >= MAX_IMGS;
   if (added >= BULK_MIN) {
     bulkInserted = true;
-    // OCR 按印刷行断句，一段话会变成七八行硬回车
-    if (countLines(ta.value) >= 2) showToast(`扫到 ${added} 字`, '整理断行', tidyComposer);
+    // OCR 是按印刷行断的，跟句子对不上。整理后确实会变才提示，已经齐整的不打扰
+    if (tidyLineBreaks(ta.value) !== ta.value) showToast(`扫到 ${added} 字`, '整理断行', tidyComposer);
   }
 }
 
@@ -1521,25 +1521,52 @@ function tidyComposer() {
   ta.focus();
 }
 
-/* 把 OCR 的硬断行接回段落。保守：句末标点后的换行、空行（段落分隔）都留着，
-   只合并明显是「一行没写完被折走」的那种。 */
-const TERMINAL = /[。！？…”」』.!?]$/;
-const CONTINUES = /^[，。！？；：、）」』”…,.!?;:)]/;
-function tidyLineBreaks(text) {
-  const lines = text.split('\n').map(l => l.trim());
+/* 把 OCR 的印刷断行整理成语义断行。两步走：段内的硬断行先全接回成一整段，
+   再按句子重断，一句一行——所以「一行印了一句半」这种也能摆正，
+   而不只是把断掉的接回去。空行＝自然段分隔，两步都不碰。 */
+
+// 列表项 / 编号 / 小标题：这行是新的一块，不接到上一行屁股后面
+const LIST_HEAD = /^([-–—•·*]|\d+[.、)）]|[（(]\d+[）)]|第[一二三四五六七八九十百]+[章节条部篇]|[一二三四五六七八九十]+[、.])\s/;
+const CLOSE = '”’」』）】》)\\]';                                    // 收尾的引号括号，归到上一句
+const SENT_CJK = new RegExp(`([。！？…]+[${CLOSE}]*)(?=[^${CLOSE}\\s])`, 'g');
+const SENT_EN = /([.!?]["'’”)\]]*)\s+(?=[A-Z“"「（(])/g;
+const ABBR = new Set(['mr','mrs','ms','dr','prof','st','vs','etc','no','fig','e.g','i.e']);
+/* 两行接起来时中间要不要补空格：拉丁文之间要，中文之间不要。
+   句末标点也算「拉丁尾」，否则 `He said "go."` 和 `Then…` 会粘成一坨，
+   下一轮 SENT_EN 认不出来（它要求句点后有空格），这条就再也断不开了。 */
+const LAT_TAIL = /[A-Za-z0-9.!?,;:'")\]”’]$/;
+const LAT_HEAD = /^[A-Za-z0-9'"“(\[]/;
+
+function splitSentences(s) {
+  return s.replace(SENT_CJK, '$1\n')
+          .replace(SENT_EN, (m, p, off, whole) => {
+            if (m[0] !== '.') return p + '\n';
+            // Mr. Smith / e.g. Tokyo：句点属于缩写，不是句末
+            const w = (whole.slice(0, off).match(/[A-Za-z.]+$/) || [''])[0].toLowerCase();
+            return ABBR.has(w.replace(/\.$/, '')) ? m : p + '\n';
+          });
+}
+
+function joinPara(p) {
   const out = [];
-  for (const line of lines) {
-    if (!out.length || line === '' || out[out.length - 1] === '') { out.push(line); continue; }
-    const prev = out[out.length - 1];
-    // 下一行以「，」这类标点开头，一定是被折走的下半句，即使上一行看着已经收尾
-    const join = CONTINUES.test(line) || !TERMINAL.test(prev);
-    if (!join) { out.push(line); continue; }
+  for (const line of p.split('\n').map(l => l.trim()).filter(Boolean)) {
+    const prev = out.length ? out[out.length - 1] : null;
+    // 上一行以「：」收尾的话，后面通常是列举，那个换行是作者写的，留着
+    if (prev === null || LIST_HEAD.test(line) || /[:：]$/.test(prev)) { out.push(line); continue; }
     let a = prev;
-    if (/[A-Za-z]-$/.test(a) && /^[a-z]/.test(line)) a = a.slice(0, -1);          // 英文连字符断词
-    else if (/[A-Za-z0-9]$/.test(a) && /^[A-Za-z0-9]/.test(line)) a += ' ';       // 英文词之间补空格
+    if (/[A-Za-z]-$/.test(a) && /^[a-z]/.test(line)) a = a.slice(0, -1);   // 英文连字符断词
+    else if (LAT_TAIL.test(a) && LAT_HEAD.test(line)) a += ' ';            // 拉丁文之间补空格
     out[out.length - 1] = a + line;
   }
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return out;
+}
+
+function tidyLineBreaks(text) {
+  return text.split(/\n[ \t]*\n+/)
+             .map(p => joinPara(p).map(splitSentences).join('\n'))
+             .filter(Boolean)
+             .join('\n\n')
+             .trim();
 }
 
 function renderAttachStrip() {
@@ -1698,6 +1725,7 @@ const ICONS = {
   // exclamationmark.bubble
   pin:    `<path d="${ICO_BUBBLE}"/><path d="M12 8.2v3.3"/><path d="M12 13.8h.01"/>`,
   edit:   '<path d="M4 20h4L18.5 9.5a2.4 2.4 0 0 0-3.4-3.4L4.6 16.6 4 20z"/><path d="M14.5 7.5l2.6 2.6"/>',
+  clock:  '<circle cx="12" cy="12" r="8.6"/><path d="M12 7.2V12l3.2 2"/>',
   copy:   '<rect x="9" y="9" width="11" height="12" rx="2.2"/><path d="M15.5 6.2A2.2 2.2 0 0 0 13.4 4.5H6.2A2.2 2.2 0 0 0 4 6.7v7.2c0 1 .7 1.9 1.7 2.1"/>',
   tidy:   '<path d="M4 6.5h16"/><path d="M4 11.5h8"/><path d="M4 16.5h16"/><path d="M13 11.5h5m0 0-2-2m2 2-2 2"/>',
   tag:    '<path d="M20.6 12.9 12.9 20.6a2 2 0 0 1-2.8 0l-6.6-6.6a2 2 0 0 1-.6-1.4V4.6A1.6 1.6 0 0 1 4.5 3h8a2 2 0 0 1 1.4.6l6.7 6.7a2 2 0 0 1 0 2.6z"/><circle cx="7.6" cy="7.6" r="1.3"/>',
@@ -1854,8 +1882,9 @@ function openEntryAction(id) {
     </div>
     <div class="action-group">
       <button class="action-btn" onclick="forceCloseAction(); openEditText('${id}')">${ico('edit')}编辑文本</button>
+      <button class="action-btn" onclick="forceCloseAction(); openEntryWhen('${id}')">${ico('clock')}改时间</button>
       ${e.text ? `<button class="action-btn" onclick="copyEntry('${id}')">${ico('copy')}复制文本</button>` : ''}
-      ${countLines(e.text) >= 2 ? `<button class="action-btn" onclick="forceCloseAction(); tidyEntry('${id}')">${ico('tidy')}整理断行</button>` : ''}
+      ${e.text && tidyLineBreaks(e.text) !== e.text ? `<button class="action-btn" onclick="forceCloseAction(); tidyEntry('${id}')">${ico('tidy')}整理断行</button>` : ''}
       <button class="action-btn" onclick="forceCloseAction(); openTagPicker('${id}')">${ico('tag')}改标签</button>
       ${nImg ? `<button class="action-btn" onclick="forceCloseAction(); openImageManager('${id}')">${ico('photo')}管理图片（${nImg} 张）</button>` : ''}
     </div>
@@ -1866,6 +1895,30 @@ function openEntryAction(id) {
 
 /* ═══════════════════ 高光 / 摘抄 / 置顶 ═══════════════════ */
 
+/* 形态（待办 / 摘抄）开着的时候要接管标签，导出和筛选才对得上；
+   但关掉时必须还回去，否则误触双击一开一关，就把关键词判出来的标签吃掉了。
+   e.tg0 = 被接管之前的那个标签，只在接管期间存在，还回去就删掉。 */
+const FORM_TAG = { td: 'todo', qt: 'quote' };
+const hasTag = id => tags.some(t => t.id === id);
+
+function formTagOn(e, key) {
+  const id = FORM_TAG[key];
+  if (!hasTag(id) || e.tagId === id) return;   // 本来就是这个标签，没什么好存底的
+  if (e.tg0 === undefined) e.tg0 = e.tagId;    // 两个形态都开时，第一次接管的底最原始
+  e.tagId = id;
+  e.auto = false;
+}
+
+function formTagOff(e, key) {
+  const id = FORM_TAG[key];
+  if (e.tagId !== id) return;                  // 标签早被别的操作改走了，不插手
+  const other = key === 'td' ? 'qt' : 'td';    // 另一个形态还开着 → 标签交给它
+  if (e[other] && hasTag(FORM_TAG[other])) { e.tagId = FORM_TAG[other]; return; }
+  // 这里要的是「存在才还」，tagById 找不到会给兜底标签，不能拿来当校验
+  if (e.tg0 !== undefined && hasTag(e.tg0)) e.tagId = e.tg0;
+  delete e.tg0;
+}
+
 // pin 存的是置顶时刻，多条置顶时按它排序（后置顶的在上面）
 function toggleMark(id, kind) {
   const e = entryById(id);
@@ -1874,8 +1927,8 @@ function toggleMark(id, kind) {
   const on = !e[kind];
   if (kind === 'pin') e.pin = on ? Date.now() : 0;
   else e[kind] = on;
-  // 摘抄样式和「摘抄」标签一起走，导出和筛选才对得上
-  if (kind === 'qt' && on && tags.some(t => t.id === 'quote')) { e.tagId = 'quote'; e.auto = false; }
+  // 摘抄样式和「摘抄」标签一起走
+  if (kind === 'qt') on ? formTagOn(e, 'qt') : formTagOff(e, 'qt');
   saveEntries();
   renderAll();
   showToast(on ? { hl: '已高光', qt: '已排成摘抄', pin: '已置顶', msk: '已隐藏' }[kind]
@@ -1989,8 +2042,8 @@ function toggleTodo(id) {
   forceCloseAction();
   const on = !e.td;
   e.td = on ? 1 : 0;
-  // 跟「摘抄」一个路子：形态和标签一起走，筛选和导出才对得上
-  if (on && tags.some(t => t.id === 'todo')) { e.tagId = 'todo'; e.auto = false; }
+  // 跟「摘抄」一个路子：形态和标签一起走，取消时把原标签还回去
+  on ? formTagOn(e, 'td') : formTagOff(e, 'td');
   saveEntries();
   renderAll();
   showToast(on ? '已转成待办' : '已取消待办');
@@ -2121,17 +2174,22 @@ function saveBackfillWhen() {
   renderComposerBars();
 }
 
-/* 补记的 ts 由「那天 + 那个点」现算，流里才会插到该在的位置。
-   同一分钟连补几条会撞上同一个 ts，往后挪毫秒——只影响排序，显示的还是同一个 HH:MM */
+/* 「那天 + 那个点」→ ts，流里才会插到该在的位置。同一分钟连补几条会撞上同一个 ts，
+   往后挪毫秒——只影响排序，显示的还是同一个 HH:MM。
+   selfId 是「改时间」用的：自己不该跟自己撞车。 */
+function uniqueTs(date, time, selfId) {
+  const [y, mo, da] = date.split('-').map(Number);
+  const [hh, mi] = time.split(':').map(Number);
+  let ts = new Date(y, mo - 1, da, hh, mi, 0, 0).getTime();
+  const used = new Set(entries.filter(e => e.id !== selfId).map(e => e.ts));
+  while (used.has(ts)) ts++;
+  return ts;
+}
+
 function composeWhen() {
   const now = new Date();
   if (!backfill) return { ts: now.getTime(), date: dateKey(now), time: nowTime(now) };
-  const [y, mo, da] = backfill.date.split('-').map(Number);
-  const [hh, mi] = backfill.time.split(':').map(Number);
-  let ts = new Date(y, mo - 1, da, hh, mi, 0, 0).getTime();
-  const used = new Set(entries.map(e => e.ts));
-  while (used.has(ts)) ts++;
-  return { ts, date: backfill.date, time: backfill.time };
+  return { ts: uniqueTs(backfill.date, backfill.time), date: backfill.date, time: backfill.time };
 }
 
 /* 输入条上方那两条状态。被回复的记录可能已经删了，顺手把悬空的引用清掉 */
@@ -2396,7 +2454,8 @@ function setEntryTag(id, tagId) {
   if (!e) return;
   const changed = e.tagId !== tagId;
   e.tagId = tagId;
-  if (changed) e.auto = false;
+  // 手动改过标签，形态存的那个底就作废了，取消待办/摘抄时不该再覆盖用户的选择
+  if (changed) { e.auto = false; delete e.tg0; }
   saveEntries();
   forceCloseAction();
   renderAll();
@@ -2425,10 +2484,48 @@ function openEditText(id) {
   openForm('编辑文本', `
     <div class="form-group">
       <textarea class="form-area" id="edit-text" style="min-height:120px">${esc(e.text)}</textarea>
-      <div class="form-hint">时间点保持不变（记的是发生时间，不是修改时间）</div>
+      <div class="form-hint">时间点保持不变（记的是发生时间，不是修改时间）。要挪时间用菜单里的「改时间」</div>
     </div>
     <button class="btn-primary" onclick="saveEditText('${id}')">保存</button>`);
   setTimeout(() => document.getElementById('edit-text').focus(), 250);
+}
+
+/* 补记定的是「接下来记的」，这里管的是已经躺在流里的那条。
+   ts / date / time 得一起改：流按 ts 排（visibleEntries），日期分隔条按 date 分组。 */
+function openEntryWhen(id) {
+  const e = entryById(id);
+  if (!e) return;
+  openForm('改时间', `
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">日期</label>
+        <input class="form-input" type="date" id="ew-date" value="${e.date}" max="${todayKey()}">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">时间</label>
+        <input class="form-input" type="time" id="ew-time" value="${e.time || '00:00'}">
+      </div>
+    </div>
+    <div class="form-hint" style="margin:-6px 0 14px">改的是这条记录发生的时间点，它会挪到那天对应的位置。</div>
+    <button class="btn-primary" onclick="saveEntryWhen('${id}')">保存</button>`);
+}
+
+function saveEntryWhen(id) {
+  const e = entryById(id);
+  if (!e) return;
+  const d = document.getElementById('ew-date').value;
+  const t = document.getElementById('ew-time').value;
+  if (!d || !t) { showToast('日期和时间都要填'); return; }
+  if (d > todayKey()) { showToast('不能改到未来'); return; }   // 跟补记一个规矩
+  if (d === e.date && t === e.time) { closeForm(); return; }
+  e.ts = uniqueTs(d, t, e.id);
+  e.date = d;
+  e.time = t;
+  saveEntries();
+  closeForm();
+  renderAll();
+  jumpToEntry(id);      // 挪到别的日子后原地就看不见了，跳过去闪一下让人确认
+  showToast(`已挪到 ${cnDate(d)} ${t}`);
 }
 
 function tidyEntry(id) {
@@ -2440,7 +2537,7 @@ function tidyEntry(id) {
   e.text = tidied;
   saveEntries();
   renderAll();
-  showToast(`${countLines(before) + 1} 行并成 ${countLines(tidied) + 1} 行`, '撤销', () => {
+  showToast(`${countLines(before) + 1} 行 → ${countLines(tidied) + 1} 行`, '撤销', () => {
     const x = entryById(id);
     if (!x) return;
     x.text = before;
@@ -2575,7 +2672,7 @@ function renderSettings() {
         <div class="row-sub">1. 点一下输入框，再点一下光标<br>2. 选菜单里的「扫描文本」<br>3. 镜头对准书页，文字直接填进来</div>
       </div></div>
     </div>
-    <div class="form-hint" style="margin:8px 2px 0">这是 iOS 自带的能力（Apple Vision），识别中文比网页方案准得多，也不用联网。扫进来的整段文字会自动归到「摘抄」；断行太碎的话，长按气泡选「整理断行」。</div>`;
+    <div class="form-hint" style="margin:8px 2px 0">这是 iOS 自带的能力（Apple Vision），识别中文比网页方案准得多，也不用联网。扫进来的整段文字会自动归到「摘抄」；断行不对的话，长按气泡选「整理断行」，会把印刷断行接回去、再一句一行重排。</div>`;
 
   html += `<div class="card-label">标签</div><div class="card">`;
   tags.forEach((t, i) => {
@@ -2700,7 +2797,10 @@ function deleteTag(id) {
   const n = entries.filter(e => e.tagId === id).length;
   const fb = fallbackTag();
   if (!confirm(`删除「${t.name}」？${n ? `该标签下的 ${n} 条记录会归到「${fb.name}」。` : ''}`)) return;
-  entries.forEach(e => { if (e.tagId === id) { e.tagId = fb.id; e.auto = false; } });
+  entries.forEach(e => {
+    if (e.tagId === id) { e.tagId = fb.id; e.auto = false; }
+    if (e.tg0 === id) delete e.tg0;          // 存了底的标签被删了，底也跟着作废
+  });
   tags = tags.filter(x => x.id !== id);
   if (activeFilter === id) activeFilter = 'all';
   saveEntries(); saveTags();
