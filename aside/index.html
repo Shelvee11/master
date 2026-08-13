@@ -212,7 +212,7 @@
       border-radius: var(--bubble-tail) var(--bubble-r) var(--bubble-r) var(--bubble-r);
       cursor: pointer;
       /* 关掉系统选词：双击要用来开待办，不然每次都先蹦出一个「拷贝」气泡。
-         复制走长按菜单里的「复制文本」 */
+         拷贝走长按菜单里的「拷贝」 */
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
       /* 横滑归我们，竖向滚动照旧交给浏览器——写 none 会把整条时间线滚不动 */
       touch-action: pan-y;
@@ -492,6 +492,13 @@
     .action-btn.strong { font-weight: 700; justify-content: center; }
     .action-ico { width: 21px; height: 21px; flex: none; }
     .action-check { color: var(--accent); font-weight: 800; margin-left: auto; }
+    /* 属性行（标签 / 时间）：右边挂当前值 + 箭头。
+       「点它可以换一个」由这个组合说明，标题就不用写成动词了，顺带不点开也看得见现在是什么 */
+    .action-val {
+      margin-left: auto; min-width: 0; font-size: 15px; color: var(--label2);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .action-val i { font-style: normal; color: var(--label3); margin-left: 6px; }
 
     /* ── Cards (settings) ── */
     .card-label {
@@ -677,9 +684,6 @@
     .theme-swatch i { display: block; height: 8px; border-radius: 4px; }
     .theme-swatch i:first-child { width: 62%; align-self: flex-start; }
     .theme-swatch i:last-child  { width: 78%; align-self: flex-end; }
-
-    .imgman { display: flex; flex-wrap: wrap; gap: 12px; padding: 14px 16px; justify-content: center; }
-    .imgman .attach-x { border-color: var(--card); }
 
     .kw-list { display: flex; flex-wrap: wrap; gap: 8px; }
     .kw-chip {
@@ -930,6 +934,11 @@ function esc(s) {
 function cnDate(key) {
   const [y, m, d] = key.split('-').map(Number);
   return `${m}月${d}日 周${DAY_LABELS[new Date(y, m - 1, d).getDay()]}`;
+}
+// 「8月13日 16:25」：菜单行右边挂当前值用，比 cnDate 少一个「周三」，一行塞得下
+function cnDateTime(key, time) {
+  const [, m, d] = key.split('-').map(Number);
+  return `${m}月${d}日 ${time}`;
 }
 function cnFullDate(key) {
   const [y, m, d] = key.split('-').map(Number);
@@ -1444,35 +1453,6 @@ function removeImageFromEntry(entryId, imgId) {
   return emptied;
 }
 
-// 一条记录里多张图时，逐张删太慢，给个管理面板
-function openImageManager(id) {
-  const e = entryById(id);
-  if (!e || !(e.imgs || []).length) return;
-  openAction(`
-    <div class="action-group">
-      <div class="action-title">点 ✕ 删掉不要的图</div>
-      <div class="imgman" id="imgman">${e.imgs.map(imgId => `
-        <div class="attach-thumb">
-          <img data-mimg="${imgId}" alt="">
-          <button class="attach-x" onclick="deleteEntryImage('${id}','${imgId}')" aria-label="删除这张">✕</button>
-        </div>`).join('')}</div>
-    </div>
-    <div class="action-group">
-      <button class="action-btn strong" onclick="forceCloseAction()">完成</button>
-    </div>`);
-  document.querySelectorAll('#imgman img[data-mimg]').forEach(async el => {
-    const url = await imgURL(el.dataset.mimg);
-    if (url) el.src = url;
-  });
-}
-
-function deleteEntryImage(entryId, imgId) {
-  const emptied = removeImageFromEntry(entryId, imgId);
-  const e = entryById(entryId);
-  if (emptied || !e || !(e.imgs || []).length) forceCloseAction();
-  else openImageManager(entryId);       // 还有剩的就原地刷新面板
-}
-
 function scrollToBottom(smooth) {
   const w = document.getElementById('stream-wrap');
   w.scrollTo({ top: w.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
@@ -1504,69 +1484,7 @@ function onInput() {
   ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
   document.getElementById('send-btn').disabled = !ta.value.trim() && !pendingImgs.length;
   document.getElementById('plus-btn').disabled = pendingImgs.length >= MAX_IMGS;
-  if (added >= BULK_MIN) {
-    bulkInserted = true;
-    // OCR 是按印刷行断的，跟句子对不上。整理后确实会变才提示，已经齐整的不打扰
-    if (tidyLineBreaks(ta.value) !== ta.value) showToast(`扫到 ${added} 字`, '整理断行', tidyComposer);
-  }
-}
-
-function countLines(s) { return (s.match(/\n/g) || []).length; }
-
-function tidyComposer() {
-  const ta = document.getElementById('input');
-  ta.value = tidyLineBreaks(ta.value);
-  lastInputLen = ta.value.length;
-  onInput();
-  ta.focus();
-}
-
-/* 把 OCR 的印刷断行整理成语义断行。两步走：段内的硬断行先全接回成一整段，
-   再按句子重断，一句一行——所以「一行印了一句半」这种也能摆正，
-   而不只是把断掉的接回去。空行＝自然段分隔，两步都不碰。 */
-
-// 列表项 / 编号 / 小标题：这行是新的一块，不接到上一行屁股后面
-const LIST_HEAD = /^([-–—•·*]|\d+[.、)）]|[（(]\d+[）)]|第[一二三四五六七八九十百]+[章节条部篇]|[一二三四五六七八九十]+[、.])\s/;
-const CLOSE = '”’」』）】》)\\]';                                    // 收尾的引号括号，归到上一句
-const SENT_CJK = new RegExp(`([。！？…]+[${CLOSE}]*)(?=[^${CLOSE}\\s])`, 'g');
-const SENT_EN = /([.!?]["'’”)\]]*)\s+(?=[A-Z“"「（(])/g;
-const ABBR = new Set(['mr','mrs','ms','dr','prof','st','vs','etc','no','fig','e.g','i.e']);
-/* 两行接起来时中间要不要补空格：拉丁文之间要，中文之间不要。
-   句末标点也算「拉丁尾」，否则 `He said "go."` 和 `Then…` 会粘成一坨，
-   下一轮 SENT_EN 认不出来（它要求句点后有空格），这条就再也断不开了。 */
-const LAT_TAIL = /[A-Za-z0-9.!?,;:'")\]”’]$/;
-const LAT_HEAD = /^[A-Za-z0-9'"“(\[]/;
-
-function splitSentences(s) {
-  return s.replace(SENT_CJK, '$1\n')
-          .replace(SENT_EN, (m, p, off, whole) => {
-            if (m[0] !== '.') return p + '\n';
-            // Mr. Smith / e.g. Tokyo：句点属于缩写，不是句末
-            const w = (whole.slice(0, off).match(/[A-Za-z.]+$/) || [''])[0].toLowerCase();
-            return ABBR.has(w.replace(/\.$/, '')) ? m : p + '\n';
-          });
-}
-
-function joinPara(p) {
-  const out = [];
-  for (const line of p.split('\n').map(l => l.trim()).filter(Boolean)) {
-    const prev = out.length ? out[out.length - 1] : null;
-    // 上一行以「：」收尾的话，后面通常是列举，那个换行是作者写的，留着
-    if (prev === null || LIST_HEAD.test(line) || /[:：]$/.test(prev)) { out.push(line); continue; }
-    let a = prev;
-    if (/[A-Za-z]-$/.test(a) && /^[a-z]/.test(line)) a = a.slice(0, -1);   // 英文连字符断词
-    else if (LAT_TAIL.test(a) && LAT_HEAD.test(line)) a += ' ';            // 拉丁文之间补空格
-    out[out.length - 1] = a + line;
-  }
-  return out;
-}
-
-function tidyLineBreaks(text) {
-  return text.split(/\n[ \t]*\n+/)
-             .map(p => joinPara(p).map(splitSentences).join('\n'))
-             .filter(Boolean)
-             .join('\n\n')
-             .trim();
+  if (added >= BULK_MIN) bulkInserted = true;
 }
 
 function renderAttachStrip() {
@@ -1727,9 +1645,7 @@ const ICONS = {
   edit:   '<path d="M4 20h4L18.5 9.5a2.4 2.4 0 0 0-3.4-3.4L4.6 16.6 4 20z"/><path d="M14.5 7.5l2.6 2.6"/>',
   clock:  '<circle cx="12" cy="12" r="8.6"/><path d="M12 7.2V12l3.2 2"/>',
   copy:   '<rect x="9" y="9" width="11" height="12" rx="2.2"/><path d="M15.5 6.2A2.2 2.2 0 0 0 13.4 4.5H6.2A2.2 2.2 0 0 0 4 6.7v7.2c0 1 .7 1.9 1.7 2.1"/>',
-  tidy:   '<path d="M4 6.5h16"/><path d="M4 11.5h8"/><path d="M4 16.5h16"/><path d="M13 11.5h5m0 0-2-2m2 2-2 2"/>',
   tag:    '<path d="M20.6 12.9 12.9 20.6a2 2 0 0 1-2.8 0l-6.6-6.6a2 2 0 0 1-.6-1.4V4.6A1.6 1.6 0 0 1 4.5 3h8a2 2 0 0 1 1.4.6l6.7 6.7a2 2 0 0 1 0 2.6z"/><circle cx="7.6" cy="7.6" r="1.3"/>',
-  photo:  '<rect x="3" y="4.5" width="18" height="15" rx="2.6"/><path d="M3.5 16.5l4.6-4.6a2 2 0 0 1 2.8 0l3.4 3.4"/><path d="M14 14.5l1.6-1.6a2 2 0 0 1 2.8 0l2.1 2.1"/><circle cx="8.6" cy="9.4" r="1.5"/>',
   // checklist
   multi:  '<path d="M3.5 7.4l1.9 1.9L8.9 5.8"/><path d="M12.5 7.6h8"/><path d="M3.5 15.4l1.9 1.9 3.5-3.5"/><path d="M12.5 15.6h8"/>',
   trash:  '<path d="M3 6h18"/><path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/><path d="M5.5 6l1 13A2 2 0 0 0 8.5 21h7a2 2 0 0 0 2-1.9l1-13.1"/>',
@@ -1865,11 +1781,10 @@ function swipeTo(id, dir) {
 function openEntryAction(id) {
   const e = entryById(id);
   if (!e) return;
-  const nImg = (e.imgs || []).length;
   const nThread = (e.re || replyCounts()[id]) ? threadOf(id).length : 0;
   openAction(`
     <div class="action-group">
-      <div class="action-title">${esc(e.date)} ${esc(e.time)}<br>${esc(preview(e, 28))}</div>
+      <div class="action-title">${esc(preview(e, 28))}</div>
       <button class="action-btn" onclick="forceCloseAction(); startReply('${id}')">${ico('reply')}回复这条</button>
       ${nThread > 1 ? `<button class="action-btn" onclick="forceCloseAction(); openThread('${id}')">${ico('thread')}查看整串（${nThread} 条）</button>` : ''}
       <button class="action-btn" onclick="toggleTodo('${id}')">${ico('todo')}${e.td ? '取消待办' : '转成待办'}</button>
@@ -1881,12 +1796,12 @@ function openEntryAction(id) {
       <button class="action-btn danger" onclick="deleteEntry('${id}')">${ico('trash')}删除</button>
     </div>
     <div class="action-group">
-      <button class="action-btn" onclick="forceCloseAction(); openEditText('${id}')">${ico('edit')}编辑文本</button>
-      <button class="action-btn" onclick="forceCloseAction(); openEntryWhen('${id}')">${ico('clock')}改时间</button>
-      ${e.text ? `<button class="action-btn" onclick="copyEntry('${id}')">${ico('copy')}复制文本</button>` : ''}
-      ${e.text && tidyLineBreaks(e.text) !== e.text ? `<button class="action-btn" onclick="forceCloseAction(); tidyEntry('${id}')">${ico('tidy')}整理断行</button>` : ''}
-      <button class="action-btn" onclick="forceCloseAction(); openTagPicker('${id}')">${ico('tag')}改标签</button>
-      ${nImg ? `<button class="action-btn" onclick="forceCloseAction(); openImageManager('${id}')">${ico('photo')}管理图片（${nImg} 张）</button>` : ''}
+      <button class="action-btn" onclick="forceCloseAction(); openEditText('${id}')">${ico('edit')}编辑</button>
+      ${e.text ? `<button class="action-btn" onclick="copyEntry('${id}')">${ico('copy')}拷贝</button>` : ''}
+      <button class="action-btn" onclick="forceCloseAction(); openTagPicker('${id}')">${ico('tag')}标签
+        <span class="action-val">${esc(tagById(e.tagId).emoji)} ${esc(tagById(e.tagId).name)}<i>›</i></span></button>
+      <button class="action-btn" onclick="forceCloseAction(); openEntryWhen('${id}')">${ico('clock')}时间
+        <span class="action-val">${esc(cnDateTime(e.date, e.time))}<i>›</i></span></button>
     </div>
     <div class="action-group">
       <button class="action-btn strong" onclick="forceCloseAction()">取消</button>
@@ -2018,7 +1933,7 @@ function copyEntry(id) {
   const e = entryById(id);
   if (!e || !e.text) return;
   forceCloseAction();
-  const done = () => showToast('已复制');
+  const done = () => showToast('已拷贝');
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(e.text).then(done).catch(() => legacyCopy(e.text, done));
   } else legacyCopy(e.text, done);
@@ -2029,7 +1944,7 @@ function legacyCopy(text, done) {
   ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
   document.body.appendChild(ta);
   ta.select();
-  try { document.execCommand('copy'); done(); } catch { showToast('复制失败'); }
+  try { document.execCommand('copy'); done(); } catch { showToast('拷贝失败'); }
   ta.remove();
 }
 
@@ -2528,24 +2443,6 @@ function saveEntryWhen(id) {
   showToast(`已挪到 ${cnDate(d)} ${t}`);
 }
 
-function tidyEntry(id) {
-  const e = entryById(id);
-  if (!e) return;
-  const tidied = tidyLineBreaks(e.text);
-  if (tidied === e.text) { showToast('这条不用整理'); return; }
-  const before = e.text;
-  e.text = tidied;
-  saveEntries();
-  renderAll();
-  showToast(`${countLines(before) + 1} 行 → ${countLines(tidied) + 1} 行`, '撤销', () => {
-    const x = entryById(id);
-    if (!x) return;
-    x.text = before;
-    saveEntries();
-    renderAll();
-  });
-}
-
 function saveEditText(id) {
   const e = entryById(id);
   const v = document.getElementById('edit-text').value.trim();
@@ -2672,7 +2569,7 @@ function renderSettings() {
         <div class="row-sub">1. 点一下输入框，再点一下光标<br>2. 选菜单里的「扫描文本」<br>3. 镜头对准书页，文字直接填进来</div>
       </div></div>
     </div>
-    <div class="form-hint" style="margin:8px 2px 0">这是 iOS 自带的能力（Apple Vision），识别中文比网页方案准得多，也不用联网。扫进来的整段文字会自动归到「摘抄」；断行不对的话，长按气泡选「整理断行」，会把印刷断行接回去、再一句一行重排。</div>`;
+    <div class="form-hint" style="margin:8px 2px 0">这是 iOS 自带的能力（Apple Vision），识别中文比网页方案准得多，也不用联网。扫进来的整段文字会自动归到「摘抄」，断行保持原样；要改的话长按气泡选「编辑文本」。</div>`;
 
   html += `<div class="card-label">标签</div><div class="card">`;
   tags.forEach((t, i) => {
