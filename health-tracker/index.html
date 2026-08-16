@@ -161,6 +161,19 @@ main {
 .modal-input::-webkit-outer-spin-button { -webkit-appearance: none; }
 .modal-input:focus { border-color: var(--accent); }
 .modal-calc { text-align: center; font-size: 15px; font-weight: 600; color: var(--accent); margin-top: 10px; min-height: 22px; }
+/* 时间输入：iOS 上原生 time 控件有最小内在宽度会撑破弹窗，必须关掉原生外观 */
+.modal-time {
+  -webkit-appearance: none; appearance: none;
+  display: block; width: 100%; min-width: 0; max-width: 100%;
+  margin-top: 10px; padding: 10px 12px;
+  border: 1.5px solid var(--sep); border-radius: 10px;
+  background: var(--bg2); color: inherit;
+  font-size: 15px; font-family: inherit; font-variant-numeric: tabular-nums;
+  text-align: center; outline: none; transition: border-color 0.15s;
+}
+.modal-time:focus { border-color: var(--accent); }
+.modal-time::-webkit-date-and-time-value { text-align: center; margin: 0; }
+.modal-time::-webkit-calendar-picker-indicator { display: none; }
 .modal-actions { display: flex; border-top: 1px solid var(--sep); }
 .modal-btn {
   flex: 1; padding: 14px; border: none; background: none;
@@ -470,7 +483,7 @@ main {
       <div class="modal-calc" id="qty-calc"></div>
       <input class="form-input" id="qty-note" style="margin-top:10px;font-size:14px;display:none"
         placeholder="备注：吃了什么？（选填）" onkeydown="if(event.key==='Enter')confirmQty()">
-      <input class="form-input" id="qty-time" type="time" style="margin-top:10px;font-size:14px;display:none">
+      <input class="modal-time" id="qty-time" type="time" style="display:none">
     </div>
     <div class="modal-actions">
       <button class="modal-btn modal-btn-cancel" onclick="closeQtyModal()">取消</button>
