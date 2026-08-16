@@ -2931,6 +2931,8 @@ function renderSettings() {
         <button class="row row-btn danger" onclick="clearAll()">清除全部数据</button>
       </div>
       <div class="form-hint" style="margin:8px 2px 0">换机或误删只有 JSON 能完整恢复（Markdown 不可逆、也不含关键词词表）。重复导入不会产生重复记录。</div>
+      <div class="form-hint" id="vp-debug" onclick="this.textContent = viewportDebug()"
+           style="margin:14px 2px 0;line-height:1.8;font-variant-numeric:tabular-nums;white-space:pre-line;word-break:break-all">${esc(viewportDebug())}</div>
     </details>`;
 
   document.getElementById('settings-body').innerHTML = html;
@@ -3486,6 +3488,34 @@ if (window.visualViewport) {
 window.addEventListener('orientationchange', () => setTimeout(syncViewport, 250));
 window.addEventListener('pageshow', syncViewport);
 window.addEventListener('resize', syncViewport);
+
+/* 视口诊断：真机上「输入条离屏幕底还差一截」只能靠这几个数字定位，
+   iOS 上 innerHeight / visualViewport / dvh / safe-area 谁在说谎，看一眼就知道。
+   在 设置 → 高级 最底下，点一下刷新。 */
+function viewportDebug() {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:100dvh;' +
+                        'padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)';
+  document.body.appendChild(probe);
+  const pcs = getComputedStyle(probe);
+  const dvh = Math.round(parseFloat(pcs.height) || 0);
+  const saT = Math.round(parseFloat(pcs.paddingTop) || 0);
+  const saB = Math.round(parseFloat(pcs.paddingBottom) || 0);
+  probe.remove();
+
+  const vv = window.visualViewport;
+  const cs = getComputedStyle(document.documentElement);
+  const app = document.querySelector('.app').getBoundingClientRect();
+  const comp = document.querySelector('.composer').getBoundingClientRect();
+  const r = n => Math.round(n);
+  return [
+    `screen ${r(window.screen.height)} · inner ${r(window.innerHeight)} · dvh ${dvh} · client ${r(document.documentElement.clientHeight)}`,
+    `vv ${vv ? r(vv.height) : '—'} · vvTop ${vv ? r(vv.offsetTop) : '—'} · vvPage ${vv ? r(vv.pageTop) : '—'}`,
+    `safe ↑${saT} ↓${saB} · standalone ${isStandalone ? 'Y' : 'N'} · base ${r(vvBase)}`,
+    `app ${r(app.top)}→${r(app.bottom)} · composer ↓${r(comp.bottom)} 高${r(comp.height)}`,
+    `--app-h ${cs.getPropertyValue('--app-h').trim()} · --kb ${cs.getPropertyValue('--kb').trim()} · --sab-on ${cs.getPropertyValue('--sab-on').trim()}`
+  ].join('\n');
+}
 
 /* ═══════════════════ Init ═══════════════════ */
 
