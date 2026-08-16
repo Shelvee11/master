@@ -2,7 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <!-- height=device-height 是冲着 black-translucent 那条老坑去的：视图顶到屏幕最上面，
+       高度却仍是「屏幕 − 状态栏」，屏幕底下会留一条网页够不着的空带（本机实测 874−812=62px，
+       输入条因此永远浮着）。真机验收看 设置→高级 那块读数：client 追平 screen 就是补上了 -->
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <!-- black-translucent 不是为了「黑」，是为了让网页视图铺到屏幕最顶上：
        default 的话视图从状态栏下面才开始，那条由 iOS 用 manifest 里写死的
@@ -82,6 +85,9 @@
       --app-h:   100dvh;
       --vv-top:  0px;
       --kb:      0px;
+      /* 底部要给 home 指示条留的余量。默认就是安全区，JS 起来后按实际情况改写：
+         键盘弹起时归 0，视图本来就够不到屏幕底时也归 0（见 syncViewport） */
+      --sab:     env(safe-area-inset-bottom);
       /* 上下文菜单：半透明面板 + 分隔线 + 按下态。两套配色各给一份 */
       --ctx-mat: rgba(252,252,250,0.84);
       --ctx-sep: rgba(31,30,26,0.12);
@@ -350,7 +356,7 @@
       backdrop-filter: saturate(180%) blur(20px);
       -webkit-backdrop-filter: saturate(180%) blur(20px);
       padding: 6px 16px 8px;
-      padding-bottom: calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 8px);
+      padding-bottom: calc(var(--sab) + 8px);
     }
     .composer-inner { max-width: 430px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px; }
 
@@ -462,7 +468,7 @@
       position: fixed; left: 0; right: 0; bottom: var(--kb); z-index: 201;
       background: var(--card);
       border-radius: var(--radius) var(--radius) 0 0;
-      padding: 18px 20px calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 20px);
+      padding: 18px 20px calc(var(--sab) + 20px);
       transform: translateY(110%); transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
       max-height: 84%; overflow-y: auto;
     }
@@ -484,7 +490,7 @@
     }
     .action-overlay.open { opacity: 1; pointer-events: auto; }
     .action-sheet {
-      width: 100%; padding: 0 12px calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 12px);
+      width: 100%; padding: 0 12px calc(var(--sab) + 12px);
       transform: translateY(110%); transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
       max-height: 90%; overflow-y: auto;
     }
@@ -762,7 +768,7 @@
     }
     .lightbox-bar {
       position: absolute; left: 0; right: 0; bottom: 0;
-      padding: 16px 20px calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 20px);
+      padding: 16px 20px calc(var(--sab) + 20px);
       display: flex; align-items: center; justify-content: space-between;
     }
     .lb-btn {
@@ -3449,32 +3455,50 @@ window.addEventListener('online', () => doSync({ fresh: true }));
 
 /* ═══════════════════ Viewport（iOS 键盘） ═══════════════════ */
 
-/* 装成 App（standalone）跑在 iOS 上时，visualViewport.height 已经把底部安全区扣掉了，
-   而 .app 又照它设高、输入条再补一遍 env(safe-area-inset-bottom)——同一条安全区付两次钱，
-   输入条就浮在离屏幕底 60~70px 的空中；那点差还会被当成键盘高度（kb>40 → --sab-on 关掉），
-   把症状搅得半遮半掩。解法：把「没在打字时 innerHeight 与 visualViewport 的固有差」记成基线，
-   键盘高度 = 当前差 − 基线，App 高度改从 innerHeight 减键盘算，不再直接吃 vv.height。
-   只在 standalone 下这么算——浏览器标签页里那点差是 Safari 上下工具条，必须照扣。
-   两边差为 0 的环境（桌面 / Android）算出来跟旧代码一模一样。 */
+/* ⚠️ 三条 iOS 事实，缺一条输入条就挂在半空（都是 2026-08-16 在真机上量出来的，别凭感觉改）：
+   ① **iOS 的 window.innerHeight 给的是「视觉视口」**，键盘一弹就跟着变小，跟 vv.height 一个值
+      （实测键盘弹起时 innerHeight 451 / vv 451 / clientHeight 812）。布局高度只能问
+      document.documentElement.clientHeight。老公式 kb = innerHeight − vv.height − offsetTop
+      在 iOS 上恒等于 0（甚至负数），**键盘高度从来没被算进去过**，sheet 的抬起也一直是死的。
+   ② 键盘弹起时 iOS 会把视觉视口整体往下挪（offsetTop，实测 361），position:fixed 的 .app
+      得照着挪回来，否则整个 App 会跑到屏幕外面。
+   ③ **black-translucent 的老坑**：网页视图顶到屏幕最上面，高度却仍是「屏幕 − 状态栏」，
+      于是屏幕底下多出一条网页够不着的空带（本机 874 − 812 = 62px）。这条空带已经把 home
+      指示条盖住了，再补一遍 env(safe-area-inset-bottom) 就是白付第二遍 —— 这就是输入条
+      离屏幕底 100px 的由来。指纹是「screen − clientHeight 正好等于顶部安全区」，
+      对不上就照常补，不瞎猜。 */
 const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
                      || window.navigator.standalone === true;
-let vvBase = 0;
+
+// env() 只能靠探针量。值不会变（转屏才变），量一次存着
+let saCache = null;
+function safeInsets() {
+  if (saCache) return saCache;
+  const p = document.createElement('div');
+  p.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:0;' +
+                    'padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)';
+  document.body.appendChild(p);
+  const cs = getComputedStyle(p);
+  saCache = { top: parseFloat(cs.paddingTop) || 0, bottom: parseFloat(cs.paddingBottom) || 0 };
+  p.remove();
+  return saCache;
+}
 
 function syncViewport() {
   const vv = window.visualViewport;
-  const h = vv ? vv.height : window.innerHeight;
-  const top = vv ? vv.offsetTop : 0;
-  const gap = Math.max(0, window.innerHeight - h - top);
-  const ae = document.activeElement;
-  const editing = !!ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT' || ae.isContentEditable);
-  if (isStandalone && !editing) vvBase = gap;   // 没在打字，这点差就不是键盘
-  const kb = Math.max(0, gap - (isStandalone ? vvBase : 0));
   const root = document.documentElement;
-  root.style.setProperty('--app-h', (isStandalone ? window.innerHeight - kb : h) + 'px');
+  const layoutH = root.clientHeight || window.innerHeight;   // 布局视口，键盘弹起也不变
+  const top = vv ? vv.offsetTop : 0;
+  const kb = Math.max(0, layoutH - (vv ? vv.height : layoutH));
+  const sa = safeInsets();
+  const screenH = (window.screen && window.screen.height) || 0;
+  // 视图整体上移、底下够不着的那条空带（只认得出 black-translucent 那个指纹才算数）
+  const hole = (sa.top > 0 && screenH && Math.abs(screenH - layoutH - sa.top) <= 2) ? sa.top : 0;
+  root.style.setProperty('--app-h', (layoutH - kb) + 'px');
   root.style.setProperty('--vv-top', top + 'px');
   root.style.setProperty('--kb', kb + 'px');
-  // 键盘弹起时 safe-area 底部内边距会和键盘叠加，关掉它
-  root.style.setProperty('--sab-on', kb > 40 ? 0 : 1);
+  // 键盘弹起时输入条压在键盘上，底部安全区不用留；空带已经替 home 指示条占过位的也不用留
+  root.style.setProperty('--sab', (kb > 40 ? 0 : Math.max(0, sa.bottom - hole)) + 'px');
   // 高度一变，滚动容器的「底」就换了地方，贴底状态要跟着重贴（见 stickBottom）
   if (stickBottom) {
     const w = document.getElementById('stream-wrap');
@@ -3485,7 +3509,7 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', syncViewport);
   window.visualViewport.addEventListener('scroll', syncViewport);
 }
-window.addEventListener('orientationchange', () => setTimeout(syncViewport, 250));
+window.addEventListener('orientationchange', () => { saCache = null; setTimeout(syncViewport, 250); });
 window.addEventListener('pageshow', syncViewport);
 window.addEventListener('resize', syncViewport);
 
@@ -3511,9 +3535,9 @@ function viewportDebug() {
   return [
     `screen ${r(window.screen.height)} · inner ${r(window.innerHeight)} · dvh ${dvh} · client ${r(document.documentElement.clientHeight)}`,
     `vv ${vv ? r(vv.height) : '—'} · vvTop ${vv ? r(vv.offsetTop) : '—'} · vvPage ${vv ? r(vv.pageTop) : '—'}`,
-    `safe ↑${saT} ↓${saB} · standalone ${isStandalone ? 'Y' : 'N'} · base ${r(vvBase)}`,
+    `safe ↑${saT} ↓${saB} · standalone ${isStandalone ? 'Y' : 'N'}`,
     `app ${r(app.top)}→${r(app.bottom)} · composer ↓${r(comp.bottom)} 高${r(comp.height)}`,
-    `--app-h ${cs.getPropertyValue('--app-h').trim()} · --kb ${cs.getPropertyValue('--kb').trim()} · --sab-on ${cs.getPropertyValue('--sab-on').trim()}`
+    `--app-h ${cs.getPropertyValue('--app-h').trim()} · --kb ${cs.getPropertyValue('--kb').trim()} · --sab ${cs.getPropertyValue('--sab').trim()}`
   ].join('\n');
 }
 
