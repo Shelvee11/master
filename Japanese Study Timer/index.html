@@ -750,6 +750,134 @@ body {
   margin-top: 10px;
 }
 
+/* 计时中：常驻计时条。放在 header 里边，--header-h 就会自动把它算进去，
+   视图高度不用另外补一套计算 */
+.timer-bar {
+  display: none;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.timer-bar.show { display: flex; }
+
+.tb-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: tb-pulse 2s ease-in-out infinite;
+}
+
+.tb-dot.paused { animation: none; opacity: 0.3; }
+
+@keyframes tb-pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.25 } }
+
+.tb-time {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+  flex-shrink: 0;
+}
+
+.tb-topic {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-weight: 400;
+  color: var(--label2);
+}
+
+.tb-chev { flex-shrink: 0; display: flex; }
+
+.tb-chev svg {
+  width: 14px; height: 14px;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* 计时中：全屏接管。你在学习，不是在用 app —— 这一屏只剩一个数字 */
+.timer-full {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 90;          /* 盖住 tab bar(20)，但让编辑弹窗(100)和 toast(200) 还能上来 */
+  background: var(--bg);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 32px);
+}
+
+.timer-full.show { display: flex; }
+
+.tf-collapse {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 72px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--label3);
+}
+
+.tf-collapse svg {
+  width: 22px; height: 22px;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.tf-time {
+  font-size: 56px;
+  font-weight: 300;
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  line-height: 1;
+}
+
+.tf-topic {
+  margin-top: 14px;
+  font-size: 15px;
+  color: var(--label2);
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tf-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+  margin-top: 48px;
+}
+
+.tf-actions .btn { flex: 1; }
+
 /* Cloud sync */
 .sync-field {
   padding: 11px 0;
@@ -895,6 +1023,12 @@ body {
 <header class="header">
   <h1>跡</h1>
   <p class="header-sub" id="headerSub">日々の学びを、ここに刻む</p>
+  <button class="timer-bar" id="timerBar" onclick="expandTimer()">
+    <span class="tb-dot" id="tbDot"></span>
+    <span class="tb-time" id="tbTime">00:00:00</span>
+    <span class="tb-topic" id="tbTopic"></span>
+    <span class="tb-chev"><svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg></span>
+  </button>
 </header>
 
 <!-- Home View -->
@@ -1077,9 +1211,22 @@ body {
   </div>
 </div>
 
-<!-- Confirm overlay -->
+<!-- 计时中：全屏接管。点顶部的 ⌄ 收起，收起后变成 header 里那条计时条 -->
+<div class="timer-full" id="timerFull">
+  <button class="tf-collapse" onclick="collapseTimer()" aria-label="收起计时器">
+    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+  </button>
+  <div class="tf-time" id="tfTime">00:00:00</div>
+  <div class="tf-topic" id="tfTopic"></div>
+  <div class="tf-actions">
+    <button class="btn btn-secondary" id="tfPauseBtn" onclick="togglePause()">暂停</button>
+    <button class="btn btn-danger" onclick="stopTimer()">结束</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
+<!-- Confirm overlay -->
 <div class="confirm-overlay" id="confirmOverlay" onclick="hideConfirm()">
   <div class="confirm-sheet" onclick="event.stopPropagation()">
     <p>确定要清除所有学习记录吗？此操作不可恢复。</p>
@@ -1101,14 +1248,6 @@ function parseDate(s) {
 
 function dateDiffDays(a, b) {
   return Math.round((parseDate(a) - parseDate(b)) / 86400000);
-}
-
-function isoMonday(date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = (day === 0 ? -6 : 1) - day;
-  d.setDate(d.getDate() + diff);
-  return d;
 }
 
 function formatDuration(seconds) {
@@ -1183,12 +1322,9 @@ function switchTab(id) {
 
 // ── Quick Start ──────────────────────────────────────────────
 function quickStart() {
-  const data = loadData();
-  if (data.activeTimer) {
-    switchTab('timer');
-  } else {
-    switchTab('timer');
-  }
+  // 计时中点它 = 回到全屏；没在计时 = 去填学习内容
+  if (loadData().activeTimer) expandTimer();
+  else switchTab('timer');
 }
 
 function updateQuickStartBtn() {
@@ -1236,9 +1372,13 @@ function renderHeatmap() {
   grid.innerHTML = '';
   monthsEl.innerHTML = '';
 
+  /* 滚动的最近 52 周，右端永远是本周。
+     固定从 1 月 1 日画起的话，年中打开会在左边挂一片空格子，替用户说了一句
+     他没说过的话——「你有半年没学」，而那半年他可能还没装这个 app。 */
   const today = new Date();
-  const startSunday = weekSunday(new Date(today.getFullYear(), 0, 1));
-  const totalWeeks = Math.ceil((weekSunday(today).getTime() - startSunday.getTime()) / (7 * 86400000)) + 1;
+  const totalWeeks = 52;
+  const startSunday = weekSunday(today);
+  startSunday.setDate(startSunday.getDate() - (totalWeeks - 1) * 7);
 
   const monthPositions = [];
   let lastMonth = -1;
@@ -1265,10 +1405,9 @@ function renderHeatmap() {
 
       grid.appendChild(cell);
 
+      // 52 周会跨年，月份标签不能再只认当年，否则去年那几个月是空的
       if (d === 0 && cellDate.getMonth() !== lastMonth) {
-        if (cellDate.getFullYear() === today.getFullYear()) {
-          monthPositions.push({ month: cellDate.getMonth(), week: w });
-        }
+        monthPositions.push({ month: cellDate.getMonth(), week: w });
         lastMonth = cellDate.getMonth();
       }
     }
@@ -1596,8 +1735,7 @@ function renderTimerView() {
   if (data.activeTimer) {
     showTimerState('running');
     document.getElementById('timerTopicLabel').textContent = data.activeTimer.topic || '';
-    const btn = document.getElementById('pauseBtn');
-    btn.textContent = data.activeTimer.pausedAt ? '继续' : '暂停';
+    setPauseLabel(data.activeTimer.pausedAt ? '继续' : '暂停');
     startTimerDisplay();
   } else {
     showTimerState('idle');
@@ -1673,6 +1811,59 @@ function populateTopicSuggestions(data) {
   }
 })();
 
+/* ── 计时中的界面接管 ────────────────────────────────────────
+   计时中全屏只剩一个数字——你在学习，不是在用 app。
+   但要能翻记录，所以全屏能收起：收起后 header 里露出一条计时条，任何页面都看得见，
+   点它回到全屏。收起与否记在本地，重开 app 保持上次的样子，不强行再接管一次。 */
+const TIMER_COLLAPSED_KEY = 'jp-timer-collapsed';
+
+function timerCollapsed() { return localStorage.getItem(TIMER_COLLAPSED_KEY) === '1'; }
+
+function expandTimer() {
+  localStorage.removeItem(TIMER_COLLAPSED_KEY);
+  syncTimerChrome();
+}
+
+function collapseTimer() {
+  localStorage.setItem(TIMER_COLLAPSED_KEY, '1');
+  syncTimerChrome();
+}
+
+// 「在不在计时 / 收起没有」只在这一个地方翻译成界面，别处各改各的迟早对不上
+function syncTimerChrome() {
+  const at = loadData().activeTimer;
+  const running = !!at;
+  const collapsed = timerCollapsed();
+
+  document.getElementById('timerFull').classList.toggle('show', running && !collapsed);
+  document.getElementById('timerBar').classList.toggle('show', running && collapsed);
+
+  if (running) {
+    const label = at.topic || '未命名';
+    document.getElementById('tfTopic').textContent = label;
+    document.getElementById('tbTopic').textContent = label;
+    document.getElementById('tbDot').classList.toggle('paused', !!at.pausedAt);
+    setPauseLabel(at.pausedAt ? '继续' : '暂停');
+    updateTimerDisplay();
+  }
+  // 计时条进出 header 会改变 header 高度，视图高度是按它算的，必须跟着刷新
+  updateLayoutVars();
+}
+
+// 结束计时：界面交还给 app，全屏和计时条一起收掉
+function hideTimerChrome() {
+  localStorage.removeItem(TIMER_COLLAPSED_KEY);
+  document.getElementById('timerFull').classList.remove('show');
+  document.getElementById('timerBar').classList.remove('show');
+  updateLayoutVars();
+}
+
+// 暂停/继续的按钮有两个（全屏一个、计时页一个），文案得一起改
+function setPauseLabel(txt) {
+  document.getElementById('pauseBtn').textContent = txt;
+  document.getElementById('tfPauseBtn').textContent = txt;
+}
+
 function showTimerState(state) {
   document.getElementById('timerIdle').style.display = state === 'idle' ? 'block' : 'none';
   document.getElementById('timerRunning').style.display = state === 'running' ? 'block' : 'none';
@@ -1696,8 +1887,8 @@ function startTimer() {
   document.getElementById('topicInput').value = '';
   showTimerState('running');
   document.getElementById('timerTopicLabel').textContent = topic;
-  document.getElementById('pauseBtn').textContent = '暂停';
   startTimerDisplay();
+  expandTimer();   // 一开始就接管整屏
 }
 
 function startTimerDisplay() {
@@ -1717,27 +1908,31 @@ function updateTimerDisplay() {
     elapsed = Math.floor((Date.now() - at.startedAt - (at.pausedDuration || 0)) / 1000);
   }
   if (elapsed < 0) elapsed = 0;
-  document.getElementById('timerTime').textContent = formatTimer(elapsed);
+  // 三处同时在显示同一个数：全屏、header 计时条、计时页
+  const txt = formatTimer(elapsed);
+  document.getElementById('timerTime').textContent = txt;
+  document.getElementById('tfTime').textContent = txt;
+  document.getElementById('tbTime').textContent = txt;
 }
 
 function togglePause() {
   const data = loadData();
   if (!data.activeTimer) return;
   const at = data.activeTimer;
-  const btn = document.getElementById('pauseBtn');
 
   if (at.pausedAt) {
     at.pausedDuration = (at.pausedDuration || 0) + (Date.now() - at.pausedAt);
     at.pausedAt = null;
-    btn.textContent = '暂停';
+    setPauseLabel('暂停');
     startTimerDisplay();
   } else {
     at.pausedAt = Date.now();
-    btn.textContent = '继续';
+    setPauseLabel('继续');
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     updateTimerDisplay();
   }
   saveData(data);
+  document.getElementById('tbDot').classList.toggle('paused', !!at.pausedAt);
 }
 
 function stopTimer() {
@@ -1749,6 +1944,10 @@ function stopTimer() {
   stoppedDuration = Math.floor((endTime - at.startedAt - (at.pausedDuration || 0)) / 1000);
   if (stoppedDuration < 0) stoppedDuration = 0;
 
+  /* 顺序要紧：switchTab('timer') 会跑 renderTimerView()，而 activeTimer 这时还在，
+     它会按「计时中」重画一遍，把总结页盖掉。所以先切页，再置成 stopped。 */
+  hideTimerChrome();
+  switchTab('timer');
   showTimerState('stopped');
   document.getElementById('summaryDur').textContent = formatDuration(stoppedDuration);
   document.getElementById('topicEdit').value = at.topic || '';
@@ -2243,7 +2442,10 @@ const savedTab = sessionStorage.getItem('jp-active-tab');
 if (savedTab) switchTab(savedTab);
 
 const initData = loadData();
-if (initData.activeTimer) switchTab('timer');
+if (initData.activeTimer) {
+  switchTab('timer');
+  syncTimerChrome();   // 全屏还是计时条，按上次收起与否，不强行再接管一次
+}
 
 // 打开就先拉一次，别等到用户存了一条才发现别的设备上有新记录
 if (syncOn()) doSync({ fresh: true });
