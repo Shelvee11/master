@@ -337,7 +337,8 @@
     }
     .composer-inner { max-width: 430px; margin: 0 auto; display: flex; align-items: flex-end; gap: 10px; }
 
-    /* 一次性提示：教「扫描文本」这个系统手势，关掉就不再出现 */
+    /* 输入框上方的提示条：开屏指路到加号（关掉就不再出现），
+       以及从加号点「扫描文本」后的现场教学（15 秒自收） */
     .tip {
       max-width: 430px; margin: 0 auto 8px;
       display: none; align-items: center; gap: 8px;
@@ -804,7 +805,7 @@
     <div class="composer-inner">
       <button class="plus-btn" id="plus-btn" onclick="plusClick()"
               onpointerdown="plusDown()" onpointerup="plusCancel()" onpointercancel="plusCancel()"
-              aria-label="添加图片，长按读剪贴板">
+              aria-label="添加：照片 / 扫描文本 / 剪贴板，长按直接读剪贴板">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -1300,6 +1301,12 @@ function renderStream() {
         : `<div class="requote gone">原记录已删除</div>`;
     }
     const body = requote + core;
+    /* 待办和摘抄的气泡自己已经把「这是什么」画出来了（能勾的圆 / 引文排版），
+       下面再挂一枚同名标签是同一句话说两遍。标签本身照旧存着，筛选和导出不受影响。
+       比的是标签有没有跟形态重名，而不是「是不是待办气泡」——万一哪条待办的标签
+       被手动改成了饮食，那枚标签就还是真信息，得留着。 */
+    const dupTag = (e.td && t.id === FORM_TAG.td) || (e.qt && t.id === FORM_TAG.qt);
+
     const nre = rc[e.id] || 0;
     const thread = (nre || e.re)
       ? `<span>·</span><span class="threadchip" onclick="event.stopPropagation(); openThread('${e.id}')">💬${nre ? ' ' + nre : ''}</span>`
@@ -1321,8 +1328,8 @@ function renderStream() {
             </div>
           </div>
           <div class="bmeta">
-            <span class="tagchip" onclick="event.stopPropagation(); openTagPicker('${e.id}')">${esc(t.emoji)} ${esc(t.name)}</span>
-            <span>·</span>
+            ${dupTag ? '' : `<span class="tagchip" onclick="event.stopPropagation(); openTagPicker('${e.id}')">${esc(t.emoji)} ${esc(t.name)}</span>
+            <span>·</span>`}
             <span class="btime">${esc(e.time)}</span>
             ${thread}
           </div>
@@ -1453,10 +1460,34 @@ function removeImageFromEntry(entryId, imgId) {
   return emptied;
 }
 
+/* 「贴着底」是个状态，不是一次动作。
+   光在启动时 scrollToBottom() 一次是不够的：图片是渲染完再从 IDB 异步灌进去的
+   （见 hydrateImages），灌完内容变高，刚才那一下就不在底上了，开屏会停在倒数几条。
+   所以记一个 stickBottom：只要用户没有主动往上翻，内容一变高就重新贴回底部。
+   顺带把「在底部时云同步拉来新记录」也一并接住了。 */
+let stickBottom = true;
+const BOTTOM_SLACK = 80;   // 离底 80px 以内都算「还在底上」，容得下惯性滚动的零头
+
+function atBottom(w) {
+  return w.scrollHeight - w.scrollTop - w.clientHeight <= BOTTOM_SLACK;
+}
+
 function scrollToBottom(smooth) {
   const w = document.getElementById('stream-wrap');
+  stickBottom = true;
   w.scrollTo({ top: w.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
 }
+
+(() => {
+  const w = document.getElementById('stream-wrap');
+  // 用户往上翻就撒手，翻回底部再接上
+  w.addEventListener('scroll', () => { stickBottom = atBottom(w); }, { passive: true });
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => {
+      if (stickBottom) w.scrollTop = w.scrollHeight;   // 这里别用 scrollTo/smooth，会跟观察回调打架
+    }).observe(document.getElementById('stream'));
+  }
+})();
 
 function renderAll() {
   renderHeader(); renderFilters(); renderPinBar(); renderStream(); renderComposerBars();
@@ -1470,11 +1501,15 @@ function renderAll() {
 
 let pendingImgs = [];   // 待发送的图片 dataURL
 
-/* 一次插进来 40 字以上，只可能是扫描或粘贴，打字打不出这个量。
-   用它来给「摘抄」加一票，并提示可以整理 OCR 的硬断行。 */
+/* 一次插进来一大段，只可能是扫描或粘贴，打字打不出这个量——用它给「摘抄」投一票。
+   门槛看有没有别的线索：走过加号→「扫描文本」的（scanArmed），摆明了是在抄书，
+   短短一行也算数；没有这个前提就只能靠量取胜，40 字以下不敢乱猜。 */
 const BULK_MIN = 40;
+const SCAN_MIN = 12;
 let lastInputLen = 0;
 let bulkInserted = false;
+let scanArmed = false;      // 从加号菜单点过「扫描文本」，这一条还没落地
+function bulkMin() { return scanArmed ? SCAN_MIN : BULK_MIN; }
 
 function onInput() {
   const ta = document.getElementById('input');
@@ -1484,7 +1519,8 @@ function onInput() {
   ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
   document.getElementById('send-btn').disabled = !ta.value.trim() && !pendingImgs.length;
   document.getElementById('plus-btn').disabled = pendingImgs.length >= MAX_IMGS;
-  if (added >= BULK_MIN) bulkInserted = true;
+  if (added >= bulkMin()) bulkInserted = true;
+  if (tipTimer) hideTip();   // 扫描的现场教学：字已经进来了就别占着地方（开屏那条没有 timer，不受影响）
 }
 
 function renderAttachStrip() {
@@ -1499,9 +1535,12 @@ function renderAttachStrip() {
 }
 function removePending(i) { pendingImgs.splice(i, 1); renderAttachStrip(); }
 
-/* 加号：轻点 = 直接开图片选择器（iOS 会自己弹「照片图库 / 拍照 / 选取文件」，
-   这层是 WebKit 固定行为，网页绕不过去，所以不再叠自己的菜单）；
-   长按 = 读剪贴板——iOS 上没法往 textarea 里 ⌘V，留个不占界面的入口。 */
+/* 加号：轻点 = 打开一张小菜单（照片 / 扫描文本 / 从剪贴板）；长按 = 直接读剪贴板，抄近路。
+
+   这张菜单以前撤掉过，理由是「照片」点下去 iOS 还要再弹一层系统的
+   「照片图库 / 拍照 / 选取文件」——那层是 WebKit 固定行为，网页绕不过去，
+   于是变成白点两次。现在菜单回来了，是因为「扫描文本」没有别的地方可以挂：
+   藏在长按里没人找得到。多点一次换一个能看见的入口，这是权衡不是回退。 */
 let plusTimer = null, plusFired = false;
 function plusDown() {
   plusFired = false;
@@ -1513,8 +1552,21 @@ function plusCancel() { clearTimeout(plusTimer); }
 function plusClick() {
   if (plusFired) { plusFired = false; return; }   // 刚才长按已经处理过了
   if (pendingImgs.length >= MAX_IMGS) { showToast(`最多 ${MAX_IMGS} 张`); return; }
-  pickFiles();
+  openAction(`
+    <div class="action-group">
+      <button class="action-btn" onclick="actPickPhoto()">${ico('photo')}照片 / 拍照</button>
+      ${canScan ? `<button class="action-btn" onclick="actScanText()">${ico('scan')}扫描文本</button>` : ''}
+      <button class="action-btn" onclick="actPasteImage()">${ico('paste')}从剪贴板</button>
+    </div>
+    <div class="action-group">
+      <button class="action-btn strong" onclick="forceCloseAction()">取消</button>
+    </div>`);
 }
+/* 三个入口都得留在同一次用户手势里：forceCloseAction 只是切个 class，是同步的，
+   所以后面的 input.click() / focus() 仍然算「用户点出来的」，iOS 才肯放行。 */
+function actPickPhoto()  { forceCloseAction(); pickFiles(); }
+function actPasteImage() { forceCloseAction(); pasteImage(); }
+function actScanText()   { forceCloseAction(); startScanText(); }
 
 function pickFiles() {
   document.getElementById('pick-file').click();
@@ -1569,7 +1621,8 @@ async function addEntry() {
   const when = composeWhen();            // 补记时这里给的是过去的那个时间点
   let tag = suggestTag(text);            // 纯图片没有文字信号，自然落到兜底的「其他」
   // 扫/粘进来的整段文字，本来要掉进「其他」的才改判摘抄；有饮食运动信号的不抢
-  if (bulkInserted && tag.fallback && text.length >= BULK_MIN) tag = tagById('quote') || tag;
+  const scanned = bulkInserted && text.length >= bulkMin();
+  if (scanned && tag.fallback) tag = tagById('quote') || tag;
 
   const imgIds = [];
   for (const data of pendingImgs) {
@@ -1580,12 +1633,16 @@ async function addEntry() {
 
   const id = genId();
   const entry = { id, ts: when.ts, date: when.date, time: when.time, text, tagId: tag.id, auto: true, imgs: imgIds };
+  // 判成摘抄的，连排版一起给（引号气泡 + 导出成 blockquote），不用再长按挑一次。
+  // 只在标签真的落到「摘抄」时才给，免得抄来一段被识别成饮食的话还排成引文。
+  if (scanned && tag.id === FORM_TAG.qt) entry.qt = 1;
   if (replyTo && entryById(replyTo)) entry.re = replyTo;
   entries.push(entry);
   saveEntries();
   ta.value = '';
   pendingImgs = [];
   bulkInserted = false;
+  scanArmed = false;
   const wasBackfill = !!backfill;
   replyTo = null;      // 回复是一次性的，发完就断开，不然后面每条都挂到同一串上
   renderAttachStrip();
@@ -1649,6 +1706,15 @@ const ICONS = {
   // checklist
   multi:  '<path d="M3.5 7.4l1.9 1.9L8.9 5.8"/><path d="M12.5 7.6h8"/><path d="M3.5 15.4l1.9 1.9 3.5-3.5"/><path d="M12.5 15.6h8"/>',
   trash:  '<path d="M3 6h18"/><path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/><path d="M5.5 6l1 13A2 2 0 0 0 8.5 21h7a2 2 0 0 0 2-1.9l1-13.1"/>',
+  photo:  '<rect x="3" y="4.6" width="18" height="14.8" rx="2.6"/>'
+        + '<path d="M3.4 16.6l4.4-4.2a2 2 0 0 1 2.8 0l3.2 3.1"/>'
+        + '<path d="M13.9 14.1l1.9-1.8a2 2 0 0 1 2.8 0l2 1.9"/><circle cx="8.5" cy="9.2" r="1.4"/>',
+  // 取景框 + 两行字：iOS 系统「扫描文本」那颗图标的意思
+  scan:   '<path d="M3.6 8.4V6.3A2.7 2.7 0 0 1 6.3 3.6h2.1"/><path d="M15.6 3.6h2.1A2.7 2.7 0 0 1 20.4 6.3v2.1"/>'
+        + '<path d="M20.4 15.6v2.1a2.7 2.7 0 0 1-2.7 2.7h-2.1"/><path d="M8.4 20.4H6.3a2.7 2.7 0 0 1-2.7-2.7v-2.1"/>'
+        + '<path d="M8 9.8h8"/><path d="M8 13.6h5.4"/>',
+  paste:  '<path d="M8.6 4.6H6.8A2.2 2.2 0 0 0 4.6 6.8v11.4a2.2 2.2 0 0 0 2.2 2.2h10.4a2.2 2.2 0 0 0 2.2-2.2V6.8a2.2 2.2 0 0 0-2.2-2.2h-1.8"/>'
+        + '<rect x="8.6" y="2.8" width="6.8" height="3.6" rx="1.3"/>',
 };
 function ico(n) {
   return `<svg class="action-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -2230,18 +2296,48 @@ function jumpToDate(key) {
 /* ═══════════════════ 扫描提示（教系统的「扫描文本」手势） ═══════════════════ */
 
 const SCAN_TIP_KEY = 'aside-tip-scan';
-// 系统扫描是 iOS/iPadOS 的能力，别在桌面上提示一个点不出来的菜单
+/* 扫描本身是系统干的活（iOS 的实况文本 / Mac 的连续互通相机），网页这边没有 API 能直接唤起，
+   加号菜单里那一项做的是「把你送到门口」：聚焦输入框 + 把手势写在输入框正上方。
+   走这条路不是偷懒——iOS 原生识别中文比任何能塞进单文件 PWA 的 OCR 都准，而且离线可用。
+   别在 Windows/Android 上摆这一项，那是个点不出来的菜单。 */
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isMac = !isIOS && /Mac/.test(navigator.platform || '');
+const canScan = isIOS || isMac;
+const SCAN_HOW = isIOS
+  ? '长按输入框 →「扫描文本」→ 对准书页'
+  : '在输入框上点右键 →「从 iPhone 或 iPad 插入」→「扫描文本」';
 
-function initScanTip() {
-  if (!isIOS || localStorage.getItem(SCAN_TIP_KEY)) return;
+let tipTimer = null;
+
+function showTip(text, autoHideMs) {
+  clearTimeout(tipTimer);
+  document.querySelector('#tip-scan .tip-text').textContent = text;
   document.getElementById('tip-scan').classList.add('on');
+  if (autoHideMs) tipTimer = setTimeout(hideTip, autoHideMs);
+}
+function hideTip() {
+  clearTimeout(tipTimer);
+  document.getElementById('tip-scan').classList.remove('on');
+}
+
+// 开屏的一次性提示：只负责指路到加号，具体手势等点进去再讲
+function initScanTip() {
+  if (!canScan || localStorage.getItem(SCAN_TIP_KEY)) return;
+  showTip('📷 想抄书上的字？点加号 →「扫描文本」');
 }
 function dismissScanTip() {
   localStorage.setItem(SCAN_TIP_KEY, '1');
-  document.getElementById('tip-scan').classList.remove('on');
+  hideTip();
   showToast('设置里还能找到用法');
+}
+
+// 加号菜单点进来：现场教学，15 秒后自己收走，落笔了也收走
+function startScanText() {
+  localStorage.setItem(SCAN_TIP_KEY, '1');   // 入口已经找到了，开屏那条可以退休
+  scanArmed = true;                          // 接下来插进来的那段按扫描办：摘抄标签 + 摘抄排版
+  showTip('📷 ' + SCAN_HOW, 15000);
+  document.getElementById('input').focus();
 }
 
 /* ═══════════════════ 配色主题 ═══════════════════ */
@@ -2566,7 +2662,7 @@ function renderSettings() {
   html += `<div class="card-label">小技巧</div><div class="card">
       <div class="row"><div class="row-info">
         <div class="row-name">📷 扫描书上的文字</div>
-        <div class="row-sub">1. 点一下输入框，再点一下光标<br>2. 选菜单里的「扫描文本」<br>3. 镜头对准书页，文字直接填进来</div>
+        <div class="row-sub">1. 点输入框左边的加号，选「扫描文本」<br>2. 按提示长按输入框，选系统菜单里的「扫描文本」<br>3. 镜头对准书页，文字直接填进来</div>
       </div></div>
     </div>
     <div class="form-hint" style="margin:8px 2px 0">这是 iOS 自带的能力（Apple Vision），识别中文比网页方案准得多，也不用联网。扫进来的整段文字会自动归到「摘抄」，断行保持原样；要改的话长按气泡选「编辑文本」。</div>`;
