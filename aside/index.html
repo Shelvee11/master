@@ -349,10 +349,10 @@
       background: var(--bg-blur);
       backdrop-filter: saturate(180%) blur(20px);
       -webkit-backdrop-filter: saturate(180%) blur(20px);
-      padding: 8px 16px 12px;
-      padding-bottom: calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 12px);
+      padding: 6px 16px 8px;
+      padding-bottom: calc(env(safe-area-inset-bottom) * var(--sab-on, 1) + 8px);
     }
-    .composer-inner { max-width: 430px; margin: 0 auto; display: flex; align-items: flex-end; gap: 10px; }
+    .composer-inner { max-width: 430px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px; }
 
     /* 输入框上方的提示条：开屏指路到加号（关掉就不再出现），
        以及从加号点「扫描文本」后的现场教学（15 秒自收） */
@@ -408,7 +408,7 @@
     .selactions { max-width: 430px; margin: 0 auto; display: none; align-items: center; justify-content: space-between; gap: 12px; }
     body.select .selactions { display: flex; }
     .del-btn {
-      border: none; border-radius: 999px; padding: 11px 20px; cursor: pointer;
+      border: none; border-radius: 999px; padding: 9px 18px; cursor: pointer;
       font-family: inherit; font-size: 15px; font-weight: 700;
       background: var(--red); color: #fff;
       display: flex; align-items: center; gap: 7px;
@@ -418,13 +418,13 @@
     .sel-hint { font-size: 13px; color: var(--label3); }
     #input {
       flex: 1; resize: none; border: none; background: var(--bg2);
-      border-radius: 22px; padding: 12px 16px; font-size: 15.5px; line-height: 1.45;
+      border-radius: 19px; padding: 8px 14px; font-size: 15.5px; line-height: 1.45;
       font-family: inherit; color: var(--label); outline: none;
       max-height: 120px;
     }
     #input::placeholder { color: var(--label3); }
     .send-btn {
-      flex: none; width: 44px; height: 44px; border-radius: 50%; border: none;
+      flex: none; width: 38px; height: 38px; border-radius: 50%; border: none;
       background: var(--accent); color: var(--accent-fg); cursor: pointer; line-height: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s, color 0.15s, transform 0.15s;
@@ -733,7 +733,7 @@
       display: flex; align-items: center; justify-content: center; font-family: inherit;
     }
     .plus-btn {
-      flex: none; width: 44px; height: 44px; border-radius: 50%; border: none;
+      flex: none; width: 38px; height: 38px; border-radius: 50%; border: none;
       background: var(--bg2); color: var(--label); cursor: pointer; line-height: 0;
       display: flex; align-items: center; justify-content: center;
     }
@@ -1613,9 +1613,13 @@ function scrollToBottom(smooth) {
   // 用户往上翻就撒手，翻回底部再接上
   w.addEventListener('scroll', () => { stickBottom = atBottom(w); }, { passive: true });
   if (window.ResizeObserver) {
-    new ResizeObserver(() => {
+    const ro = new ResizeObserver(() => {
       if (stickBottom) w.scrollTop = w.scrollHeight;   // 这里别用 scrollTo/smooth，会跟观察回调打架
-    }).observe(document.getElementById('stream'));
+    });
+    ro.observe(document.getElementById('stream'));
+    // 容器自己变矮也会把「底」挪走（键盘弹起、--app-h 校正、字体晚到后的重排），
+    // 只盯内容高度的话开屏会停在最后一条气泡的第一行上。
+    ro.observe(w);
   }
 })();
 
@@ -3443,17 +3447,37 @@ window.addEventListener('online', () => doSync({ fresh: true }));
 
 /* ═══════════════════ Viewport（iOS 键盘） ═══════════════════ */
 
+/* 装成 App（standalone）跑在 iOS 上时，visualViewport.height 已经把底部安全区扣掉了，
+   而 .app 又照它设高、输入条再补一遍 env(safe-area-inset-bottom)——同一条安全区付两次钱，
+   输入条就浮在离屏幕底 60~70px 的空中；那点差还会被当成键盘高度（kb>40 → --sab-on 关掉），
+   把症状搅得半遮半掩。解法：把「没在打字时 innerHeight 与 visualViewport 的固有差」记成基线，
+   键盘高度 = 当前差 − 基线，App 高度改从 innerHeight 减键盘算，不再直接吃 vv.height。
+   只在 standalone 下这么算——浏览器标签页里那点差是 Safari 上下工具条，必须照扣。
+   两边差为 0 的环境（桌面 / Android）算出来跟旧代码一模一样。 */
+const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+                     || window.navigator.standalone === true;
+let vvBase = 0;
+
 function syncViewport() {
   const vv = window.visualViewport;
   const h = vv ? vv.height : window.innerHeight;
   const top = vv ? vv.offsetTop : 0;
-  const kb = Math.max(0, window.innerHeight - h - top);
+  const gap = Math.max(0, window.innerHeight - h - top);
+  const ae = document.activeElement;
+  const editing = !!ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT' || ae.isContentEditable);
+  if (isStandalone && !editing) vvBase = gap;   // 没在打字，这点差就不是键盘
+  const kb = Math.max(0, gap - (isStandalone ? vvBase : 0));
   const root = document.documentElement;
-  root.style.setProperty('--app-h', h + 'px');
+  root.style.setProperty('--app-h', (isStandalone ? window.innerHeight - kb : h) + 'px');
   root.style.setProperty('--vv-top', top + 'px');
   root.style.setProperty('--kb', kb + 'px');
   // 键盘弹起时 safe-area 底部内边距会和键盘叠加，关掉它
   root.style.setProperty('--sab-on', kb > 40 ? 0 : 1);
+  // 高度一变，滚动容器的「底」就换了地方，贴底状态要跟着重贴（见 stickBottom）
+  if (stickBottom) {
+    const w = document.getElementById('stream-wrap');
+    if (w) w.scrollTop = w.scrollHeight;
+  }
 }
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', syncViewport);
@@ -3487,6 +3511,10 @@ setInterval(() => {
 }, 60 * 1000);
 
 scrollToBottom(false);
+// 开屏这一下不够：字体（Inter）和图片都是后到的，落地后行高一变，最后一条气泡就只露出第一行。
+// 贴底状态还在才补，用户开屏就往上翻了不要抢他的位置。
+window.addEventListener('load', () => { if (stickBottom) scrollToBottom(false); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (stickBottom) scrollToBottom(false); });
 renderAttachStrip();
 
 // 启动先拉一次：在电脑上打开时立刻看到手机上记的内容，不用等 debounce
