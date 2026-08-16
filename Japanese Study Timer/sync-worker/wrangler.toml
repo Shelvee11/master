@@ -1,0 +1,10 @@
+name = "jp-study-sync"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# database_id 由 `npx wrangler d1 create jpstudy` 生成后填进来
+# binding 必须是 DB：src/index.js 里用的是 env.DB
+[[d1_databases]]
+binding = "DB"
+database_name = "jpstudy"
+database_id = "3fe769c7-eb21-454f-9d06-46a2d90777d0"

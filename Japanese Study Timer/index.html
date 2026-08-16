@@ -750,6 +750,66 @@ body {
   margin-top: 10px;
 }
 
+/* Cloud sync */
+.sync-field {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--sep);
+}
+
+.sync-field:last-of-type { border-bottom: none; }
+
+.sync-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--label2);
+  margin-bottom: 6px;
+}
+
+.sync-input {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--sep);
+  font-size: 16px;          /* 小于 16px 时 iOS 会自动放大页面 */
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--label);
+  outline: none;
+}
+
+.sync-input:focus { border-color: var(--accent-light); }
+
+.sync-state {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--label2);
+  padding-top: 12px;
+  border-top: 1px solid var(--sep);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h, 60px) + 24px);
+  transform: translateX(-50%) translateY(6px);
+  max-width: 300px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgba(46,49,66,0.92);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s, transform .18s;
+}
+
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 /* Confirm overlay */
 .confirm-overlay {
   display: none;
@@ -948,6 +1008,26 @@ body {
   </div>
 
   <div class="settings-section">
+    <h3>云同步</h3>
+    <div class="card">
+      <div class="card-inner">
+        <div class="sync-field">
+          <label for="syncUrl">Worker 地址</label>
+          <input class="sync-input" id="syncUrl" placeholder="https://jp-study-sync.xxx.workers.dev"
+                 autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url">
+        </div>
+        <div class="sync-field">
+          <label for="syncToken">同步密钥</label>
+          <input class="sync-input" id="syncToken" placeholder="部署时设的 SYNC_KEY"
+                 autocapitalize="off" autocorrect="off" spellcheck="false">
+        </div>
+        <div class="sync-state" id="syncState"></div>
+      </div>
+    </div>
+    <button class="btn btn-outline btn-block" onclick="saveSyncCfg()">保存并同步</button>
+  </div>
+
+  <div class="settings-section">
     <h3>数据管理</h3>
     <button class="btn btn-outline btn-block" onclick="exportCSV()">导出 CSV</button>
     <button class="btn btn-outline btn-block" onclick="document.getElementById('importFile').click()">导入 CSV</button>
@@ -998,6 +1078,8 @@ body {
 </div>
 
 <!-- Confirm overlay -->
+<div class="toast" id="toast"></div>
+
 <div class="confirm-overlay" id="confirmOverlay" onclick="hideConfirm()">
   <div class="confirm-sheet" onclick="event.stopPropagation()">
     <p>确定要清除所有学习记录吗？此操作不可恢复。</p>
@@ -1084,6 +1166,7 @@ function loadData() {
 
 function saveData(data) {
   localStorage.setItem(KEY, JSON.stringify(data));
+  scheduleSync();   // 全部写入都走这里，同步不用侵入任何一处业务逻辑
 }
 
 // ── Tab Navigation ───────────────────────────────────────────
@@ -1743,6 +1826,8 @@ function discardSession() {
 // ── Settings ─────────────────────────────────────────────────
 function loadSettings() {
   const data = loadData();
+  const ae = document.activeElement;
+  if (ae && (ae.id === 'goalMinutes' || ae.id === 'goalDays')) return;   // 正在改的框不回填
   document.getElementById('goalMinutes').value = data.settings.dailyGoalMinutes;
   document.getElementById('goalDays').value = data.settings.weeklyGoalDays;
 }
@@ -1759,8 +1844,15 @@ function hideConfirm() { document.getElementById('confirmOverlay').classList.rem
 
 function clearAllData() {
   localStorage.removeItem(KEY);
+  /* 清空只清这台设备。快照和游标一起归零，下次同步就当新设备走全量拉取——
+     不归零的话，比对快照会把每一条都算成「本机删过」，一轮同步就把云端也清了。 */
+  localStorage.removeItem(SYNC_AT_KEY);
+  localStorage.removeItem(SYNC_SNAP_KEY);
+  localStorage.removeItem(SYNC_SETH_KEY);
+  syncSnap = {};
   hideConfirm();
   renderAll();
+  if (syncOn()) showToast('已清空本机 · 云端数据下次同步会拉回来');
 }
 
 // ── CSV Export/Import ────────────────────────────────────────
@@ -1831,6 +1923,269 @@ function importCSV(event) {
   event.target.value = '';
 }
 
+// ── 云同步（Cloudflare Worker + D1）───────────────────────────
+/* 手机上记的学习记录要在电脑网页上直接看见，中间不能有手动步骤，所以做成后台自动
+   同步：存一条 → 2.5 秒后推上去；切回前台 / 网络恢复 → 拉一次。服务端在
+   sync-worker/，部署步骤见那儿的 README.md。
+
+   同步的是 sessions（每条一行）和 settings（整体一行，最后写入的赢）。
+   进行中的计时不同步——它每次暂停/继续都在变，两台设备抢同一段计时的话，谁赢都
+   可能吞掉一段正在计的时间。停表存成 session 之后自然就同步过去了。 */
+
+const SYNC_URL_KEY   = 'jp-sync-url';
+const SYNC_TOKEN_KEY = 'jp-sync-token';
+const SYNC_AT_KEY    = 'jp-sync-at';    // 上次同步拿到的服务器时间，增量拉取的游标
+const SYNC_SNAP_KEY  = 'jp-sync-snap';  // id → 内容 hash，用来算「哪几条改过」
+const SYNC_SETH_KEY  = 'jp-sync-seth';  // 目标设置的 hash，单独存——混进 snap 会被当成一条记录，进而生成假墓碑
+
+/* 瞬时故障的退避重试。没有这个的话，一次网络抖动就把这台设备晾到用户下次动手为止：
+   电脑上开着 App 几秒后就被下一次写入带过去了，手机记完就锁屏，一次 500 能卡一整天。 */
+const SYNC_BACKOFF = [3000, 15000, 60000];
+const SYNC_TIMEOUT = 20000;  // 挂死的请求必须自己断，见 doSync 里的 AbortController
+
+let syncSnap     = (() => { try { return JSON.parse(localStorage.getItem(SYNC_SNAP_KEY)) || {}; } catch(e) { return {}; } })();
+let syncing      = false;
+let syncTimer    = null;
+let syncErr      = '';
+let syncRetry    = 0;      // 连续失败次数，即 SYNC_BACKOFF 的下标。成功或换个由头重来就清零
+let syncLastAt   = 0;      // 上次「尝试」同步的时刻，给回前台的触发做节流
+let suppressSync = false;  // 同步过程里回写本地会调 saveData，别让它再触发一轮
+
+// fatal = 重试多少次都一样、非改配置不可，别浪费退避轮次
+function syncFail(msg, fatal) { const e = new Error(msg); e.fatal = !!fatal; return e; }
+
+function syncCfg() {
+  return {
+    url:   (localStorage.getItem(SYNC_URL_KEY) || '').trim().replace(/\/+$/, ''),
+    token: (localStorage.getItem(SYNC_TOKEN_KEY) || '').trim(),
+  };
+}
+function syncOn() { const c = syncCfg(); return !!(c.url && c.token); }
+
+// djb2。只存 hash 不存原文，快照压到几 KB，不跟记录抢 localStorage 那 5MB
+function hashStr(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+// 极老的数据可能没有 id。按内容算一个：同一条在两台设备上算出来一样，不会同步成两条
+function sessionId(s) {
+  return s.id || ('x' + hashStr([s.date, s.startTime, s.duration, s.topic].join('|')));
+}
+
+// 跟上次同步后的快照比，算出「改过的」和「被删的」，
+// 这样每处 saveData() 调用点都不用改，也不用往 session 上加 updated 字段
+function collectDirty(sessions) {
+  const out = [];
+  const live = new Set();
+  for (const s of sessions) {
+    const id = sessionId(s);
+    live.add(id);
+    const data = JSON.stringify({ ...s, id });
+    if (syncSnap[id] !== hashStr(data)) out.push({ id, data });
+  }
+  // 快照里有、现在没了 → 本机删过。必须给服务端留墓碑，否则下次拉取它又活过来
+  for (const id in syncSnap) if (!live.has(id)) out.push({ id, deleted: 1 });
+  return out;
+}
+
+function applyRemote(data, rows) {
+  let n = 0;
+  for (const r of rows) {
+    if (!r || !r.id) continue;
+    const i = data.sessions.findIndex(s => sessionId(s) === r.id);
+    if (r.deleted) {
+      if (i >= 0) { data.sessions.splice(i, 1); n++; }
+      delete syncSnap[r.id];
+      continue;
+    }
+    let s;
+    try { s = JSON.parse(r.data); } catch(e) { continue; }
+    if (!s || !s.id) continue;
+    if (i >= 0) data.sessions[i] = s; else data.sessions.push(s);
+    syncSnap[s.id] = hashStr(JSON.stringify(s));
+    n++;
+  }
+  return n;
+}
+
+function scheduleSync(delay = 2500) {
+  if (suppressSync || !syncOn()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => doSync(), delay);
+}
+
+async function doSync(opts = {}) {
+  const manual = !!opts.manual;
+  if (!syncOn())         { if (manual) showToast('还没设置云同步'); return; }
+  if (syncing)           { if (manual) showToast('正在同步…'); return; }
+  if (!navigator.onLine) { if (manual) showToast('当前没有网络'); return; }
+  // 编辑弹窗开着的时候拉到新数据会重绘列表，打断操作，等一会儿再说
+  if (!manual && editingId) { scheduleSync(8000); return; }
+  // 换了个由头重来（手点、回前台、网络恢复），退避从头算，别接着上一轮的 60 秒
+  if (manual || opts.fresh) syncRetry = 0;
+
+  syncing = true;
+  syncLastAt = Date.now();
+  setSyncStateText('正在同步…');
+  try {
+    const cfg = syncCfg();
+    const since = Number(localStorage.getItem(SYNC_AT_KEY) || 0);
+    const data = loadData();
+    const dirty = collectDirty(data.sessions);
+    const setJSON = JSON.stringify(data.settings);
+    /* 没有基准 hash = 这台设备第一次同步，手上的目标设置很可能只是默认值。
+       照样发上去，但标成「种子」：云端空着就用它开头，已经有了就以云端为准。
+       不这么分的话，新设备第一次同步就会把别处设好的目标冲成默认值。 */
+    const setBase = localStorage.getItem(SYNC_SETH_KEY);
+    const setSeed = setBase === null;
+    const setDirty = setSeed || hashStr(setJSON) !== setBase;
+
+    /* 超时必须自己掐。移动网络下 fetch 可以吊着永不 reject，而 syncing 是在
+       finally 里才放开的——真挂住的话这台设备后面每次同步都会被「正在同步…」
+       挡回去，直到用户重启 App。 */
+    const ac = new AbortController();
+    const killer = setTimeout(() => ac.abort(), SYNC_TIMEOUT);
+    let res;
+    try {
+      res = await fetch(cfg.url + '/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.token },
+        body: JSON.stringify({ since, sessions: dirty, settings: setDirty ? setJSON : null, settingsSeed: setSeed ? 1 : 0 }),
+        signal: ac.signal,
+      });
+    } catch (e) {
+      throw syncFail(e.name === 'AbortError' ? '超时' : '连不上服务器');
+    } finally {
+      clearTimeout(killer);
+    }
+    if (res.status === 401) throw syncFail('密钥不对', true);
+    // 5xx 和 429 是服务端一时不行（冷启动撞上 D1 抖动就会抛 500），值得重试；
+    // 其余 4xx 是这个请求本身有问题，重发一模一样的内容不会有别的结果
+    if (!res.ok) throw syncFail('服务端 ' + res.status, res.status < 500 && res.status !== 429);
+    const out = await res.json();
+
+    // 推成功了快照才跟上。失败就原样留着，下次整批重推——宁可重推也不能漏推
+    for (const d of dirty) {
+      if (d.deleted) delete syncSnap[d.id];
+      else syncSnap[d.id] = hashStr(d.data);
+    }
+    if (setDirty) localStorage.setItem(SYNC_SETH_KEY, hashStr(setJSON));
+
+    // 回写前重新读一遍：请求飞在路上的这几秒里用户可能又存了一条
+    const fresh = loadData();
+    let changed = 0;
+    if (out.settings) {
+      try {
+        const rs = JSON.parse(out.settings);
+        if (rs && typeof rs === 'object') {
+          const merged = { ...fresh.settings, ...rs };
+          const h = hashStr(JSON.stringify(merged));
+          if (h !== hashStr(JSON.stringify(fresh.settings))) changed++;   // 一样就别算成一次更新
+          fresh.settings = merged;
+          localStorage.setItem(SYNC_SETH_KEY, h);
+        }
+      } catch(e) { /* 云端设置坏了就不动本地的 */ }
+    }
+    changed += applyRemote(fresh, out.sessions || []);
+
+    localStorage.setItem(SYNC_AT_KEY, String(out.now));
+    localStorage.setItem(SYNC_SNAP_KEY, JSON.stringify(syncSnap));
+    syncErr = '';
+    syncRetry = 0;
+
+    if (changed) {
+      suppressSync = true;
+      saveData(fresh);
+      suppressSync = false;
+      renderAll();
+      if (document.getElementById('view-stats').classList.contains('active')) renderStats();
+    }
+    setSyncStateText();
+    if (manual) showToast(changed ? `已同步，更新 ${changed} 条` : '已是最新');
+    if (out.truncated) scheduleSync(600);   // 这批没拉完，接着拉下一批
+  } catch (err) {
+    syncErr = err.message || '同步失败';
+    if (manual) showToast('同步失败：' + syncErr);
+    /* 退避重试走 scheduleSync 而不是自己起 timer，为的是共用 syncTimer：期间用户
+       又存了一条的话，那 2.5 秒的正常同步会顶掉排队中的重试，不会两个计时器打架。
+       三轮走完就交回给自然触发（存记录 / 回前台 / 网络恢复），不无限重试。 */
+    if (!err.fatal && syncRetry < SYNC_BACKOFF.length) {
+      const wait = SYNC_BACKOFF[syncRetry++];
+      syncErr += `，${Math.round(wait / 1000)} 秒后重试`;
+      scheduleSync(wait);
+    } else {
+      syncRetry = 0;
+    }
+    setSyncStateText();
+  } finally {
+    syncing = false;
+  }
+}
+
+function syncStateText() {
+  if (!syncOn()) return '未开启 · 记录只存在这台设备上';
+  if (syncErr) return '上次失败：' + syncErr;
+  const at = Number(localStorage.getItem(SYNC_AT_KEY) || 0);
+  if (!at) return '已设置 · 还没同步过';
+  const d = new Date(at);
+  const hm = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  const today = todayStr() === `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return `上次同步 ${today ? '' : `${d.getMonth()+1}月${d.getDate()}日 `}${hm}`;
+}
+
+function setSyncStateText(msg) {
+  const el = document.getElementById('syncState');
+  if (el) el.textContent = msg || syncStateText();
+}
+
+function loadSyncCfg() {
+  const c = syncCfg();
+  // 后台同步会带着 renderAll 一起回来，正在输入的框不能被回填顶掉
+  const ae = document.activeElement;
+  if (!ae || (ae.id !== 'syncUrl' && ae.id !== 'syncToken')) {
+    document.getElementById('syncUrl').value = c.url;
+    document.getElementById('syncToken').value = c.token;
+  }
+  setSyncStateText();
+}
+
+function saveSyncCfg() {
+  const url = document.getElementById('syncUrl').value.trim().replace(/\/+$/, '');
+  const token = document.getElementById('syncToken').value.trim();
+  // 换了地址或密钥就当新设备：游标和快照归零，下次走全量拉取
+  const c = syncCfg();
+  if (url !== c.url || token !== c.token) {
+    localStorage.removeItem(SYNC_AT_KEY);
+    localStorage.removeItem(SYNC_SNAP_KEY);
+    syncSnap = {};
+    syncErr = '';
+  }
+  localStorage.setItem(SYNC_URL_KEY, url);
+  localStorage.setItem(SYNC_TOKEN_KEY, token);
+  loadSyncCfg();
+  if (!syncOn()) { showToast('地址和密钥都要填'); return; }
+  doSync({ manual: true });
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// 切回前台 / 网络恢复：拉一次别的设备的改动。30 秒内刚同步过就不重复敲
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && Date.now() - syncLastAt > 30000) {
+    doSync({ fresh: true });
+  }
+});
+window.addEventListener('online', () => doSync({ fresh: true }));
+
 // ── Service Worker ───────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -1874,6 +2229,7 @@ function updateAppHeight() {
 function renderAll() {
   renderHome();
   loadSettings();
+  loadSyncCfg();
 }
 
 updateLayoutVars();
@@ -1888,6 +2244,9 @@ if (savedTab) switchTab(savedTab);
 
 const initData = loadData();
 if (initData.activeTimer) switchTab('timer');
+
+// 打开就先拉一次，别等到用户存了一条才发现别的设备上有新记录
+if (syncOn()) doSync({ fresh: true });
 </script>
 </body>
 </html>
