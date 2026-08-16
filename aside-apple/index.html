@@ -7,7 +7,9 @@
        正文提到 17px 之后那个副作用就没了，缩放该还给用户。 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <!-- 铺到屏幕最顶上，状态栏那块交给 header 自己画（它带 env(safe-area-inset-top)），
+       颜色于是永远跟当前配色一致 -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Aside">
   <meta name="theme-color" content="#efeeea">
   <title>Aside · Apple 风格设计稿</title>
@@ -235,7 +237,9 @@
       width: 3px; border-radius: 2px; background: currentColor; opacity: 0.38;
     }
 
-    .bubble.msk > *:not(.msk-veil) { filter: blur(7px); opacity: 0.5; }
+    /* 照 mynd：整块内容彻底不显示，气泡只剩一个空壳，尺寸仍跟着原文走。
+       不用 blur——糊过之后字形还在，凑近仍读得出个大概 */
+    .bubble.msk > *:not(.msk-veil) { opacity: 0; }
     .msk-veil { position: absolute; inset: 0; z-index: 2; border-radius: inherit; }
     .bubble.msk { position: relative; }
 
