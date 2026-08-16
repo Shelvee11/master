@@ -112,7 +112,9 @@ main {
 .entry-row {
   display: flex; align-items: center; padding: 10px 16px;
   border-bottom: 1px solid var(--sep); gap: 8px;
+  cursor: pointer; transition: background 0.1s;
 }
+.entry-row:active { background: var(--fill); }
 .entry-row:last-child { border-bottom: none; }
 .entry-time { font-size: 12px; color: var(--label3); width: 40px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .entry-food { flex: 1; font-size: 14px; font-weight: 500; }
@@ -468,10 +470,11 @@ main {
       <div class="modal-calc" id="qty-calc"></div>
       <input class="form-input" id="qty-note" style="margin-top:10px;font-size:14px;display:none"
         placeholder="备注：吃了什么？（选填）" onkeydown="if(event.key==='Enter')confirmQty()">
+      <input class="form-input" id="qty-time" type="time" style="margin-top:10px;font-size:14px;display:none">
     </div>
     <div class="modal-actions">
       <button class="modal-btn modal-btn-cancel" onclick="closeQtyModal()">取消</button>
-      <button class="modal-btn modal-btn-confirm" onclick="confirmQty()">确定</button>
+      <button class="modal-btn modal-btn-confirm" id="qty-confirm-btn" onclick="confirmQty()">确定</button>
     </div>
   </div>
 </div>
@@ -622,6 +625,7 @@ const DEFAULT_FOODS = [
   { id: 'f12', name: '纳豆',     emoji: '\u{1F35B}', unit: '克',  proteinPer: 17,   perAmount: 100, cat: '植物' },
   // 兜底
   { id: 'f18', name: '蛋白粉',   emoji: '\u{1F4AA}', unit: '克',  proteinPer: 86,   perAmount: 100, cat: '其他' },
+  { id: 'f21', name: '豆浆',     emoji: '\u{1FAD8}', unit: '毫升', proteinPer: 3,    perAmount: 100, cat: '其他' },
   { id: 'f20', name: '其他',     emoji: '\u{1F37D}\u{FE0F}', unit: '克',  proteinPer: 1,    perAmount: 1,   cat: '其他' },
 ];
 
@@ -682,6 +686,18 @@ function fmtKey(key) { const [, m, d] = key.split('-'); return `${parseInt(m)}/$
 
 /* ═══════════════════ State & Persistence ═══════════════════ */
 
+/* 豆浆：排到蛋白粉之后、其他之前。已有同名条目只挪位置+换图标，保留用户填的营养值 */
+function applyFoodsV5(list) {
+  let soy = list.find(f => f.id === 'f21' || f.name === '豆浆');
+  if (soy) list.splice(list.indexOf(soy), 1);
+  else soy = { id: 'f21', name: '豆浆', unit: '毫升', proteinPer: 3, perAmount: 100 };
+  soy.emoji = '\u{1FAD8}';
+  soy.cat = '其他';
+  const iOther = list.findIndex(f => f.id === 'f20');
+  if (iOther === -1) list.push(soy); else list.splice(iOther, 0, soy);
+  return list;
+}
+
 function loadFoods() {
   const saved = loadJSON(FOODS_KEY, null);
   if (!saved) return DEFAULT_FOODS.map(f => ({ ...f }));
@@ -707,7 +723,8 @@ function loadFoods() {
       const ia = idOrder.indexOf(a.id), ib = idOrder.indexOf(b.id);
       return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
     });
-    localStorage.setItem('foods-migration', '4');
+    migrated = applyFoodsV5(migrated);
+    localStorage.setItem('foods-migration', '5');
     return migrated;
   }
   if (migrationVersion < 2) {
@@ -733,7 +750,8 @@ function loadFoods() {
       const i9 = migrated.indexOf(f9m), i17 = migrated.indexOf(f17m);
       if (i9 < i17) { migrated.splice(i9, 1); migrated.splice(i17, 0, f9m); }
     }
-    localStorage.setItem('foods-migration', '4');
+    migrated = applyFoodsV5(migrated);
+    localStorage.setItem('foods-migration', '5');
     return migrated;
   }
   if (migrationVersion < 3) {
@@ -749,14 +767,21 @@ function loadFoods() {
       const i9 = migrated.indexOf(f9m), i17 = migrated.indexOf(f17m);
       if (i9 < i17) { migrated.splice(i9, 1); migrated.splice(i17, 0, f9m); }
     }
-    localStorage.setItem('foods-migration', '4');
+    migrated = applyFoodsV5(migrated);
+    localStorage.setItem('foods-migration', '5');
     return migrated;
   }
   if (migrationVersion < 4) {
     let migrated = [...saved];
     const f10 = migrated.find(f => f.id === 'f10');
     if (f10) f10.emoji = '\u{1F376}';
-    localStorage.setItem('foods-migration', '4');
+    migrated = applyFoodsV5(migrated);
+    localStorage.setItem('foods-migration', '5');
+    return migrated;
+  }
+  if (migrationVersion < 5) {
+    const migrated = applyFoodsV5([...saved]);
+    localStorage.setItem('foods-migration', '5');
     return migrated;
   }
   return saved;
@@ -855,12 +880,12 @@ function renderProtein() {
     entries.forEach(e => {
       const unit = (foods.find(f => f.id === e.foodId) || {}).unit || '';
       html += `
-        <div class="entry-row">
+        <div class="entry-row" onclick="openEntryEdit('${e.id}')">
           <span class="entry-time">${e.timestamp}</span>
           <span class="entry-food">${esc(e.foodName)}</span>
           <span class="entry-qty">${e.quantity}${esc(unit)}</span>
           <span class="entry-protein">${e.protein}g</span>
-          <button class="entry-del" onclick="delEntry('${e.id}')">&times;</button>
+          <button class="entry-del" onclick="event.stopPropagation();delEntry('${e.id}')">&times;</button>
         </div>`;
     });
   }
@@ -1003,59 +1028,100 @@ function foodPointerCancel() {
   longPressTimer = null;
 }
 
-/* ── Quantity Modal ── */
-let qtyFoodId = null;
+/* ── Quantity Modal（新增 / 编辑已有记录共用）── */
+let qtyFood = null;      // 当前食物（编辑已删除食物的记录时是临时构造的）
+let qtyEditId = null;    // null = 新增；否则 = 正在编辑的记录 id
 
-function openQtyModal(id) {
-  const f = foods.find(x => x.id === id);
+/* 食物被删掉后，用记录本身还原一个等效食物，让旧记录依然可编辑 */
+function foodFromEntry(e) {
+  const per = e.quantity > 0 ? e.protein / e.quantity : 0;
+  return { id: e.foodId, name: e.foodName, emoji: '\u{1F37D}\u{FE0F}', unit: '', proteinPer: per, perAmount: 1 };
+}
+
+function openEntryEdit(entryId) {
+  const day = records[todayKey()];
+  const e = day && day.entries.find(x => x.id === entryId);
+  if (!e) return;
+  openQtyModal(e.foodId, entryId);
+}
+
+function openQtyModal(id, entryId) {
+  const day = records[todayKey()];
+  const entry = entryId ? (day && day.entries.find(x => x.id === entryId)) : null;
+  if (entryId && !entry) return;
+  const f = foods.find(x => x.id === id) || (entry ? foodFromEntry(entry) : null);
   if (!f) return;
-  qtyFoodId = id;
+  qtyFood = f;
+  qtyEditId = entryId || null;
   const isOther = f.id === 'f20';
   document.getElementById('qty-emoji').textContent = f.emoji;
-  document.getElementById('qty-title').textContent = f.name;
+  document.getElementById('qty-title').textContent = entry ? `编辑 · ${f.name}` : f.name;
   document.getElementById('qty-desc').textContent = isOther
     ? '直接输入蛋白质克数'
     : f.perAmount === 1
       ? `每${f.unit}含蛋白质 ${f.proteinPer}g`
       : `每${f.perAmount}${f.unit}含蛋白质 ${f.proteinPer}g`;
   const inp = document.getElementById('qty-input');
-  inp.value = f.perAmount === 1 ? '1' : '';
+  inp.value = entry ? entry.quantity : (f.perAmount === 1 ? '1' : '');
   inp.step = f.perAmount === 1 ? '1' : '10';
   inp.placeholder = isOther ? '蛋白质 g' : f.unit;
   const note = document.getElementById('qty-note');
-  note.value = '';
-  note.style.display = isOther ? '' : 'none';
+  note.value = entry ? (entry.note || '') : '';
+  note.style.display = (isOther || (entry && entry.note)) ? '' : 'none';
+  const time = document.getElementById('qty-time');
+  time.value = entry ? entry.timestamp : '';
+  time.style.display = entry ? '' : 'none';
+  document.getElementById('qty-confirm-btn').textContent = entry ? '保存' : '确定';
   updateQtyCalc();
   document.getElementById('qty-modal').classList.add('open');
   setTimeout(() => inp.focus(), 100);
 }
 
 function updateQtyCalc() {
-  const f = foods.find(x => x.id === qtyFoodId);
-  if (!f) return;
+  if (!qtyFood) return;
   const num = parseFloat(document.getElementById('qty-input').value) || 0;
-  const p = calcProtein(f, num);
+  const p = calcProtein(qtyFood, num);
   document.getElementById('qty-calc').textContent = num > 0 ? `= ${fmtG(p)}g 蛋白质` : '';
 }
 
 function closeQtyModal() {
   document.getElementById('qty-modal').classList.remove('open');
-  qtyFoodId = null;
+  qtyFood = null;
+  qtyEditId = null;
 }
 
 function confirmQty() {
-  const f = foods.find(x => x.id === qtyFoodId);
+  const f = qtyFood;
   if (!f) return;
   const num = parseFloat(document.getElementById('qty-input').value) || 0;
   if (num <= 0) return;
   const note = document.getElementById('qty-note').value.trim();
-  const entry = {
-    id: genId(), foodId: f.id, foodName: note || f.name, quantity: num,
-    protein: Math.round(calcProtein(f, num) * 10) / 10, timestamp: nowTime()
-  };
-  if (note) entry.note = note;
+  const protein = Math.round(calcProtein(f, num) * 10) / 10;
   const tk = todayKey();
   if (!records[tk]) records[tk] = { entries: [] };
+
+  if (qtyEditId) {
+    const e = records[tk].entries.find(x => x.id === qtyEditId);
+    if (!e) { closeQtyModal(); return; }
+    const time = document.getElementById('qty-time').value;
+    e.quantity = num;
+    e.protein = protein;
+    e.foodName = note || (foods.find(x => x.id === e.foodId) || f).name;
+    if (note) e.note = note; else delete e.note;
+    if (time) e.timestamp = time;
+    records[tk].entries.sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
+    saveRecords();
+    closeQtyModal();
+    showToast(`已更新为 ${protein}g`);
+    renderProtein();
+    return;
+  }
+
+  const entry = {
+    id: genId(), foodId: f.id, foodName: note || f.name, quantity: num,
+    protein, timestamp: nowTime()
+  };
+  if (note) entry.note = note;
   records[tk].entries.push(entry);
   saveRecords();
   closeQtyModal();

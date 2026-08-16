@@ -1,4 +1,4 @@
-const CACHE_NAME = 'profast-v5';
+const CACHE_NAME = 'profast-v7';
 const BASE = '/master/health-tracker/';
 const ASSETS = [BASE, BASE + 'index.html', BASE + 'manifest.json'];
 
