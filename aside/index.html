@@ -967,7 +967,7 @@ const SEED_TAGS = [
       '公里', '配速', '心率', '组数', '训练', '锻炼', '出汗', '酸痛', '肌肉', '腿酸', '腰酸', '累瘫', '热身']
   },
   {
-    id: 'todo', name: '待办', emoji: '✅',
+    id: 'todo', name: '待办', emoji: '📌',
     pattern: '',
     keywords: ['要买', '记得', '别忘', '待办', 'todo', '预约', '挂号', '下单', '续费', '缴费', '还书', '提醒',
       '明天要', '得去', '需要去', '安排一下', '回头', '有空', '截止', 'deadline', '交表', '报名']
@@ -986,7 +986,7 @@ const SEED_TAGS = [
     pattern: '[“”「」『』《》]|^\\s*>|——\\s*\\S',
     keywords: ['书里', '读到', '看到一句', '这句话', '作者', '原文', '引用', '金句', '摘抄', '书中', '写道', '说过']
   },
-  { id: 'other', name: '其他', emoji: '📝', pattern: '', keywords: [], fallback: true }
+  { id: 'other', name: '其他', emoji: '📎', pattern: '', keywords: [], fallback: true }
 ];
 
 /* ═══════════════════ State ═══════════════════ */
@@ -1031,6 +1031,21 @@ if (Number(localStorage.getItem(MIG_KEY) || 0) < 3) {
     localStorage.setItem(TAGS_KEY, JSON.stringify(tags));
   }
   localStorage.setItem(MIG_KEY, '3');
+}
+
+/* v4：换掉两枚图标。待办 ✅ → 📌：✅ 是个 UI 控件符号，而待办气泡自己就渲染
+   勾选框，一枚绿勾挂在没勾掉的待办旁边读起来像「已完成」。
+   其他 📝 → 📎：📝 和摘抄的 📖 同是米黄文具，小尺寸下分不开。
+   都只在仍是旧默认值时才换，用户自己改过的图标一律不动。 */
+if (Number(localStorage.getItem(MIG_KEY) || 0) < 4) {
+  const swaps = { todo: ['✅', '📌'], other: ['📝', '📎'] };
+  let touched = false;
+  Object.entries(swaps).forEach(([id, [was, now]]) => {
+    const t = tags.find(x => x.id === id);
+    if (t && t.emoji === was) { t.emoji = now; touched = true; }
+  });
+  if (touched) localStorage.setItem(TAGS_KEY, JSON.stringify(tags));
+  localStorage.setItem(MIG_KEY, '4');
 }
 
 // 全项目只有这两个写入口，云同步就挂在这儿——任何地方改了数据都会自动排上传队列
