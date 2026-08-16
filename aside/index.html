@@ -4,7 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <!-- black-translucent 不是为了「黑」，是为了让网页视图铺到屏幕最顶上：
+       default 的话视图从状态栏下面才开始，那条由 iOS 用 manifest 里写死的
+       theme_color 填，而 manifest 只能写一个颜色、配色却有两套，必然对不上。
+       铺满之后状态栏那块由 header 自己画（它已经带 env(safe-area-inset-top) 内边距），
+       于是永远跟当前配色同色，两套都不用管。 -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Aside">
   <meta name="theme-color" content="#efeeea">
   <!-- 主题必须在首屏画之前定下来，否则会闪一下默认色 -->
@@ -77,6 +82,10 @@
       --app-h:   100dvh;
       --vv-top:  0px;
       --kb:      0px;
+      /* 上下文菜单：半透明面板 + 分隔线 + 按下态。两套配色各给一份 */
+      --ctx-mat: rgba(252,252,250,0.84);
+      --ctx-sep: rgba(31,30,26,0.12);
+      --ctx-hit: rgba(31,30,26,0.06);
     }
 
     /* 备选配色：白底天蓝（参照 iMessage）——灰气泡在左，蓝气泡在右 */
@@ -97,6 +106,9 @@
       --sep:     #e3e3e6;
       --hl:      #f4e361;
       --hl-fg:   #3d3608;
+      --ctx-mat: rgba(255,255,255,0.86);
+      --ctx-sep: rgba(60,60,67,0.13);
+      --ctx-hit: rgba(60,60,67,0.07);
     }
 
     html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
@@ -259,7 +271,12 @@
     /* 隐藏：糊掉就是糊掉，没有「点一下看」。要看得长按走菜单里的「取消隐藏」。
        veil 是一层透明挡板，专门吃掉落在图片上的点击（图片有自己的 onclick） */
     .bubble.msk { position: relative; -webkit-user-select: none; user-select: none; }
-    .bubble.msk > * { filter: blur(7px); opacity: 0.5; }
+    /* 照 mynd：整块内容彻底不显示，气泡只剩一个空壳，尺寸仍跟着原文走
+       （长文一颗高的、短句一颗扁的）。不用 blur——糊过之后字形还在，
+       凑近仍读得出个大概，那就不叫遮给别人看了。
+       用 opacity 不用 visibility：veil 要照旧吃掉落在图片上的点击，
+       而 opacity:0 的元素仍然收得到指针事件。 */
+    .bubble.msk > *:not(.msk-veil) { opacity: 0; }
     .msk-veil { position: absolute; inset: 0; z-index: 2; border-radius: inherit; }
 
     /* 回复：原文引用嵌在气泡顶部（照 mynd）——竖线 + 日期时间 + 原文摘要。
@@ -500,6 +517,90 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .action-val i { font-style: normal; color: var(--label3); margin-left: 6px; }
+
+    /* ── 上下文菜单（长按气泡）──────────────────────────────────────
+       iOS 13 起，作用在具体内容上的长按弹的是这个，不是从屏幕底部升起一张表。
+       气泡留在列表里不动，浮起来的是它的克隆体——所以时间线的滚动位置一点不丢。
+       底部操作表（.action-*）照旧保留：加号的「选择照片来源」本来就该是 action sheet。 */
+    .ctx { display: none; position: fixed; inset: 0; z-index: 350; }
+    .ctx.mounted { display: block; }
+    .ctx-scrim {
+      position: absolute; inset: 0;
+      background: rgba(26,26,24,0.14);
+      backdrop-filter: blur(20px) saturate(120%);
+      -webkit-backdrop-filter: blur(20px) saturate(120%);
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    .ctx.open .ctx-scrim { opacity: 1; }
+
+    .ctx-clone {
+      position: fixed !important; max-width: none !important; margin: 0 !important;
+      --lift: 0px;
+      transform: translateY(var(--lift)) scale(1);
+      transition: transform 0.34s cubic-bezier(0.32,0.72,0,1);
+      box-shadow: 0 14px 40px rgba(26,26,24,0.20);
+      pointer-events: none;
+    }
+    .ctx.open .ctx-clone { transform: translateY(var(--lift)) scale(1.04); }
+    /* 「今天在右」的气泡靠 .brow.me 后代选择器上色，克隆体离开了那个父节点，
+       不补这几条就会变成一颗白气泡浮起来。.me.hl 要提高一级特异性，
+       否则前面的 .bubble.hl 会被后面的 .ctx-clone.me 盖掉 */
+    .ctx-clone.me {
+      background: var(--accent); color: var(--accent-fg);
+      border-radius: var(--bubble-r) var(--bubble-tail) var(--bubble-r) var(--bubble-r);
+    }
+    .ctx-clone.me.hl { background: var(--hl); color: var(--hl-fg); }
+    .ctx-clone.me.td.done .td-box { background: var(--accent-fg); border-color: var(--accent-fg); }
+    .ctx-clone.me.td.done .td-box .tick { color: var(--accent); }
+
+    .ctx-menu {
+      position: fixed; width: 250px;
+      background: var(--ctx-mat);
+      backdrop-filter: blur(30px) saturate(180%);
+      -webkit-backdrop-filter: blur(30px) saturate(180%);
+      border-radius: 14px; overflow: hidden;
+      box-shadow: 0 12px 44px rgba(26,26,24,0.22), 0 0 0 0.5px rgba(26,26,24,0.06);
+      opacity: 0; transform: scale(0.9);
+      transition: opacity 0.2s ease, transform 0.34s cubic-bezier(0.32,0.72,0,1);
+    }
+    .ctx.open .ctx-menu { opacity: 1; transform: scale(1); }
+
+    /* 高光/摘抄/置顶/隐藏压成一行图标（照 Messages 的 tapback 行）：
+       原来这四项各占一行，菜单一共 12 行，超过 iOS 上下文菜单开始滚动的高度。
+       压成一行之后，开/关也从「读文字」变成「看填色」 */
+    .ctx-marks { display: flex; padding: 6px; gap: 2px; }
+    .ctx-mark {
+      flex: 1; height: 44px; border: none; background: none; cursor: pointer;
+      border-radius: 10px; color: var(--label);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+    .ctx-mark .action-ico { width: 22px; height: 22px; }
+    .ctx-mark.on { background: var(--accent); color: var(--accent-fg); }
+    .ctx-mark:active { background: var(--ctx-hit); }
+    .ctx-mark.on:active { opacity: 0.8; }
+
+    .ctx-div { height: 7px; background: var(--ctx-hit); }
+    .ctx-item {
+      width: 100%; min-height: 44px; padding: 0 15px; border: none; background: none;
+      font-family: inherit; font-size: 17px; color: var(--label);
+      cursor: pointer; display: flex; align-items: center; gap: 10px; text-align: left;
+    }
+    .ctx-item + .ctx-item { box-shadow: inset 0 0.5px 0 var(--ctx-sep); }
+    .ctx-item:active { background: var(--ctx-hit); }
+    .ctx-item .action-ico { width: 19px; height: 19px; }
+    .ctx-lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* 属性行的当前值要看得全（「8月16日 16:25」），窄了就成了没用的「8月16日 16:…」 */
+    .ctx-val {
+      flex: none; color: var(--label2); font-size: 15px; max-width: 150px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ctx-item.danger { color: var(--red); }
+    /* 开了「减弱动态效果」就别浮起也别缩放。只管这一层新加的，不动 App 其余动效 */
+    @media (prefers-reduced-motion: reduce) {
+      .ctx-scrim, .ctx-clone, .ctx-menu { transition-duration: 0.01ms !important; }
+      .ctx.open .ctx-clone { transform: translateY(var(--lift)) scale(1); }
+    }
 
     /* ── Cards (settings) ── */
     .card-label {
@@ -837,9 +938,16 @@
 
 <div class="toast" id="toast"><span id="toast-text"></span></div>
 
-<!-- 记录操作 / 选标签：action sheet -->
+<!-- 加号菜单 / 选标签 / 改时间：action sheet（长按气泡不再走这里，见下面的 .ctx） -->
 <div class="action-overlay" id="action-overlay" onclick="closeAction(event)">
   <div class="action-sheet" id="action-sheet"></div>
+</div>
+
+<!-- 长按气泡：iOS 式上下文菜单 -->
+<div class="ctx" id="ctx">
+  <div class="ctx-scrim" onclick="closeCtx()"></div>
+  <div id="ctx-stage"></div>
+  <div class="ctx-menu" id="ctx-menu"></div>
 </div>
 
 <!-- 设置 -->
@@ -1219,6 +1327,13 @@ function preview(e, n = 40) {
   return txt.length > n ? txt.slice(0, n) + '…' : txt;
 }
 
+/* 气泡的形态 class。列表和上下文菜单的克隆体共用这一份，
+   以后加新形态只改这里，不会出现「列表变了克隆体没变」 */
+function bubbleCls(e) {
+  return ['bubble', e.hl && 'hl', e.qt && 'qt', e.td && 'td',
+          e.td === 2 && 'done', e.msk && 'msk'].filter(Boolean).join(' ');
+}
+
 // id → 直接回复它的条数。渲染前算一次，别在循环里反复扫全表
 function replyCounts() {
   const c = {};
@@ -1336,7 +1451,7 @@ function renderStream() {
         <div class="brow ${onRight(e) ? 'me' : ''}">
           <div class="bline">
             ${pill}
-            <div class="bubble ${e.hl ? 'hl' : ''} ${e.qt ? 'qt' : ''} ${e.td ? 'td' : ''} ${e.td === 2 ? 'done' : ''} ${e.msk ? 'msk' : ''}"
+            <div class="${bubbleCls(e)}"
                  onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
               ${body}
               ${veil}
@@ -1744,7 +1859,15 @@ function closeAction(e) {
   if (e && e.target.closest('.action-group')) return;
   document.getElementById('action-overlay').classList.remove('open');
 }
-function forceCloseAction() { document.getElementById('action-overlay').classList.remove('open'); }
+/* 「把当前弹出层收掉」的统一出口。菜单项的 handler（deleteEntry / copyEntry /
+   toggleTodo / startReply / openTagPicker …）本来就都调它，所以让它连上下文菜单
+   一起收，那 20 处调用点一个都不用改。
+   这里必须是**瞬间**收：上下文菜单的 z-index 比 action sheet 和 form sheet 都高，
+   留着淡出的话，接着弹出来的「选标签 / 改时间 / 编辑」会被它那层毛玻璃糊住 300ms。 */
+function forceCloseAction() {
+  document.getElementById('action-overlay').classList.remove('open');
+  closeCtx(true);
+}
 
 /* 气泡上的三种手势：
      长按 → 操作表（立刻）
@@ -1859,35 +1982,126 @@ function swipeTo(id, dir) {
   renderAll();
 }
 
+/* ── 长按气泡 → iOS 式上下文菜单 ─────────────────────────────────
+   菜单项和原来的底部操作表一条不增不减，只是换了形态：
+     · 高光/摘抄/置顶/隐藏 四项压成顶部一行图标（点开点关，菜单不关）
+     · 其余项图标在右（iOS 上下文菜单的惯例，和 action sheet 的左图标相反）
+     · 没有「取消」行——点背景即关，这是 iOS 的约定
+   函数名保持 openEntryAction，bubbleDown 那个调用点不用动。 */
+let ctxId = null, ctxRight = false;
+
+function ctxMenuHTML(e) {
+  const id = e.id;
+  const nThread = (e.re || replyCounts()[id]) ? threadOf(id).length : 0;
+  const t = tagById(e.tagId);
+  const mark = (k, label) =>
+    `<button class="ctx-mark ${e[k] ? 'on' : ''}" aria-label="${label}"
+             aria-pressed="${e[k] ? 'true' : 'false'}"
+             onclick="ctxMark('${k}')">${ico(k)}</button>`;
+  const item = (fn, label, icon, val, cls) =>
+    `<button class="ctx-item ${cls || ''}" onclick="${fn}">`
+    + `<span class="ctx-lbl">${label}</span>`
+    + (val ? `<span class="ctx-val">${val}</span>` : '')
+    + ico(icon) + `</button>`;
+
+  return `
+    <div class="ctx-marks">
+      ${mark('hl', '高光')}${mark('qt', '摘抄')}${mark('pin', '置顶')}${mark('msk', '隐藏')}
+    </div>
+    <div class="ctx-div"></div>
+    ${item(`forceCloseAction(); startReply('${id}')`, '回复这条', 'reply')}
+    ${nThread > 1 ? item(`forceCloseAction(); openThread('${id}')`, `查看整串（${nThread} 条）`, 'thread') : ''}
+    ${item(`toggleTodo('${id}')`, e.td ? '取消待办' : '转成待办', 'todo')}
+    ${item(`forceCloseAction(); enterSelect('${id}')`, '多选', 'multi')}
+    <div class="ctx-div"></div>
+    ${item(`forceCloseAction(); openEditText('${id}')`, '编辑', 'edit')}
+    ${e.text ? item(`copyEntry('${id}')`, '拷贝', 'copy') : ''}
+    ${item(`forceCloseAction(); openTagPicker('${id}')`, '标签', 'tag',
+           `${esc(t.emoji)} ${esc(t.name)}`)}
+    ${item(`forceCloseAction(); openEntryWhen('${id}')`, '时间', 'clock',
+           esc(cnDateTime(e.date, e.time)))}
+    <div class="ctx-div"></div>
+    ${item(`deleteEntry('${id}')`, '删除', 'trash', '', 'danger')}`;
+}
+
 function openEntryAction(id) {
   const e = entryById(id);
-  if (!e) return;
-  const nThread = (e.re || replyCounts()[id]) ? threadOf(id).length : 0;
-  openAction(`
-    <div class="action-group">
-      <div class="action-title">${esc(preview(e, 28))}</div>
-      <button class="action-btn" onclick="forceCloseAction(); startReply('${id}')">${ico('reply')}回复这条</button>
-      ${nThread > 1 ? `<button class="action-btn" onclick="forceCloseAction(); openThread('${id}')">${ico('thread')}查看整串（${nThread} 条）</button>` : ''}
-      <button class="action-btn" onclick="toggleTodo('${id}')">${ico('todo')}${e.td ? '取消待办' : '转成待办'}</button>
-      <button class="action-btn" onclick="toggleMark('${id}','hl')">${ico('hl')}${e.hl ? '取消高光' : '高光'}</button>
-      <button class="action-btn" onclick="toggleMark('${id}','qt')">${ico('qt')}${e.qt ? '取消摘抄格式' : '摘抄'}</button>
-      <button class="action-btn" onclick="forceCloseAction(); enterSelect('${id}')">${ico('multi')}多选</button>
-      <button class="action-btn" onclick="toggleMark('${id}','pin')">${ico('pin')}${e.pin ? '取消置顶' : '置顶'}</button>
-      <button class="action-btn" onclick="toggleMark('${id}','msk')">${ico('msk')}${e.msk ? '取消隐藏' : '隐藏'}</button>
-      <button class="action-btn danger" onclick="deleteEntry('${id}')">${ico('trash')}删除</button>
-    </div>
-    <div class="action-group">
-      <button class="action-btn" onclick="forceCloseAction(); openEditText('${id}')">${ico('edit')}编辑</button>
-      ${e.text ? `<button class="action-btn" onclick="copyEntry('${id}')">${ico('copy')}拷贝</button>` : ''}
-      <button class="action-btn" onclick="forceCloseAction(); openTagPicker('${id}')">${ico('tag')}标签
-        <span class="action-val">${esc(tagById(e.tagId).emoji)} ${esc(tagById(e.tagId).name)}<i>›</i></span></button>
-      <button class="action-btn" onclick="forceCloseAction(); openEntryWhen('${id}')">${ico('clock')}时间
-        <span class="action-val">${esc(cnDateTime(e.date, e.time))}<i>›</i></span></button>
-    </div>
-    <div class="action-group">
-      <button class="action-btn strong" onclick="forceCloseAction()">取消</button>
-    </div>`);
+  const row = document.querySelector(`.srow[data-id="${id}"]`);
+  if (!e || !row) return;
+  const bub = row.querySelector('.bubble');
+  const r = bub.getBoundingClientRect();
+  ctxId = id;
+  ctxRight = row.querySelector('.brow').classList.contains('me');
+
+  // 克隆体锁在原气泡的坐标上，列表本身一动不动——滚动位置一点不丢
+  const clone = bub.cloneNode(true);
+  clone.className = bubbleCls(e) + ' ctx-clone' + (ctxRight ? ' me' : '');
+  ['onpointerdown', 'onpointerup', 'onpointercancel'].forEach(a => clone.removeAttribute(a));
+  clone.style.left  = r.left + 'px';
+  clone.style.top   = r.top + 'px';
+  clone.style.width = r.width + 'px';
+  clone.style.transformOrigin = ctxRight ? 'right center' : 'left center';
+  const stage = document.getElementById('ctx-stage');
+  stage.innerHTML = '';
+  stage.appendChild(clone);
+
+  const menu = document.getElementById('ctx-menu');
+  menu.innerHTML = ctxMenuHTML(e);
+  menu.style.left = '0px'; menu.style.top = '0px';
+  // mounted 只给 display:block；菜单此刻还是 opacity:0（.open 才亮），
+  // 所以可以直接量高度，不用再拿 visibility 遮一道
+  document.getElementById('ctx').classList.add('mounted');
+
+  const MW = 250, GAP = 10, PAD = 12;
+  const mh = menu.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight;
+
+  // 气泡在下半屏就向上开，在上半屏就向下开；两边都塞不下就贴底放菜单、把气泡顶上去
+  let below = (vh - r.bottom - PAD) >= mh + GAP;
+  const above = (r.top - PAD) >= mh + GAP;
+  let top, lift = 0;
+  if (below)      { top = r.bottom + GAP; }
+  else if (above) { top = r.top - GAP - mh; below = false; }
+  else {
+    top = Math.max(PAD, vh - PAD - mh);
+    lift = Math.min(0, (top - GAP) - r.bottom);
+    below = true;
+  }
+  let left = ctxRight ? (r.right - MW) : r.left;
+  left = Math.max(PAD, Math.min(left, vw - PAD - MW));
+
+  menu.style.left = left + 'px';
+  menu.style.top  = top + 'px';
+  menu.style.transformOrigin = `${ctxRight ? 'right' : 'left'} ${below ? 'top' : 'bottom'}`;
+  clone.style.setProperty('--lift', lift + 'px');
+
+  requestAnimationFrame(() => document.getElementById('ctx').classList.add('open'));
 }
+
+function closeCtx(instant) {
+  const c = document.getElementById('ctx');
+  if (!c.classList.contains('mounted')) return;
+  ctxId = null;
+  const wipe = () => { c.classList.remove('mounted'); document.getElementById('ctx-stage').innerHTML = ''; };
+  c.classList.remove('open');
+  if (instant) wipe(); else setTimeout(wipe, 340);
+}
+
+// 图标行：数据照旧走 toggleMark，菜单留在原地，克隆体和图标状态跟着变
+function ctxMark(kind) {
+  if (ctxId) toggleMark(ctxId, kind, true);
+}
+function ctxSync() {
+  const e = entryById(ctxId);
+  if (!e) return closeCtx(true);
+  const clone = document.querySelector('#ctx-stage .ctx-clone');
+  if (clone) clone.className = bubbleCls(e) + ' ctx-clone' + (ctxRight ? ' me' : '');
+  // 项数不变所以高度不变，重画整块最省事，不用重新定位
+  document.getElementById('ctx-menu').innerHTML = ctxMenuHTML(e);
+}
+
+// 转屏 / 键盘弹起会让量好的坐标失效，直接收掉
+window.addEventListener('resize', () => { if (ctxId) closeCtx(true); });
 
 /* ═══════════════════ 高光 / 摘抄 / 置顶 ═══════════════════ */
 
@@ -1915,11 +2129,13 @@ function formTagOff(e, key) {
   delete e.tg0;
 }
 
-// pin 存的是置顶时刻，多条置顶时按它排序（后置顶的在上面）
-function toggleMark(id, kind) {
+/* pin 存的是置顶时刻，多条置顶时按它排序（后置顶的在上面）
+   quiet：从上下文菜单的图标行调进来的。那里菜单要留着继续点，而且气泡就在眼前
+   实时变样，再弹一句「已高光」是同一件事说两遍。 */
+function toggleMark(id, kind, quiet) {
   const e = entryById(id);
   if (!e) return;
-  forceCloseAction();
+  if (!quiet) forceCloseAction();
   const on = !e[kind];
   if (kind === 'pin') e.pin = on ? Date.now() : 0;
   else e[kind] = on;
@@ -1927,6 +2143,7 @@ function toggleMark(id, kind) {
   if (kind === 'qt') on ? formTagOn(e, 'qt') : formTagOff(e, 'qt');
   saveEntries();
   renderAll();
+  if (quiet) { ctxSync(); return; }
   showToast(on ? { hl: '已高光', qt: '已排成摘抄', pin: '已置顶', msk: '已隐藏' }[kind]
                : { hl: '已取消高光', qt: '已取消摘抄格式', pin: '已取消置顶', msk: '已取消隐藏' }[kind]);
 }
