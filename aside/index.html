@@ -890,7 +890,7 @@
   <div class="composer">
     <div class="tip" id="tip-scan">
       <span class="tip-text">📷 想抄书上的字？点一下输入框，选「扫描文本」</span>
-      <button class="tip-x" onclick="dismissScanTip()" aria-label="不再提示">✕</button>
+      <button class="tip-x" onclick="hideTip()" aria-label="收起提示">✕</button>
     </div>
     <div class="cbar" id="reply-bar">
       <span class="cbar-label">↩ 回复</span>
@@ -1650,7 +1650,7 @@ function onInput() {
   document.getElementById('send-btn').disabled = !ta.value.trim() && !pendingImgs.length;
   document.getElementById('plus-btn').disabled = pendingImgs.length >= MAX_IMGS;
   if (added >= bulkMin()) bulkInserted = true;
-  if (tipTimer) hideTip();   // 扫描的现场教学：字已经进来了就别占着地方（开屏那条没有 timer，不受影响）
+  if (tipTimer) hideTip();   // 扫描的现场教学：字已经进来了就别占着地方
 }
 
 function renderAttachStrip() {
@@ -2527,8 +2527,10 @@ function jumpToDate(key) {
 
 /* ═══════════════════ 扫描提示（教系统的「扫描文本」手势） ═══════════════════ */
 
-const SCAN_TIP_KEY = 'aside-tip-scan';
-/* 扫描本身是系统干的活（iOS 的实况文本 / Mac 的连续互通相机），网页这边没有 API 能直接唤起，
+/* 这条提示只在**点过加号 →「扫描文本」之后**出现，做现场教学。
+   开屏不再指路（2026-08-16 用户要求）：一进来就顶一条提示，对已经会用的人是噪音，
+   对不知道有这功能的人也讲不清楚——设置页「小技巧」那张卡里写着完整用法。
+   扫描本身是系统干的活（iOS 的实况文本 / Mac 的连续互通相机），网页这边没有 API 能直接唤起，
    加号菜单里那一项做的是「把你送到门口」：聚焦输入框 + 把手势写在输入框正上方。
    走这条路不是偷懒——iOS 原生识别中文比任何能塞进单文件 PWA 的 OCR 都准，而且离线可用。
    别在 Windows/Android 上摆这一项，那是个点不出来的菜单。 */
@@ -2553,20 +2555,8 @@ function hideTip() {
   document.getElementById('tip-scan').classList.remove('on');
 }
 
-// 开屏的一次性提示：只负责指路到加号，具体手势等点进去再讲
-function initScanTip() {
-  if (!canScan || localStorage.getItem(SCAN_TIP_KEY)) return;
-  showTip('📷 想抄书上的字？点加号 →「扫描文本」');
-}
-function dismissScanTip() {
-  localStorage.setItem(SCAN_TIP_KEY, '1');
-  hideTip();
-  showToast('设置里还能找到用法');
-}
-
 // 加号菜单点进来：现场教学，15 秒后自己收走，落笔了也收走
 function startScanText() {
-  localStorage.setItem(SCAN_TIP_KEY, '1');   // 入口已经找到了，开屏那条可以退休
   scanArmed = true;                          // 接下来插进来的那段按扫描办：摘抄标签 + 摘抄排版
   showTip('📷 ' + SCAN_HOW, 15000);
   document.getElementById('input').focus();
@@ -3498,7 +3488,6 @@ setInterval(() => {
 
 scrollToBottom(false);
 renderAttachStrip();
-initScanTip();
 
 // 启动先拉一次：在电脑上打开时立刻看到手机上记的内容，不用等 debounce
 if (syncOn()) doSync({ fresh: true });
