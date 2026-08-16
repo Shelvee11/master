@@ -469,10 +469,14 @@
       background: var(--card);
       border-radius: var(--radius) var(--radius) 0 0;
       padding: 18px 20px calc(var(--sab) + 20px);
-      transform: translateY(110%); transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+      transform: translateY(110%); transition: transform 0.28s cubic-bezier(0.32,0.72,0,1), visibility 0s 0.28s;
       max-height: 84%; overflow-y: auto;
+      /* 光靠 translateY(110%) 把它推到屏幕外是不牢的：键盘弹起时 bottom 抬起 var(--kb)，
+         推下去的那点距离不够，关着的 sheet（「编辑 / 取消」那条）会从下面探出头来。
+         关着就是关着，直接 visibility 藏掉，收起动画播完再藏（见 transition 里的 0.28s 延迟） */
+      visibility: hidden;
     }
-    .sheet.open { transform: translateY(0); }
+    .sheet.open { transform: translateY(0); visibility: visible; transition: transform 0.28s cubic-bezier(0.32,0.72,0,1), visibility 0s; }
     .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .sheet-title { font-size: 17px; font-weight: 700; }
     .sheet-done {
@@ -3488,17 +3492,23 @@ function syncViewport() {
   const vv = window.visualViewport;
   const root = document.documentElement;
   const layoutH = root.clientHeight || window.innerHeight;   // 布局视口，键盘弹起也不变
+  const vvH = vv ? vv.height : layoutH;
   const top = vv ? vv.offsetTop : 0;
-  const kb = Math.max(0, layoutH - (vv ? vv.height : layoutH));
+  // 屏幕上真正看得见的那块，用布局坐标写出来是 [top, top + vvH]。两个数由此而来：
+  const kbH = Math.max(0, layoutH - vvH);          // 键盘（含附件条）吃掉多少
+  const gapBelow = Math.max(0, layoutH - top - vvH);  // 布局底 → 可见区底，fixed 元素要留的余量
   const sa = safeInsets();
   const screenH = (window.screen && window.screen.height) || 0;
   // 视图整体上移、底下够不着的那条空带（只认得出 black-translucent 那个指纹才算数）
   const hole = (sa.top > 0 && screenH && Math.abs(screenH - layoutH - sa.top) <= 2) ? sa.top : 0;
-  root.style.setProperty('--app-h', (layoutH - kb) + 'px');
+  root.style.setProperty('--app-h', vvH + 'px');
   root.style.setProperty('--vv-top', top + 'px');
-  root.style.setProperty('--kb', kb + 'px');
+  // ⚠️ --kb 不是键盘高度，是「fixed 元素离布局底该留多少」。键盘弹起时 iOS 会把视觉视口
+  // 整体下移（offsetTop），拿键盘高度当 bottom 会把 .sheet 顶起来 offsetTop 那么多——
+  // 关着的「编辑 / 取消」那条就是这么探出头的。
+  root.style.setProperty('--kb', gapBelow + 'px');
   // 键盘弹起时输入条压在键盘上，底部安全区不用留；空带已经替 home 指示条占过位的也不用留
-  root.style.setProperty('--sab', (kb > 40 ? 0 : Math.max(0, sa.bottom - hole)) + 'px');
+  root.style.setProperty('--sab', (kbH > 40 ? 0 : Math.max(0, sa.bottom - hole)) + 'px');
   // 高度一变，滚动容器的「底」就换了地方，贴底状态要跟着重贴（见 stickBottom）
   if (stickBottom) {
     const w = document.getElementById('stream-wrap');
