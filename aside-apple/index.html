@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <!-- 注意这里没有 maximum-scale / user-scalable=no。
+       原版禁用缩放的唯一原因是输入框只有 15.5px，iOS 聚焦时会自动放大页面；
+       正文提到 17px 之后那个副作用就没了，缩放该还给用户。 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Aside">
+  <meta name="theme-color" content="#efeeea">
+  <title>Aside · Apple 风格设计稿</title>
+  <style>
+    /* ══════════════════════════════════════════════════════════════
+       ① TOKENS
+       ══════════════════════════════════════════════════════════════ */
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      /* 色：沿用 mynd 的身份（暖灰底 + 白气泡 + 墨绿），只修被改坏的那两个 */
+      --accent:    #3d4f45;
+      --accent-fg: #ffffff;
+      --red:       #b4483c;
+      --label:     #1a1a18;
+      --label2:    #6b6b64;   /* ≈4.5:1 — 时间戳、日期条、空状态正文都改用它 */
+      --label3:    #8a897f;   /* 原为 #a3a29b（2.1:1）。只留给 placeholder / disabled / 装饰 */
+      --fill:      #e7e6e1;
+      --fill2:     #dedcd6;
+      --bg:        #efeeea;
+      --bg2:       #ffffff;
+      --sep:       #e2e0da;
+      --hl:        #f0dd7a;
+      --hl-fg:     #4a4126;
+
+      /* 材质：原版 0.92 的不透明度让模糊几乎不可见，等于付了材质的钱拿到一根实心条 */
+      --mat:       rgba(239,238,234,0.74);
+      --mat-blur:  saturate(180%) blur(30px);
+      --mat-menu:  rgba(252,252,250,0.82);
+
+      /* 排版：对齐 iOS Text Styles。全文件的 font-size 只许引用这六个 */
+      --t-title: 34px;   /* Large Title */
+      --t-body:  17px;   /* Body */
+      --t-sub:   15px;   /* Subhead */
+      --t-foot:  13px;   /* Footnote */
+      --t-cap:   12px;   /* Caption 1 */
+      --t-cap2:  11px;   /* Caption 2 */
+
+      /* 圆角：原版九个值收成四个 */
+      --r-card:   12px;
+      --r-sheet:  14px;
+      --r-bubble: 20px;
+      --r-tail:    7px;
+      --r-pill:  999px;
+
+      /* 苹果那条弹性曲线，全文件只用这一条 */
+      --ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+      --app-h:  100dvh;
+      --vv-top: 0px;
+    }
+
+    html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+
+    body {
+      /* 不引 Inter：SF Pro 有光学尺寸和内建 tracking，而中文本来就落到 PingFang，
+         混排时 Inter 只负责拉丁字母，两套垂直度量对不齐 */
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui,
+                   'PingFang SC', 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--label);
+      font-size: var(--t-body);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+      position: fixed; left: 0; right: 0;
+      top: var(--vv-top); height: var(--app-h);
+      display: flex; flex-direction: column;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       ② 顶栏：大标题折叠
+       ══════════════════════════════════════════════════════════════ */
+    header {
+      flex: none; position: relative; z-index: 10;
+      background: var(--mat);
+      backdrop-filter: var(--mat-blur); -webkit-backdrop-filter: var(--mat-blur);
+      padding: 0 16px;
+      padding-top: env(safe-area-inset-top);
+    }
+    /* iOS 导航栏的发丝线：静止时没有，一滚才淡入。
+       它必须画在整块顶部 chrome 的**最后一层**上——画在 header 上会掉进
+       header 和筛选条中间，两块同材质之间凭空多一条线 */
+    .filters, .pinbar { transition: box-shadow 0.24s ease; }
+    body.scrolled .filters { box-shadow: 0 0.5px 0 var(--sep); }
+    body.scrolled .pinbar.on { box-shadow: 0 0.5px 0 var(--sep); }
+    body.scrolled:has(.pinbar.on) .filters { box-shadow: none; }
+
+    .nav {
+      position: relative; max-width: 430px; margin: 0 auto;
+      height: 44px; display: flex; align-items: center; justify-content: flex-end;
+    }
+    /* 收起后的小标题：与大标题同一串文字，居中——iOS 是「大标题收进小标题」，不是换一句话 */
+    .nav-title {
+      position: absolute; left: 50%; top: 50%;
+      transform: translate(-50%, -50%) translateY(6px);
+      font-size: var(--t-body); font-weight: 600; white-space: nowrap;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.28s var(--ease);
+    }
+    body.scrolled .nav-title { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
+
+    .nav-btns { display: flex; align-items: center; gap: 4px; }
+    /* 裸描线字形直接落在栏上，取 tint 色。
+       原版是 38px 圆形 + 填充底片——那是 Material 的做法，iOS 导航栏不这么画 */
+    .icon-btn {
+      width: 44px; height: 44px; border: none; background: none;
+      color: var(--accent); cursor: pointer; line-height: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:active { opacity: 0.4; }
+
+    .large-title {
+      max-width: 430px; margin: 0 auto;
+      height: 62px; padding-bottom: 8px; overflow: hidden;
+      transition: height 0.3s var(--ease), opacity 0.2s ease, transform 0.3s var(--ease);
+    }
+    body.scrolled .large-title { height: 0; padding-bottom: 0; opacity: 0; transform: translateY(-10px); }
+    .large-title h1 { font-size: var(--t-title); font-weight: 700; line-height: 1.12; }
+    .large-title p {
+      font-size: var(--t-foot); color: var(--label2); margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       ③ 筛选条
+       ══════════════════════════════════════════════════════════════ */
+    .filters {
+      flex: none; position: relative; z-index: 9;
+      background: var(--mat);
+      backdrop-filter: var(--mat-blur); -webkit-backdrop-filter: var(--mat-blur);
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .filters::-webkit-scrollbar { display: none; }
+    .filters-inner { display: flex; gap: 7px; padding: 2px 16px 10px; width: max-content; min-width: 100%; }
+    .fchip {
+      flex: none; border: none; background: var(--bg2);
+      color: var(--label2); border-radius: var(--r-pill); padding: 7px 13px;
+      font-size: var(--t-foot); font-weight: 500; font-family: inherit; cursor: pointer;
+      white-space: nowrap; display: flex; align-items: center;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+    .fchip .em { font-size: 0.92em; margin-right: 4px; }
+    /* 计数退成尾随的次级色数字——Mail 里邮箱未读数的处理方式。
+       原版和标签名同字号同颜色，读起来像标签名的一部分 */
+    .fchip .n { color: var(--label3); font-size: var(--t-cap); margin-left: 5px; }
+    .fchip.active { background: var(--accent); color: var(--accent-fg); }
+    .fchip.active .n { color: rgba(255,255,255,0.62); }
+    .fchip:active { opacity: 0.7; }
+
+    /* 置顶横幅 */
+    .pinbar {
+      flex: none; display: none; align-items: center; justify-content: center;
+      padding: 0 16px 10px; background: var(--mat);
+      backdrop-filter: var(--mat-blur); -webkit-backdrop-filter: var(--mat-blur);
+      position: relative; z-index: 8; cursor: pointer;
+    }
+    .pinbar.on { display: flex; }
+    .pinbar-pill {
+      max-width: 100%; display: flex; align-items: center; gap: 6px;
+      background: var(--fill); color: var(--label2);
+      border-radius: var(--r-pill); padding: 6px 13px; font-size: var(--t-foot);
+    }
+    .pinbar-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pinbar:active .pinbar-pill { opacity: 0.6; }
+
+    /* ══════════════════════════════════════════════════════════════
+       ④ 时间线
+       ══════════════════════════════════════════════════════════════ */
+    .stream-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+    .stream {
+      max-width: 430px; margin: 0 auto;
+      padding: 10px 16px 22px;
+      display: flex; flex-direction: column; gap: 20px;
+      min-height: 100%;
+    }
+    /* 每一天自成一个 section。这不是排版洁癖：position:sticky 只在自己的
+       containing block 里吸顶，日期条若和气泡是兄弟，三天的头会同时钉在
+       同一个 y 上叠成一坨。分了 section，下一天的头才会把上一天的顶走 */
+    .day { display: flex; flex-direction: column; gap: 14px; }
+
+    /* 分组头吸顶。原版滚上去就没了；因为要吸顶，必须给它真实背景，
+       否则一贴住就和底下的气泡文字叠在一起 */
+    .daysep {
+      position: sticky; top: 6px; z-index: 3;
+      align-self: center;
+      color: var(--label2); padding: 4px 12px; border-radius: var(--r-pill);
+      font-size: var(--t-foot); font-weight: 500;
+      /* 这是全文件唯一该用近乎不透明底色的地方：吸顶时它正压在气泡上，
+         必须挡住底下的字，不然两层文字糊成一片 */
+      background: rgba(239,238,234,0.94);
+      backdrop-filter: var(--mat-blur); -webkit-backdrop-filter: var(--mat-blur);
+    }
+
+    .srow { display: flex; align-items: center; touch-action: pan-y; }
+    .brow { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; max-width: 100%; }
+    .brow.me { align-items: flex-end; }
+
+    .bline { display: flex; align-items: center; gap: 10px; width: 100%; }
+    .brow.me .bline { justify-content: flex-end; }
+    .brow:not(.me) .bline { flex-direction: row-reverse; justify-content: flex-end; }
+
+    .bubble {
+      max-width: 88%; padding: 10px 14px;
+      background: var(--bg2); color: var(--label);
+      border-radius: var(--r-tail) var(--r-bubble) var(--r-bubble) var(--r-bubble);
+      cursor: pointer;
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+      touch-action: pan-y;
+      transition: transform 0.18s ease, background 0.24s ease, color 0.24s ease;
+    }
+    .brow.me .bubble {
+      background: var(--accent); color: var(--accent-fg);
+      border-radius: var(--r-bubble) var(--r-tail) var(--r-bubble) var(--r-bubble);
+    }
+    .bubble:active { opacity: 0.82; }
+    .btext { font-size: var(--t-body); line-height: 1.42; white-space: pre-wrap; word-break: break-word; }
+
+    .bubble.hl, .brow.me .bubble.hl { background: var(--hl); color: var(--hl-fg); }
+
+    .bubble.qt { position: relative; padding-left: 28px; }
+    .bubble.qt::before {
+      content: ''; position: absolute; left: 15px; top: 13px; bottom: 13px;
+      width: 3px; border-radius: 2px; background: currentColor; opacity: 0.38;
+    }
+
+    .bubble.msk > *:not(.msk-veil) { filter: blur(7px); opacity: 0.5; }
+    .msk-veil { position: absolute; inset: 0; z-index: 2; border-radius: inherit; }
+    .bubble.msk { position: relative; }
+
+    /* 待办 */
+    .tdrow { display: flex; align-items: center; gap: 11px; }
+    .td-box {
+      position: relative; flex: none; width: 22px; height: 22px; padding: 0;
+      border-radius: 50%; border: 2px solid currentColor; opacity: 0.5;
+      background: none; color: inherit; cursor: pointer; line-height: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.22s var(--ease), border-color 0.22s var(--ease),
+                  opacity 0.22s ease, transform 0.14s ease;
+    }
+    /* 视觉 22px 不变，命中区撑到 44 —— 全文件低于 44pt 的按钮都用这一招 */
+    .td-box::after, .tip-x::after {
+      content: ''; position: absolute; top: 50%; left: 50%;
+      width: 44px; height: 44px; transform: translate(-50%, -50%);
+    }
+    .td-box:active { transform: scale(0.88); }
+    .td-box .tick { stroke-dasharray: 24; stroke-dashoffset: 24; transition: stroke-dashoffset 0.22s var(--ease); }
+    .bubble.td.done .td-box { opacity: 1; background: var(--accent); border-color: var(--accent); }
+    .bubble.td.done .td-box .tick { color: #fff; stroke-dashoffset: 0; }
+    .brow.me .bubble.td.done .td-box { background: var(--accent-fg); border-color: var(--accent-fg); }
+    .brow.me .bubble.td.done .td-box .tick { color: var(--accent); }
+    .bubble.td.done .btext { text-decoration: line-through; opacity: 0.5; }
+    .tdrow .tdwrap { flex: 1; min-width: 0; }
+
+    /* 回复引用 */
+    .requote {
+      margin: -1px 0 8px; padding: 1px 0 1px 10px;
+      border-left: 2.5px solid currentColor; cursor: pointer;
+      opacity: 0.6; font-size: var(--t-foot); line-height: 1.4; overflow: hidden;
+    }
+    .requote-when { font-weight: 600; }
+    .requote-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* 图片 */
+    .imgs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; align-items: flex-start; }
+    .imgs:last-child { margin-bottom: 0; }
+    .imgs img { display: block; width: auto; max-width: 100%; max-height: 300px; border-radius: var(--r-card); background: var(--fill); }
+    .imgstack { position: relative; isolation: isolate; width: 168px; max-width: 100%; cursor: pointer; margin-bottom: 8px; }
+    .imgstack::before, .imgstack::after {
+      content: ''; position: absolute; top: 9px; bottom: 9px; z-index: 0;
+      border-radius: var(--r-card); background: var(--fill);
+      box-shadow: 0 0 0 0.5px rgba(31,30,26,0.10), -2px 2px 6px rgba(31,30,26,0.14);
+    }
+    .imgstack::before { left: -13px; right: 13px; }
+    .imgstack::after  { left: -6.5px; right: 6.5px; }
+    .imgstack img {
+      position: relative; z-index: 1; display: block; width: 100%;
+      aspect-ratio: 4/3; object-fit: cover; border-radius: var(--r-card);
+      box-shadow: -2px 2px 6px rgba(31,30,26,0.14);
+    }
+    .expand-pill {
+      flex: none; border: none; cursor: pointer; font-family: inherit;
+      background: var(--fill); color: var(--label2);
+      border-radius: var(--r-pill); padding: 6px 12px;
+      font-size: var(--t-foot); font-weight: 500; white-space: nowrap;
+    }
+    .expand-pill:active { opacity: 0.6; }
+
+    .bmeta {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 6px 0; font-size: var(--t-foot); color: var(--label2);
+      font-variant-numeric: tabular-nums;
+    }
+    .tagchip { font-weight: 500; white-space: nowrap; }
+
+    /* 空状态：容器内垂直居中 + 一枚符号。原版是 14px 三级灰、顶上压 60px padding，
+       把全 App 最好的一行文案讲小了 */
+    .empty {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px;
+      text-align: center; padding: 40px 20px;
+    }
+    .empty svg { color: var(--label3); opacity: 0.55; }
+    .empty-t { font-size: var(--t-body); font-weight: 600; color: var(--label2); }
+    .empty-b { font-size: var(--t-sub); color: var(--label3); line-height: 1.5; max-width: 260px; }
+
+    /* ══════════════════════════════════════════════════════════════
+       ⑤ 输入条
+       ══════════════════════════════════════════════════════════════ */
+    .composer {
+      flex: none; position: relative; z-index: 10;
+      background: var(--mat);
+      backdrop-filter: var(--mat-blur); -webkit-backdrop-filter: var(--mat-blur);
+      box-shadow: 0 -0.5px 0 var(--sep);
+      padding: 8px 16px calc(env(safe-area-inset-bottom) + 10px);
+    }
+    .composer-inner { max-width: 430px; margin: 0 auto; display: flex; align-items: flex-end; gap: 10px; }
+    #input {
+      flex: 1; resize: none; border: none; background: var(--bg2);
+      border-radius: var(--r-pill); padding: 11px 16px;
+      font-size: var(--t-body); line-height: 1.4;
+      font-family: inherit; color: var(--label); outline: none;
+      max-height: 120px;
+    }
+    #input::placeholder { color: var(--label3); }
+    .plus-btn, .send-btn {
+      flex: none; width: 44px; height: 44px; border-radius: 50%; border: none;
+      cursor: pointer; line-height: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.16s, color 0.16s, transform 0.16s var(--ease);
+    }
+    .plus-btn { background: none; color: var(--accent); }
+    .send-btn { background: var(--accent); color: var(--accent-fg); }
+    .send-btn:disabled { background: var(--fill); color: var(--label3); }
+    .plus-btn:active, .send-btn:active:not(:disabled) { transform: scale(0.9); }
+
+    /* ══════════════════════════════════════════════════════════════
+       ⑥ 上下文菜单（长按气泡）
+       ══════════════════════════════════════════════════════════════ */
+    .ctx { display: none; position: fixed; inset: 0; z-index: 500; }
+    .ctx.mounted { display: block; }
+    .ctx-scrim {
+      position: absolute; inset: 0;
+      background: rgba(26,26,24,0.14);
+      backdrop-filter: blur(20px) saturate(120%);
+      -webkit-backdrop-filter: blur(20px) saturate(120%);
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    .ctx.open .ctx-scrim { opacity: 1; }
+
+    /* 克隆体：原气泡留在列表里不动，浮起来的是它的副本，所以滚动位置一点不丢 */
+    .ctx-clone {
+      position: fixed !important; max-width: none !important; margin: 0 !important;
+      --lift: 0px;
+      transform: translateY(var(--lift)) scale(1);
+      transition: transform 0.34s var(--ease);
+      box-shadow: 0 14px 40px rgba(26,26,24,0.20);
+      pointer-events: none;
+    }
+    .ctx.open .ctx-clone { transform: translateY(var(--lift)) scale(1.04); }
+    /* 「今天在右」的绿气泡是靠 .brow.me 后代选择器上色的，克隆体离开了那个父节点，
+       不补这几条就会变成一颗白气泡浮起来 */
+    .ctx-clone.me {
+      background: var(--accent); color: var(--accent-fg);
+      border-radius: var(--r-bubble) var(--r-tail) var(--r-bubble) var(--r-bubble);
+    }
+    .ctx-clone.me.hl { background: var(--hl); color: var(--hl-fg); }
+    .ctx-clone.me.td.done .td-box { background: var(--accent-fg); border-color: var(--accent-fg); }
+    .ctx-clone.me.td.done .td-box .tick { color: var(--accent); }
+
+    .ctx-menu {
+      position: fixed; width: 250px;
+      background: var(--mat-menu);
+      backdrop-filter: blur(30px) saturate(180%);
+      -webkit-backdrop-filter: blur(30px) saturate(180%);
+      border-radius: var(--r-sheet);
+      box-shadow: 0 12px 44px rgba(26,26,24,0.22), 0 0 0 0.5px rgba(26,26,24,0.06);
+      overflow: hidden;
+      opacity: 0; transform: scale(0.9);
+      transition: opacity 0.2s ease, transform 0.34s var(--ease);
+    }
+    .ctx.open .ctx-menu { opacity: 1; transform: scale(1); }
+
+    /* 四个标记压成一行图标——Messages 的 tapback 行。
+       12 行菜单塞不下 iOS 上下文菜单，苹果的解法是压缩不是删功能 */
+    .ctx-marks { display: flex; padding: 6px; gap: 2px; }
+    .ctx-mark {
+      flex: 1; height: 44px; border: none; background: none; cursor: pointer;
+      border-radius: 10px; color: var(--label);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+    .ctx-mark.on { background: var(--accent); color: var(--accent-fg); }
+    .ctx-mark:active { background: rgba(26,26,24,0.08); }
+    .ctx-mark.on:active { opacity: 0.8; }
+
+    .ctx-div { height: 7px; background: rgba(26,26,24,0.055); }
+    .ctx-item {
+      width: 100%; min-height: 44px; padding: 0 15px; border: none; background: none;
+      font-family: inherit; font-size: var(--t-body); color: var(--label);
+      cursor: pointer; display: flex; align-items: center; gap: 10px; text-align: left;
+    }
+    .ctx-item + .ctx-item { box-shadow: inset 0 0.5px 0 rgba(26,26,24,0.11); }
+    .ctx-item:active { background: rgba(26,26,24,0.08); }
+    .ctx-item .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* 属性行的当前值要看得全（「8月16日 16:25」），窄了就变成没用的「8月16日 16:…」。
+       标签名短，让它先让位 */
+    .ctx-item .val { flex: none; color: var(--label2); font-size: var(--t-sub); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* iOS 上下文菜单的字形在右，和底部操作表的左图标相反 */
+    .ctx-item > svg { flex: none; }
+    .ctx-item.danger { color: var(--red); }
+
+    /* ══════════════════════════════════════════════════════════════
+       ⑦ 动效
+       ══════════════════════════════════════════════════════════════ */
+    @keyframes bubble-in {
+      from { transform: scale(0.86) translateY(8px); opacity: 0; }
+      to   { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    .srow.enter .bubble { animation: bubble-in 0.32s var(--ease) both; }
+    .srow.enter .bmeta  { animation: bubble-in 0.32s 0.04s var(--ease) both; }
+
+    @keyframes row-out {
+      to { opacity: 0; transform: scale(0.9); }
+    }
+    .srow.leaving { animation: row-out 0.22s ease both; }
+
+    /* 定位提示：背景洇一层 tint 再退回。
+       原版是 4px 外发光脉冲——最吵的一种「我在这」 */
+    @keyframes wash {
+      0%   { background: var(--bg2); }
+      35%  { background: var(--fill2); }
+      100% { background: var(--bg2); }
+    }
+    .srow.wash .bubble { animation: wash 0.8s ease; }
+
+    .toast {
+      position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 86px);
+      transform: translateX(-50%) translateY(10px);
+      background: rgba(26,26,24,0.92); color: #fff;
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      padding: 10px 16px; border-radius: var(--r-pill);
+      font-size: var(--t-sub); font-weight: 500;
+      opacity: 0; transition: all 0.26s var(--ease); z-index: 600;
+      pointer-events: none; white-space: nowrap; max-width: 86vw;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="nav">
+      <div class="nav-title" id="nav-title"></div>
+      <div class="nav-btns">
+        <button class="icon-btn" onclick="notYet('日历')" aria-label="日历">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3.2" y="5" width="17.6" height="15.8" rx="3.4"></rect>
+            <line x1="3.2" y1="9.8" x2="20.8" y2="9.8"></line>
+            <line x1="8" y1="3.2" x2="8" y2="6.6"></line>
+            <line x1="16" y1="3.2" x2="16" y2="6.6"></line>
+          </svg>
+        </button>
+        <button class="icon-btn" onclick="notYet('多选')" aria-label="选择记录">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 7 5.2 9.2 9.4 5"></polyline>
+            <polyline points="3 17 5.2 19.2 9.4 15"></polyline>
+            <line x1="13" y1="7" x2="21" y2="7"></line>
+            <line x1="13" y1="17" x2="21" y2="17"></line>
+          </svg>
+        </button>
+        <button class="icon-btn" onclick="notYet('设置')" aria-label="设置">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3.1"></circle>
+            <path d="M19.1 14.8a1.6 1.6 0 0 0 .32 1.76l.06.06a1.94 1.94 0 1 1-2.74 2.74l-.06-.06a1.6 1.6 0 0 0-1.76-.32 1.6 1.6 0 0 0-.97 1.46v.16a1.94 1.94 0 1 1-3.88 0v-.09a1.6 1.6 0 0 0-1.03-1.46 1.6 1.6 0 0 0-1.76.32l-.06.06a1.94 1.94 0 1 1-2.74-2.74l.06-.06a1.6 1.6 0 0 0 .32-1.76 1.6 1.6 0 0 0-1.46-.97H3.2a1.94 1.94 0 1 1 0-3.88h.09a1.6 1.6 0 0 0 1.46-1.03 1.6 1.6 0 0 0-.32-1.76l-.06-.06a1.94 1.94 0 1 1 2.74-2.74l.06.06a1.6 1.6 0 0 0 1.76.32h.08a1.6 1.6 0 0 0 .97-1.46V3.2a1.94 1.94 0 1 1 3.88 0v.09a1.6 1.6 0 0 0 .97 1.46 1.6 1.6 0 0 0 1.76-.32l.06-.06a1.94 1.94 0 1 1 2.74 2.74l-.06.06a1.6 1.6 0 0 0-.32 1.76v.08a1.6 1.6 0 0 0 1.46.97h.16a1.94 1.94 0 1 1 0 3.88h-.09a1.6 1.6 0 0 0-1.46.97z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="large-title">
+      <h1 id="lt-main">—</h1>
+      <p id="lt-sub">—</p>
+    </div>
+  </header>
+
+  <div class="filters"><div class="filters-inner" id="filters"></div></div>
+
+  <div class="pinbar" id="pinbar" onclick="notYet('置顶列表')"></div>
+
+  <div class="stream-wrap" id="stream-wrap">
+    <div class="stream" id="stream"></div>
+  </div>
+
+  <div class="composer">
+    <div class="composer-inner">
+      <button class="plus-btn" onclick="notYet('照片 / 扫描文本')" aria-label="添加">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+          <line x1="12" y1="5.2" x2="12" y2="18.8"></line>
+          <line x1="5.2" y1="12" x2="18.8" y2="12"></line>
+        </svg>
+      </button>
+      <textarea id="input" rows="1" placeholder="记点什么…" oninput="onInput()"></textarea>
+      <button class="send-btn" id="send-btn" onclick="addEntry()" disabled aria-label="记录">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="19" x2="12" y2="5"></line>
+          <polyline points="5 12 12 5 19 12"></polyline>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="ctx" id="ctx">
+  <div class="ctx-scrim" onclick="closeCtx()"></div>
+  <div id="ctx-stage"></div>
+  <div class="ctx-menu" id="ctx-menu"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   Aside · Apple 风格设计稿（MVP）
+
+   这是一份**只看前端设计**的原型：数据是内置的，不落盘、不同步、不导出。
+   原版 ~/shelvee_master/aside/index.html 一个字节都没动。
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 工具 ───────────────────────────────────────────────────────── */
+const $  = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const WD = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+
+function shift(n) { const d = new Date(); d.setDate(d.getDate() + n); return dayKey(d); }
+const TODAY = dayKey(new Date());
+
+function cnDate(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return `${m}月${d}日 ${WD[dt.getDay()]}`;
+}
+function cnShort(key) { const [, m, d] = key.split('-').map(Number); return `${m}月${d}日`; }
+
+/* ── 图标 ───────────────────────────────────────────────────────── */
+const ICONS = {
+  hl:     '<path d="M12 4l1.9 4.3 4.6.5-3.4 3.1.9 4.5L12 14.2 8 16.4l.9-4.5L5.5 8.8l4.6-.5z"/>',
+  qt:     '<path d="M9.4 6.6C7.4 6.6 5.8 8.2 5.8 10.2s1.5 3.5 3.4 3.5c.4 0 .7 0 1-.1-.3 2-1.8 3.4-3.6 3.9"/><path d="M18.6 6.6c-2 0-3.6 1.6-3.6 3.6s1.5 3.5 3.4 3.5c.4 0 .7 0 1-.1-.3 2-1.8 3.4-3.6 3.9"/>',
+  pin:    '<path d="M12 3.2c-3 0-5.1 2.4-5.1 5.5 0 3.4 3.4 6.7 5.1 6.7s5.1-3.3 5.1-6.7c0-3.1-2.1-5.5-5.1-5.5z"/><path d="M12 15.4v1.9"/><path d="M10.4 20.5c.7-.6 1-1.4 1.6-2.4.6 1 .9 1.8 1.6 2.4"/>',
+  msk:    '<path d="M3.4 3.4l17.2 17.2"/><path d="M10.7 6.4A9.9 9.9 0 0 1 12 6.3c5 0 9 5.7 9 5.7a17.6 17.6 0 0 1-2.7 3.3M6.6 8C4.4 9.5 3 12 3 12s4 5.7 9 5.7c1.5 0 2.9-.5 4.1-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+  reply:  '<path d="M10 6.2L4.4 11.8 10 17.4"/><path d="M4.4 11.8h9.4a5.8 5.8 0 0 1 5.8 5.8v1"/>',
+  thread: '<path d="M20.2 11.4a5.2 5.2 0 0 1-5.2 5.2H9.6L5 19.8v-3.9a5.2 5.2 0 0 1-1.2-3.4V8.6A5.2 5.2 0 0 1 9 3.4h6a5.2 5.2 0 0 1 5.2 5.2z"/>',
+  todo:   '<circle cx="12" cy="12" r="8.6"/><polyline points="8.4 12.3 11 14.9 15.8 9.4"/>',
+  multi:  '<polyline points="3.2 7 5.1 8.9 8.6 5.2"/><polyline points="3.2 16.6 5.1 18.5 8.6 14.8"/><line x1="11.8" y1="7" x2="20.8" y2="7"/><line x1="11.8" y1="16.6" x2="20.8" y2="16.6"/>',
+  edit:   '<path d="M4.6 19.4l4.2-.9L20 7.3a2.2 2.2 0 0 0-3.1-3.1L5.5 15.3z"/><path d="M15.7 5.4l2.9 2.9"/>',
+  copy:   '<rect x="9" y="9" width="11.2" height="11.2" rx="2.8"/><path d="M15.2 6.3A2.4 2.4 0 0 0 12.8 3.9H6.3A2.4 2.4 0 0 0 3.9 6.3v6.5a2.4 2.4 0 0 0 2.4 2.4"/>',
+  tag:    '<path d="M11.4 3.6H6.2a2.6 2.6 0 0 0-2.6 2.6v5.2a2 2 0 0 0 .6 1.4l7.6 7.6a2 2 0 0 0 2.8 0l5.6-5.6a2 2 0 0 0 0-2.8l-7.6-7.6a2 2 0 0 0-1.2-.8z"/><circle cx="7.9" cy="7.9" r="1.35" fill="currentColor" stroke="none"/>',
+  clock:  '<circle cx="12" cy="12" r="8.6"/><polyline points="12 6.9 12 12.2 15.6 14.2"/>',
+  trash:  '<polyline points="3.6 6.2 20.4 6.2"/><path d="M8.5 6.2V4.8A1.5 1.5 0 0 1 10 3.3h4a1.5 1.5 0 0 1 1.5 1.5v1.4"/><path d="M6.1 6.2l.9 12.6a2 2 0 0 0 2 1.9h6a2 2 0 0 0 2-1.9l.9-12.6"/>',
+  bubble: '<path d="M20.5 11.6a5.6 5.6 0 0 1-5.6 5.6H9.4L4.4 20.4v-4.2a5.6 5.6 0 0 1-1.3-3.6V8.4a5.6 5.6 0 0 1 5.6-5.6h6.2a5.6 5.6 0 0 1 5.6 5.6z"/>'
+};
+function ico(k, w = 19, sw = 1.7) {
+  return `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor"
+           stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
+}
+
+/* ── 标签（照搬原版 SEED_TAGS 的 id / 名称 / emoji） ─────────────── */
+const TAGS = [
+  { id: 'diet',  name: '饮食', emoji: '🍚' },
+  { id: 'sport', name: '运动', emoji: '🏃' },
+  { id: 'todo',  name: '待办', emoji: '📌' },
+  { id: 'idea',  name: '念头', emoji: '💭' },
+  { id: 'quote', name: '摘抄', emoji: '📖' },
+  { id: 'other', name: '其他', emoji: '📎' }
+];
+const tagById = id => TAGS.find(t => t.id === id) || TAGS[TAGS.length - 1];
+
+/* ── 假图片：内联 SVG 渐变块，不碰 IndexedDB ────────────────────── */
+function ph(a, b) {
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360">` +
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+    `<stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/>` +
+    `</linearGradient></defs><rect width="480" height="360" fill="url(#g)"/></svg>`);
+}
+const PIC = {
+  river:  ph('#8ea79a', '#4a5f53'),
+  dusk:   ph('#d9c08a', '#8a7350'),
+  bowl:   ph('#e0d3c2', '#a98e6e')
+};
+
+/* ── 假数据：15 条铺 3 天，把每种气泡形态都占满 ─────────────────── */
+let entries = [
+  { id: 'a1', date: shift(-3), time: '08:12', tagId: 'other',
+    text: '早上称了下 68.2，比上周轻 0.4' },
+  { id: 'a2', date: shift(-3), time: '12:40', tagId: 'diet',
+    text: '午饭：糙米饭、清蒸鲈鱼、西兰花。吃到七分饱就停了' },
+  { id: 'a3', date: shift(-3), time: '19:05', tagId: 'sport', hl: true,
+    text: '跑了 5 公里，配速 6\'12"，最后一公里腿有点沉' },
+  { id: 'a4', date: shift(-3), time: '22:30', tagId: 'quote', qt: true,
+    text: '「我们总是高估一天能做的事，低估一年能做的事。」' },
+
+  { id: 'b1', date: shift(-1), time: '09:20', tagId: 'diet',
+    text: '早饭没吃，直接上班了' },
+  { id: 'b2', date: shift(-1), time: '13:10', tagId: 'diet',
+    text: '食堂的红烧肉太油，下午一直反酸' },
+  { id: 'b3', date: shift(-1), time: '14:02', tagId: 'todo', td: 1,
+    text: '周五之前把体检报告取回来' },
+  { id: 'b4', date: shift(-1), time: '18:45', tagId: 'sport', imgs: [PIC.river, PIC.dusk],
+    text: '傍晚沿着江边走了四十分钟，天快黑的时候风很舒服' },
+  { id: 'b5', date: shift(-1), time: '21:15', tagId: 'idea', pin: true,
+    text: '突然想到，这半年真正让我放松的，都不是「安排好的休息」' },
+  { id: 'b6', date: shift(-1), time: '23:40', tagId: 'other', msk: true,
+    text: '体重 68.0，腰围 79' },
+
+  { id: 'c1', date: TODAY, time: '08:05', tagId: 'diet',
+    text: '两个水煮蛋 + 一杯黑咖啡' },
+  { id: 'c2', date: TODAY, time: '10:30', tagId: 'idea', re: 'b5',
+    text: '接着昨天那条：可能正因为没安排，才不用「表现得在休息」' },
+  { id: 'c3', date: TODAY, time: '12:50', tagId: 'diet', imgs: [PIC.bowl],
+    text: '楼下新开的越南粉，汤头偏咸' },
+  { id: 'c4', date: TODAY, time: '14:20', tagId: 'todo', td: 2,
+    text: '买猫粮' },
+  { id: 'c5', date: TODAY, time: '16:25', tagId: 'todo', td: 1,
+    text: '下午三点后不再喝咖啡，试两周看看睡眠' }
+];
+
+let activeFilter = 'all';
+const byId = id => entries.find(e => e.id === id);
+const expanded = new Set();
+
+/* 今天在右，往日在左；横滑之后由 e.side 钉死（照搬原版规则） */
+const onRight = e => e.side ? e.side > 0 : e.date === TODAY;
+
+function preview(e, n = 34) {
+  if (!e) return '';
+  if (e.msk) return '（已隐藏）';
+  const t = (e.text || '').replace(/\n/g, ' ').trim();
+  if (!t) return `${(e.imgs || []).length} 张图片`;
+  return t.length > n ? t.slice(0, n) + '…' : t;
+}
+const visible = () =>
+  (activeFilter === 'all' ? entries : entries.filter(e => e.tagId === activeFilter))
+    .slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+
+/* ── 渲染 ───────────────────────────────────────────────────────── */
+function renderHeader() {
+  $('#lt-main').textContent = cnShort(TODAY);
+  $('#nav-title').textContent = cnDate(TODAY);
+  // 不印总数——那是数据库统计，不是人需要的信息。只有筛选生效时才说清楚在看什么
+  $('#lt-sub').textContent = activeFilter === 'all'
+    ? WD[new Date().getDay()]
+    : `${tagById(activeFilter).name} · ${visible().length} 条`;
+}
+
+function renderFilters() {
+  const c = {};
+  entries.forEach(e => { c[e.tagId] = (c[e.tagId] || 0) + 1; });
+  let h = `<button class="fchip ${activeFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">`
+        + `全部<span class="n">${entries.length}</span></button>`;
+  TAGS.forEach(t => {
+    h += `<button class="fchip ${activeFilter === t.id ? 'active' : ''}" onclick="setFilter('${t.id}')">`
+       + `<span class="em">${t.emoji}</span>${t.name}<span class="n">${c[t.id] || 0}</span></button>`;
+  });
+  $('#filters').innerHTML = h;
+  // 选中的 chip 可能在横向滚动区外面（比如「摘抄」排在最右），把它带进视野
+  const on = $('#filters .fchip.active');
+  if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function renderPinbar() {
+  const p = entries.filter(e => e.pin);
+  const bar = $('#pinbar');
+  bar.classList.toggle('on', p.length > 0);
+  if (p.length) {
+    bar.innerHTML = `<span class="pinbar-pill">🎈<span class="pinbar-text">${esc(preview(p[p.length-1], 26))}</span></span>`;
+  }
+}
+
+function bubbleClass(e) {
+  return ['bubble', e.hl && 'hl', e.qt && 'qt', e.td && 'td',
+          e.td === 2 && 'done', e.msk && 'msk'].filter(Boolean).join(' ');
+}
+
+function renderStream(enterId) {
+  const list = visible();
+  const el = $('#stream');
+  if (!list.length) {
+    el.innerHTML = `
+      <div class="empty">
+        ${ico('bubble', 44, 1.3)}
+        <div class="empty-t">记点什么吧</div>
+        <div class="empty-b">吃了什么、动了多久、身体什么感觉</div>
+      </div>`;
+    return;
+  }
+
+  let h = '', last = null;
+  list.forEach(e => {
+    if (e.date !== last) {
+      if (last !== null) h += `</section>`;
+      last = e.date;
+      h += `<section class="day"><div class="daysep">${e.date === TODAY ? '今天' : esc(cnDate(e.date))}</div>`;
+    }
+    const t = tagById(e.tagId);
+    const imgs = e.imgs || [];
+    const stacked = imgs.length >= 2 && !expanded.has(e.id);
+    const stop = `onpointerdown="event.stopPropagation()" onpointerup="event.stopPropagation()"`;
+
+    let imgHtml = '';
+    if (stacked) {
+      imgHtml = `<div class="imgstack" ${stop} onclick="event.stopPropagation(); toggleImgs('${e.id}')"><img src="${imgs[0]}" alt=""></div>`;
+    } else if (imgs.length) {
+      imgHtml = `<div class="imgs" ${stop}>${imgs.map(s => `<img src="${s}" alt="">`).join('')}</div>`;
+    }
+    const pill = imgs.length >= 2
+      ? `<button class="expand-pill" onclick="event.stopPropagation(); toggleImgs('${e.id}')">${stacked ? '展开 ' + imgs.length : '收起'}</button>`
+      : '';
+
+    const inner = imgHtml + (e.text ? `<div class="btext">${esc(e.text)}</div>` : '');
+    const core = e.td
+      ? `<div class="tdrow">
+           <button class="td-box" ${stop} onclick="event.stopPropagation(); toggleDone('${e.id}')" aria-label="完成">
+             <svg class="tick" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 9.5 18 20 6.5"></polyline></svg>
+           </button>
+           <div class="tdwrap">${inner}</div>
+         </div>`
+      : inner;
+
+    let requote = '';
+    if (e.re) {
+      const p = byId(e.re);
+      requote = p
+        ? `<div class="requote" ${stop} onclick="event.stopPropagation(); jumpTo('${p.id}')">
+             <div class="requote-when">${esc(cnShort(p.date))} · ${esc(p.time)}</div>
+             <div class="requote-text">${esc(preview(p, 24))}</div>
+           </div>`
+        : `<div class="requote">原记录已删除</div>`;
+    }
+
+    // 待办 / 摘抄的气泡自己已经把「这是什么」画出来了，下面再挂一枚同名标签是同一句话说两遍
+    const dup = (e.td && t.id === 'todo') || (e.qt && t.id === 'quote');
+    const nre = entries.filter(x => x.re === e.id).length;
+
+    h += `
+      <div class="srow ${e.id === enterId ? 'enter' : ''}" data-id="${e.id}">
+        <div class="brow ${onRight(e) ? 'me' : ''}">
+          <div class="bline">
+            ${pill}
+            <div class="${bubbleClass(e)}"
+                 onpointerdown="bubbleDown('${e.id}')" onpointerup="bubbleUp('${e.id}')" onpointercancel="bubbleCancel()">
+              ${requote}${core}${e.msk ? '<div class="msk-veil"></div>' : ''}
+            </div>
+          </div>
+          <div class="bmeta">
+            ${dup ? '' : `<span class="tagchip">${t.emoji} ${t.name}</span><span>·</span>`}
+            <span>${esc(e.time)}</span>
+            ${nre ? `<span>·</span><span>💬 ${nre}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+  });
+  if (last !== null) h += `</section>`;
+  el.innerHTML = h;
+}
+
+function render(enterId) { renderHeader(); renderFilters(); renderPinbar(); renderStream(enterId); }
+
+function setFilter(id) {
+  activeFilter = id;
+  render();
+  scrollToBottom(false);
+}
+function toggleImgs(id) {
+  expanded.has(id) ? expanded.delete(id) : expanded.add(id);
+  render();
+}
+function toggleDone(id) {
+  const e = byId(id);
+  e.td = e.td === 2 ? 1 : 2;
+  render();
+}
+function jumpTo(id) {
+  const row = document.querySelector(`.srow[data-id="${id}"]`);
+  if (!row) return toast('那条不在当前筛选里');
+  row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  row.classList.remove('wash');
+  void row.offsetWidth;
+  row.classList.add('wash');
+  setTimeout(() => row.classList.remove('wash'), 900);
+}
+
+/* ── 输入 ───────────────────────────────────────────────────────── */
+function onInput() {
+  const ta = $('#input');
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  $('#send-btn').disabled = !ta.value.trim();
+}
+function addEntry() {
+  const ta = $('#input');
+  const text = ta.value.trim();
+  if (!text) return;
+  const now = new Date();
+  const e = {
+    id: 'n' + Date.now(), date: TODAY,
+    time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+    tagId: 'other', text          // MVP 不做关键词识别，一律归「其他」
+  };
+  entries.push(e);
+  ta.value = ''; ta.style.height = 'auto'; $('#send-btn').disabled = true;
+  if (activeFilter !== 'all' && activeFilter !== 'other') activeFilter = 'all';
+  render(e.id);
+  scrollToBottom(true);
+}
+
+/* ── 手势：常量与横滑逻辑照搬原版 aside/index.html:1757-1859 ───────
+   那几个数字是调出来的，不重新发明 */
+const DBL_MS = 260, SWIPE_LOCK = 10, SWIPE_GO = 52;
+let longPressTimer = null, lastTapId = null, lastTapAt = 0;
+let sw = null, swSuppress = false;
+
+function bubbleDown(id) {
+  longPressTimer = setTimeout(() => {
+    longPressTimer = 'fired';
+    lastTapId = null;
+    openCtx(id);
+  }, 500);
+}
+function bubbleUp(id) {
+  if (swSuppress) { clearTimeout(longPressTimer); longPressTimer = null; lastTapId = null; return; }
+  if (longPressTimer === 'fired') { longPressTimer = null; return; }
+  clearTimeout(longPressTimer); longPressTimer = null;
+  const now = Date.now();
+  if (lastTapId === id && now - lastTapAt < DBL_MS) { lastTapId = null; toggleTodo(id); return; }
+  lastTapId = id; lastTapAt = now;
+}
+function bubbleCancel() { clearTimeout(longPressTimer); longPressTimer = null; swEnd(); }
+
+function toggleTodo(id) {
+  const e = byId(id);
+  if (e.td) { delete e.td; if (e.tagId === 'todo') e.tagId = 'other'; }
+  else { e.td = 1; e.tagId = 'todo'; }
+  render();
+}
+
+function swEnd() { if (sw && sw.el) { sw.el.style.transition = ''; sw.el.style.transform = ''; } sw = null; }
+function swDown(ev) {
+  const row = ev.target.closest && ev.target.closest('.srow');
+  const el = row && row.querySelector('.bubble');
+  if (!row || !el) return;
+  sw = { id: row.dataset.id, el, x0: ev.clientX, y0: ev.clientY, dx: 0, locked: false };
+}
+function swMove(ev) {
+  if (!sw) return;
+  const dx = ev.clientX - sw.x0, dy = ev.clientY - sw.y0;
+  if (!sw.locked) {
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > SWIPE_LOCK) { swEnd(); return; }
+    if (Math.abs(dx) < SWIPE_LOCK) return;
+    sw.locked = true;
+    clearTimeout(longPressTimer); longPressTimer = null;
+    lastTapId = null;
+    try { sw.el.setPointerCapture(ev.pointerId); } catch (err) {}
+    sw.el.style.transition = 'none';
+  }
+  sw.dx = dx;
+  sw.el.style.transform = `translateX(${dx}px)`;
+}
+function swUp() {
+  if (!sw) return;
+  const { id, dx, locked } = sw;
+  swEnd();
+  if (!locked) return;
+  swSuppress = true;
+  setTimeout(() => { swSuppress = false; }, 0);
+  const kill = ce => { ce.stopPropagation(); ce.preventDefault(); };
+  document.addEventListener('click', kill, true);
+  setTimeout(() => document.removeEventListener('click', kill, true), 350);
+  if (Math.abs(dx) >= SWIPE_GO) {
+    const e = byId(id);
+    const dir = dx > 0 ? 1 : -1;
+    if (onRight(e) === (dir > 0)) e.hl = !e.hl;   // 已经在这一侧 → 切高光
+    else e.side = dir;                            // 还没过来 → 挪过来
+    render();
+  }
+}
+const stream = $('#stream');
+stream.addEventListener('pointerdown', swDown, true);
+stream.addEventListener('pointermove', swMove, true);
+stream.addEventListener('pointerup', swUp, true);
+stream.addEventListener('pointercancel', () => { swEnd(); }, true);
+
+/* ── 上下文菜单 ─────────────────────────────────────────────────
+   气泡留在列表里不动，浮起来的是它的克隆体 —— 滚动位置一点不丢 */
+let ctxId = null, ctxRight = false;
+const cloneClass = e => bubbleClass(e) + ' ctx-clone' + (ctxRight ? ' me' : '');
+
+function ctxHTML(e) {
+  const nre = entries.filter(x => x.re === e.id).length;
+  const t = tagById(e.tagId);
+  const mark = (k, label) =>
+    `<button class="ctx-mark ${e[k] ? 'on' : ''}" onclick="ctxMark('${k}')" aria-label="${label}">${ico(k, 21)}</button>`;
+  const item = (fn, label, icon, val, cls) =>
+    `<button class="ctx-item ${cls || ''}" onclick="${fn}">`
+    + `<span class="lbl">${label}</span>`
+    + (val ? `<span class="val">${esc(val)}</span>` : '')
+    + ico(icon) + `</button>`;
+
+  return `
+    <div class="ctx-marks">
+      ${mark('hl', '高光')}${mark('qt', '摘抄')}${mark('pin', '置顶')}${mark('msk', '隐藏')}
+    </div>
+    <div class="ctx-div"></div>
+    ${item(`ctxDo('回复')`, '回复这条', 'reply')}
+    ${nre ? item(`ctxDo('整串')`, `查看整串（${nre + 1} 条）`, 'thread') : ''}
+    ${item(`ctxTodo()`, e.td ? '取消待办' : '转成待办', 'todo')}
+    ${item(`ctxDo('多选')`, '多选', 'multi')}
+    <div class="ctx-div"></div>
+    ${item(`ctxDo('编辑')`, '编辑', 'edit')}
+    ${e.text ? item(`ctxCopy()`, '拷贝', 'copy') : ''}
+    ${item(`ctxDo('换标签')`, '标签', 'tag', `${t.emoji} ${t.name}`)}
+    ${item(`ctxDo('改时间')`, '时间', 'clock', `${cnShort(e.date)} ${e.time}`)}
+    <div class="ctx-div"></div>
+    ${item(`ctxDelete()`, '删除', 'trash', '', 'danger')}`;
+}
+
+function openCtx(id) {
+  const e = byId(id);
+  const row = document.querySelector(`.srow[data-id="${id}"]`);
+  if (!e || !row) return;
+  const bub = row.querySelector('.bubble');
+  const r = bub.getBoundingClientRect();
+  const right = row.querySelector('.brow').classList.contains('me');
+  ctxId = id; ctxRight = right;
+
+  const stage = $('#ctx-stage');
+  const clone = bub.cloneNode(true);
+  clone.className = cloneClass(e);
+  clone.removeAttribute('onpointerdown'); clone.removeAttribute('onpointerup');
+  clone.style.left = r.left + 'px';
+  clone.style.top = r.top + 'px';
+  clone.style.width = r.width + 'px';
+  clone.style.transformOrigin = right ? 'right center' : 'left center';
+  stage.innerHTML = '';
+  stage.appendChild(clone);
+
+  const menu = $('#ctx-menu');
+  menu.innerHTML = ctxHTML(e);
+  menu.style.left = '0px'; menu.style.top = '0px';
+  // mounted 只给 display:block；菜单此刻仍是 opacity:0（.open 才亮），
+  // 所以可以直接量高度，不需要再拿 visibility 遮一道
+  $('#ctx').classList.add('mounted');
+
+  // 量完菜单才知道往上开还是往下开
+  const MW = 250, GAP = 10, PAD = 12;
+  const mh = menu.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight;
+
+  let below = (vh - r.bottom - PAD) >= mh + GAP;
+  const above = (r.top - PAD) >= mh + GAP;
+  let top, lift = 0;
+  if (below) { top = r.bottom + GAP; }
+  else if (above) { top = r.top - GAP - mh; below = false; }
+  else {
+    // 上下都不够：贴底放菜单，把气泡往上顶（iOS 就是这么处理的）
+    top = vh - PAD - mh;
+    lift = Math.min(0, (top - GAP) - r.bottom);
+    below = true;
+  }
+  let left = right ? (r.right - MW) : r.left;
+  left = Math.max(PAD, Math.min(left, vw - PAD - MW));
+
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+  menu.style.transformOrigin = `${right ? 'right' : 'left'} ${below ? 'top' : 'bottom'}`;
+  clone.style.setProperty('--lift', lift + 'px');
+
+  requestAnimationFrame(() => $('#ctx').classList.add('open'));
+}
+
+function closeCtx() {
+  const c = $('#ctx');
+  if (!c.classList.contains('mounted')) return;
+  c.classList.remove('open');
+  setTimeout(() => { c.classList.remove('mounted'); $('#ctx-stage').innerHTML = ''; }, 340);
+  ctxId = null;
+}
+
+/* 标记就地生效：菜单不关，克隆体样式跟着变——开/关从「读文字」变成「看填色」 */
+function ctxMark(k) {
+  const e = byId(ctxId);
+  if (!e) return;
+  e[k] = !e[k];
+  if (k === 'qt' && e.qt && e.tagId !== 'quote') e.tagId = 'quote';
+  const clone = $('#ctx-stage .ctx-clone');
+  if (clone) clone.className = cloneClass(e);
+  if (e.msk && clone && !clone.querySelector('.msk-veil')) {
+    const v = document.createElement('div'); v.className = 'msk-veil'; clone.appendChild(v);
+  }
+  $('#ctx-menu').innerHTML = ctxHTML(e);
+  render();
+}
+function ctxTodo() { const id = ctxId; closeCtx(); toggleTodo(id); }
+function ctxCopy() {
+  const e = byId(ctxId);
+  if (e && navigator.clipboard) navigator.clipboard.writeText(e.text || '').catch(() => {});
+  closeCtx(); toast('已拷贝');
+}
+function ctxDelete() {
+  const id = ctxId;
+  closeCtx();
+  const row = document.querySelector(`.srow[data-id="${id}"]`);
+  if (row) row.classList.add('leaving');
+  setTimeout(() => { entries = entries.filter(x => x.id !== id); render(); }, 200);
+}
+function ctxDo(what) { closeCtx(); notYet(what); }
+
+/* ── 杂项 ───────────────────────────────────────────────────────── */
+let toastTimer = null;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+function notYet(what) { toast(`「${what}」是设计稿，MVP 未接功能`); }
+
+function scrollToBottom(smooth) {
+  const w = $('#stream-wrap');
+  w.scrollTo({ top: w.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+}
+
+/* 大标题的收放挂在「离底部多远」上，不是「离顶部多远」。
+   这条流是聊天式的、底部锚定的：打开就在最新一条，那才是「今天」，
+   大标题该亮着；往上翻进历史才收起来。按 scrollTop 判定会一开机就是收起态。 */
+function syncScrolled() {
+  const w = $('#stream-wrap');
+  const fromBottom = w.scrollHeight - w.scrollTop - w.clientHeight;
+  document.body.classList.toggle('scrolled', fromBottom > 8);
+}
+$('#stream-wrap').addEventListener('scroll', syncScrolled, { passive: true });
+
+/* 键盘弹起时把输入条抬上来（照原版的 visualViewport 同步） */
+function syncViewport() {
+  const vv = window.visualViewport;
+  const root = document.documentElement;
+  if (!vv) { root.style.setProperty('--app-h', '100dvh'); return; }
+  root.style.setProperty('--app-h', vv.height + 'px');
+  root.style.setProperty('--vv-top', vv.offsetTop + 'px');
+}
+if (window.visualViewport) {
+  visualViewport.addEventListener('resize', syncViewport);
+  visualViewport.addEventListener('scroll', syncViewport);
+}
+
+window.addEventListener('resize', () => { if (ctxId) closeCtx(); });
+
+syncViewport();
+render();
+scrollToBottom(false);
+requestAnimationFrame(syncScrolled);
+// 图片解码完高度会变，开机那一次 scrollToBottom 会停在半途——补一次
+window.addEventListener('load', () => { scrollToBottom(false); syncScrolled(); });
+</script>
+</body>
+</html>
